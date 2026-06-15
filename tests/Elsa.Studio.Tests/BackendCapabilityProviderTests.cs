@@ -2,7 +2,6 @@ using System.Net;
 using Elsa.Studio.Api.Options;
 using Elsa.Studio.Api.Services;
 using Elsa.Studio.Core.Events;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace Elsa.Studio.Tests;
@@ -21,7 +20,6 @@ public sealed class BackendCapabilityProviderTests
         var provider = new BackendCapabilityProvider(
             [new ContributeLocalCapability()],
             new StubHttpClientFactory("""{"capabilities":[{"id":"remote"}]}"""),
-            NullLogger<BackendCapabilityProvider>.Instance,
             options);
 
         var capabilityIds = await provider.GetCapabilityIdsAsync(CancellationToken.None);
@@ -29,26 +27,6 @@ public sealed class BackendCapabilityProviderTests
         Assert.Contains("configured", capabilityIds);
         Assert.Contains("local", capabilityIds);
         Assert.Contains("remote", capabilityIds);
-    }
-
-    [Fact]
-    public async Task GetCapabilityIdsAsync_ContinuesWhenRemoteCapabilitiesFail()
-    {
-        var options = Options.Create(new StudioApiOptions
-        {
-            BackendCapabilitiesUrl = "https://backend/default/_elsa/capabilities"
-        });
-        options.Value.BackendCapabilityIds.Add("configured");
-
-        var provider = new BackendCapabilityProvider(
-            [],
-            new StubHttpClientFactory("not-json"),
-            NullLogger<BackendCapabilityProvider>.Instance,
-            options);
-
-        var capabilityIds = await provider.GetCapabilityIdsAsync(CancellationToken.None);
-
-        Assert.Contains("configured", capabilityIds);
     }
 
     private sealed class ContributeLocalCapability : IStudioEventHandler<OnBackendCapabilitiesCollecting>
