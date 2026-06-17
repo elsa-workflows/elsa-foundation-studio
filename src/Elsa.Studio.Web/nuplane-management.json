@@ -1,11 +1,4 @@
 {
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft.AspNetCore": "Warning"
-    }
-  },
-  "AllowedHosts": "*",
   "Nuplane": {
     "Setup": {
       "AutomaticReconciliation": true,
@@ -43,32 +36,12 @@
           "MajorVersion": 0
         }
       ]
+    },
+    "CleanupPolicy": {
+      "RetainLastNVersions": 3,
+      "RetainYoungerThanDays": 30,
+      "Mode": "Automatic",
+      "ProtectLastKnownGood": true
     }
-  },
-  "CShells": {
-    "Shells": {
-      "Default": {
-        "Features": {
-          "StudioApi": {},
-          "ConsoleStream": {
-            "EndpointPrefix": "/_elsa/studio/diagnostics/console-logs",
-            "RecentCapacity": 2000,
-            "MaxRecentQuerySize": 2000,
-            "PreserveAnsi": true
-          },
-          "FeatureManagement": {},
-          "DashboardSample": false,
-          "WeatherForecastSample": {}
-        },
-        "Configuration": {
-          "WebRouting": {
-            "Path": ""
-          }
-        }
-      }
-    }
-  },
-  "Studio": {
-    "BackendBaseUrl": "https://localhost:7243"
   }
 }
