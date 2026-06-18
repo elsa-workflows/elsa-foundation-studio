@@ -6,6 +6,7 @@ using Elsa.Studio.Core.Models;
 using Elsa.Studio.FeatureManagement;
 using Elsa.Studio.Samples.Dashboard;
 using Elsa.Studio.Samples.WeatherForecast;
+using Elsa.Studio.Workflows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -24,9 +25,26 @@ public sealed class StudioModuleManifestProviderTests
         Assert.Equal("1.0.0", response.SdkVersion);
         Assert.Contains(response.Modules, x => x.Id == "Elsa.Studio.ConsoleStream");
         Assert.Contains(response.Modules, x => x.Id == "Elsa.Studio.FeatureManagement");
+        Assert.Contains(response.Modules, x => x.Id == "Elsa.Studio.Workflows");
         Assert.Contains(response.Modules, x => x.Id == "Elsa.Studio.Samples.Dashboard");
         Assert.Contains(response.Modules, x => x.Id == "Elsa.Studio.Samples.WeatherForecast");
         Assert.Contains(response.Diagnostics, x => x.Status == StudioModuleDiagnosticStatuses.Available);
+    }
+
+    [Fact]
+    public async Task GetModules_ReturnsWorkflowsManifestAssetsAndCapabilities()
+    {
+        var provider = CreateProvider();
+
+        var response = await provider.GetRequiredService<IStudioModuleManifestProvider>().GetModules(CancellationToken.None);
+
+        var module = Assert.Single(response.Modules, x => x.Id == "Elsa.Studio.Workflows");
+        Assert.Equal("Workflows", module.DisplayName);
+        Assert.StartsWith("/_content/Elsa.Studio.Workflows/studio/modules/workflows/module.js", module.Entry, StringComparison.Ordinal);
+        Assert.Contains(module.Styles, x => x.StartsWith("/_content/Elsa.Studio.Workflows/studio/modules/workflows/module.css", StringComparison.Ordinal));
+        Assert.Contains("navigation", module.Capabilities);
+        Assert.Contains("routes", module.Capabilities);
+        Assert.Contains("workflow-designer", module.Capabilities);
     }
 
     [Fact]
@@ -39,7 +57,7 @@ public sealed class StudioModuleManifestProviderTests
         var module = Assert.Single(response.Modules, x => x.Id == "Elsa.Studio.FeatureManagement");
         Assert.Equal("Feature management", module.DisplayName);
         Assert.StartsWith("/_content/Elsa.Studio.FeatureManagement/studio/modules/features/module.js", module.Entry, StringComparison.Ordinal);
-        Assert.Contains("v=1.0.1", module.Entry);
+        Assert.Contains("v=1.0.7", module.Entry);
         Assert.Contains(module.Styles, x => x.StartsWith("/_content/Elsa.Studio.FeatureManagement/studio/modules/features/module.css", StringComparison.Ordinal));
         Assert.Contains("navigation", module.Capabilities);
         Assert.Contains("routes", module.Capabilities);
@@ -118,6 +136,7 @@ public sealed class StudioModuleManifestProviderTests
         services.AddElsaStudioApi();
         services.AddConsoleStreamStudio();
         services.AddFeatureManagementStudio();
+        services.AddWorkflowsStudio();
         services.AddDashboardStudioSample();
         services.AddWeatherForecastStudioSample();
 
