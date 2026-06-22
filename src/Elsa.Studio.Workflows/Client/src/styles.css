@@ -273,6 +273,18 @@
   background: var(--wf-panel-muted);
 }
 
+.wf-filter-chip {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  border: 1px solid var(--wf-border);
+  border-radius: 6px;
+  background: var(--wf-panel-muted);
+  color: var(--wf-muted-text);
+  font-size: 12px;
+  padding: 0 9px;
+}
+
 .wf-grid {
   display: grid;
   margin: 14px 18px;
@@ -478,12 +490,17 @@
 }
 
 .wf-dialog {
-  width: min(420px, 100%);
+  width: min(560px, 100%);
   border: 1px solid var(--wf-border);
   border-radius: 8px;
   background: var(--wf-panel);
   box-shadow: 0 24px 80px rgba(0, 0, 0, .36);
   color: var(--wf-text);
+}
+
+.wf-dialog,
+.wf-dialog * {
+  box-sizing: border-box;
 }
 
 .wf-dialog form {
@@ -501,6 +518,7 @@
 .wf-form-field {
   display: grid;
   gap: 7px;
+  min-width: 0;
   color: var(--wf-muted-text);
   font-size: 12px;
   font-weight: 700;
@@ -518,6 +536,8 @@
   font: inherit;
   font-size: 14px;
   font-weight: 500;
+  width: 100%;
+  min-width: 0;
   padding: 0 10px;
   text-transform: none;
 }

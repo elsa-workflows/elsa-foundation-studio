@@ -122,9 +122,17 @@ function WorkflowManagementPage({ context }: { context: StudioEndpointContext })
 }
 
 function WorkflowExecutablesPage({ context }: { context: StudioEndpointContext }) {
+  const [definitionFilter, setDefinitionFilter] = useState(readExecutableDefinitionFilterFromUrl);
+
+  useEffect(() => {
+    const syncFromLocation = () => setDefinitionFilter(readExecutableDefinitionFilterFromUrl());
+    window.addEventListener("popstate", syncFromLocation);
+    return () => window.removeEventListener("popstate", syncFromLocation);
+  }, []);
+
   return (
     <WorkflowsPageFrame activePath="/workflows/executables" title="Executables">
-      <WorkflowExecutables context={context} />
+      <WorkflowExecutables context={context} definitionFilter={definitionFilter} />
     </WorkflowsPageFrame>
   );
 }
@@ -164,6 +172,10 @@ function WorkflowsPageFrame({ activePath, title, children }: { activePath: strin
 }
 
 function readDefinitionIdFromUrl() {
+  return new URLSearchParams(window.location.search).get("definition");
+}
+
+function readExecutableDefinitionFilterFromUrl() {
   return new URLSearchParams(window.location.search).get("definition");
 }
 
@@ -225,7 +237,7 @@ function WorkflowDefinitions({ context, onOpen }: { context: StudioEndpointConte
     setCatalogState("loading");
     try {
       const response = await listActivities(context);
-      setCatalog(response.activities);
+      setCatalog(response.activities ?? []);
       setCatalogState("ready");
     } catch (e) {
       setCatalogState("failed");
@@ -258,6 +270,11 @@ function WorkflowDefinitions({ context, onOpen }: { context: StudioEndpointConte
     } finally {
       setCreating(false);
     }
+  };
+
+  const openDefinitionArtifacts = (definitionId: string) => {
+    window.history.pushState({}, "", `/workflows/executables?definition=${encodeURIComponent(definitionId)}`);
+    window.dispatchEvent(new PopStateEvent("popstate"));
   };
 
   const refreshAfterMutation = async () => {
@@ -425,7 +442,8 @@ function WorkflowDefinitions({ context, onOpen }: { context: StudioEndpointConte
                 <span className="wf-row-actions" onClick={event => event.stopPropagation()}>
                   {listState === "active" ? (
                     <>
-                      <button type="button" onClick={() => onOpen(definition.id)}>Open</button>
+                      <button type="button" onClick={event => { event.stopPropagation(); onOpen(definition.id); }}>Open</button>
+                      <button type="button" onClick={event => { event.stopPropagation(); openDefinitionArtifacts(definition.id); }}>Artifacts</button>
                       <button type="button" className="danger" onClick={() => void softDelete(definition)}><Trash2 size={13} /> Delete</button>
                     </>
                   ) : (
@@ -542,11 +560,17 @@ function CreateWorkflowDialog({ draft, activities, catalogState, creating, onCha
   );
 }
 
-function WorkflowExecutables({ context }: { context: StudioEndpointContext }) {
+function WorkflowExecutables({ context, definitionFilter }: { context: StudioEndpointContext; definitionFilter: string | null }) {
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [executables, setExecutables] = useState<WorkflowExecutableSummary[]>([]);
+  const visibleExecutables = useMemo(
+    () => definitionFilter
+      ? executables.filter(executable => executable.definitionId === definitionFilter || executable.sourceId === definitionFilter)
+      : executables,
+    [definitionFilter, executables]
+  );
 
   const load = useCallback(async () => {
     setState("loading");
@@ -579,12 +603,13 @@ function WorkflowExecutables({ context }: { context: StudioEndpointContext }) {
     <>
       <div className="wf-toolbar">
         <button type="button" onClick={() => void load()}>Refresh</button>
+        {definitionFilter ? <span className="wf-filter-chip">Definition {definitionFilter}</span> : null}
       </div>
       {state === "failed" ? <div className="wf-alert"><AlertCircle size={16} /> {error}</div> : null}
       {status ? <div className="wf-status-line"><Check size={14} /> {status}</div> : null}
       {state === "loading" ? <div className="wf-empty">Loading workflow executables...</div> : null}
-      {state === "ready" && executables.length === 0 ? <div className="wf-empty">No workflow executables found. Publish a workflow definition to create one.</div> : null}
-      {state === "ready" && executables.length > 0 ? (
+      {state === "ready" && visibleExecutables.length === 0 ? <div className="wf-empty">{definitionFilter ? "No workflow executables found for this definition." : "No workflow executables found. Publish a workflow definition to create one."}</div> : null}
+      {state === "ready" && visibleExecutables.length > 0 ? (
         <div className="wf-grid wf-executable-grid" role="table" aria-label="Workflow executables">
           <div className="wf-grid-head" role="row">
             <span>Artifact</span>
@@ -594,7 +619,7 @@ function WorkflowExecutables({ context }: { context: StudioEndpointContext }) {
             <span>Published</span>
             <span>Actions</span>
           </div>
-          {executables.map(executable => (
+          {visibleExecutables.map(executable => (
             <div className="wf-grid-row" role="row" key={executable.artifactId}>
               <span>
                 <strong>{executable.artifactId}</strong>
@@ -602,7 +627,7 @@ function WorkflowExecutables({ context }: { context: StudioEndpointContext }) {
               </span>
               <span>{executable.artifactVersion}</span>
               <span>{formatExecutableSource(executable)}</span>
-              <span>{executable.rootActivityType} {executable.rootActivityVersion}</span>
+              <span>{formatExecutableRoot(executable)}</span>
               <span>{formatDate(executable.publishedAt ?? executable.createdAt)}</span>
               <span className="wf-row-actions">
                 <button type="button" onClick={() => void run(executable)}><Play size={13} /> Run</button>
@@ -694,6 +719,15 @@ function formatExecutableSource(executable: WorkflowExecutableSummary) {
   return executable.definitionId;
 }
 
+function formatExecutableRoot(executable: WorkflowExecutableSummary) {
+  const rootName = formatActivityTypeName(executable.rootActivityType);
+  return rootName || executable.rootActivityType;
+}
+
+function formatActivityTypeName(typeName: string) {
+  return typeName.split(".").filter(Boolean).at(-1) ?? typeName;
+}
+
 function WorkflowEditor({ context, definitionId, onBack }: { context: StudioEndpointContext; definitionId: string; onBack(): void }) {
   const [details, setDetails] = useState<WorkflowDefinitionDetails | null>(null);
   const [draft, setDraft] = useState<WorkflowDraft | null>(null);
@@ -734,7 +768,7 @@ function WorkflowEditor({ context, definitionId, onBack }: { context: StudioEndp
     setDetails(nextDetails);
     lastSavedDraftSignatureRef.current = nextDraft ? getDraftSignature(nextDraft) : "";
     setDraft(nextDraft);
-    setCatalog(nextCatalog.activities);
+    setCatalog(nextCatalog.activities ?? []);
     setFrames([]);
     setSelectedNodeId(null);
   }, [context, definitionId]);

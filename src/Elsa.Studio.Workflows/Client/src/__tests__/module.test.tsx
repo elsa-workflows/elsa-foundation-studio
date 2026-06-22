@@ -40,6 +40,7 @@ describe("workflows module", () => {
 
     expect(container.textContent).toContain("Latest version");
     expect(container.textContent).toContain("Open");
+    expect(container.textContent).toContain("Artifacts");
     expect(container.textContent).toContain("Delete");
 
     await click(buttonByText(container, "Delete"));
@@ -137,6 +138,19 @@ describe("workflows module", () => {
     await unmount();
   });
 
+  it("opens a filtered executable artifacts view for a definition", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => response({ definitions: [definition()] })));
+    const { container, unmount } = await renderRegisteredRoute();
+
+    await waitForText(container, "Hello World");
+    await click(buttonByText(container, "Artifacts"));
+
+    expect(window.location.pathname).toBe("/workflows/executables");
+    expect(new URLSearchParams(window.location.search).get("definition")).toBe("definition-1");
+
+    await unmount();
+  });
+
   it("creates a workflow definition from the sequence action", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -215,7 +229,7 @@ describe("workflows module", () => {
       const url = String(input);
       if (init?.method === "POST") return response(null, 204);
       expect(url).toBe("https://server.example/_demo/workflows/executables");
-      return response([executable()]);
+      return response([executable({ rootActivityType: "Elsa.Activities.Flowchart.Activities.Flowchart" })]);
     });
     vi.stubGlobal("fetch", fetchMock);
     const { container, unmount } = await renderRegisteredRoute("/workflows/executables");
@@ -224,6 +238,8 @@ describe("workflows module", () => {
     expect(container.textContent).toContain("Executables");
     expect(container.textContent).toContain("Definitions");
     expect(container.textContent).toContain("Instances");
+    expect(container.textContent).toContain("Flowchart");
+    expect(container.textContent).not.toContain("Elsa.Activities.Flowchart.Activities.Flowchart");
 
     await click(buttonByText(container, "Run"));
 
@@ -231,6 +247,20 @@ describe("workflows module", () => {
       "https://server.example/_elsa/workflow-management/executables/artifact-1/run",
       expect.objectContaining({ method: "POST" })
     );
+
+    await unmount();
+  });
+
+  it("filters workflow executables by definition query parameter", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => response([
+      executable({ artifactId: "artifact-visible", definitionId: "definition-1" }),
+      executable({ artifactId: "artifact-hidden", definitionId: "definition-2", sourceId: "definition-2" })
+    ])));
+    const { container, unmount } = await renderRegisteredRoute("/workflows/executables?definition=definition-1");
+
+    await waitForText(container, "artifact-visible");
+    expect(container.textContent).toContain("Definition definition-1");
+    expect(container.textContent).not.toContain("artifact-hidden");
 
     await unmount();
   });
@@ -263,7 +293,8 @@ async function renderRegisteredRoute(path = "/workflows/definitions") {
   window.history.replaceState({}, "", path);
   const api = testApi();
   register(api);
-  const route = api.routes.list().find(candidate => candidate.path === path) ?? api.routes.list()[0];
+  const routePath = new URL(path, window.location.origin).pathname;
+  const route = api.routes.list().find(candidate => candidate.path === routePath) ?? api.routes.list()[0];
   const Component = route.component;
   const container = document.createElement("div");
   document.body.appendChild(container);
