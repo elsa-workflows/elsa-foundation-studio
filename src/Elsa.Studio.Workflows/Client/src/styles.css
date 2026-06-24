@@ -1151,8 +1151,18 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--wf-accent) 18%, transparent);
 }
 
-.wf-property-syntax {
-  justify-self: stretch;
+.wf-expression-field {
+  position: relative;
+  z-index: 5;
+  min-width: 0;
+}
+
+.wf-expression-editor {
+  min-width: 0;
+}
+
+.wf-expression-field .wf-expression-editor > input[type="text"] {
+  padding-right: 104px;
 }
 
 .wf-syntax-picker {
@@ -1179,6 +1189,33 @@
   text-align: left;
 }
 
+.wf-syntax-picker.inline {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  bottom: 4px;
+  width: auto;
+}
+
+.wf-syntax-picker-trigger.inline {
+  width: 94px;
+  height: 100%;
+  gap: 6px;
+  border-color: transparent;
+  border-left-color: var(--wf-border);
+  border-radius: 0 4px 4px 0;
+  background: color-mix(in srgb, var(--wf-surface) 78%, var(--wf-bg));
+  color: var(--wf-muted-text);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 0 8px;
+}
+
+.wf-expression-field:focus-within .wf-syntax-picker-trigger.inline,
+.wf-syntax-picker-trigger.inline.open {
+  color: var(--wf-text);
+}
+
 .wf-syntax-picker-trigger::after {
   content: "";
   width: 8px;
@@ -1198,6 +1235,13 @@
 .wf-syntax-picker-trigger.open {
   border-color: var(--wf-accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--wf-accent) 18%, transparent);
+}
+
+.wf-syntax-picker-trigger.inline:focus-visible,
+.wf-syntax-picker-trigger.inline.open {
+  border-color: transparent;
+  border-left-color: color-mix(in srgb, var(--wf-accent) 50%, var(--wf-border));
+  box-shadow: none;
 }
 
 .wf-syntax-picker-trigger span {
@@ -1221,6 +1265,12 @@
   background: #1f2630;
   box-shadow: 0 16px 32px rgba(0, 0, 0, 0.32);
   padding: 4px;
+}
+
+.wf-syntax-picker.inline .wf-syntax-picker-menu {
+  left: auto;
+  right: 0;
+  min-width: 176px;
 }
 
 .wf-syntax-picker-menu button {

@@ -354,6 +354,8 @@ describe("workflows module", () => {
     await click(container.querySelector(".wf-canvas .react-flow__node"));
     await waitForText(container, "Text");
     expect(container.querySelector("select.wf-property-syntax")).toBeNull();
+    expect(container.querySelector(".wf-expression-field .wf-syntax-picker.inline")).toBeTruthy();
+    expect(container.querySelector(".wf-property-row > .wf-syntax-picker:not(.inline)")).toBeNull();
 
     await click(container.querySelector(".wf-syntax-picker-trigger"));
     expect(container.querySelector(".wf-syntax-picker-menu")?.textContent).toContain("Literal");
