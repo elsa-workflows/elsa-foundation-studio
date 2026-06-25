@@ -2,6 +2,7 @@ import type { StudioEndpointContext } from "../../sdk";
 import type {
   AgentActionProposal,
   AgentBootstrapResponse,
+  AgentProviderDiagnostics,
   AgentCreateSessionRequest,
   AgentCreateSessionResponse,
   AgentFeedbackRequest,
@@ -34,6 +35,9 @@ export function createAgentClient(context: StudioEndpointContext): AgentClient {
       return mapSession(unwrap(await context.http.postJson<AgentApiResponse<BackendAgentSession>>("/_elsa/agent/sessions", {
         conversationId: request.activeSurface.resourceId ?? request.activeSurface.route,
         ...(providerId ? { providerId } : {}),
+        mode: request.mode,
+        activeSurface: request.activeSurface,
+        clientContext: request.clientContext,
         metadata: {
           mode: request.mode,
           route: request.activeSurface.route,
@@ -49,7 +53,10 @@ export function createAgentClient(context: StudioEndpointContext): AgentClient {
       const accepted = unwrap(await context.http.postJson<AgentApiResponse<BackendAgentMessageAcceptedResponse>>(`/_elsa/agent/sessions/${encodeURIComponent(sessionId)}/messages`, {
         role: "user",
         content: request.message,
+        message: request.message,
+        mode: request.mode,
         capabilityId: request.capabilityId,
+        requestedCapabilities: request.capabilityId ? [request.capabilityId] : [],
         contextAttachments: request.contextAttachments.map(mapContextAttachment)
       }));
 
@@ -118,8 +125,13 @@ interface BackendAgentBootstrapResponse {
 
 interface BackendAgentCapability {
   id: string;
+  moduleId?: string | null;
   displayName: string;
   description: string;
+  kind?: string | number;
+  risk?: string | number;
+  surfaces?: string[];
+  requiredPermissions?: string[];
   requiresApproval?: boolean;
 }
 
@@ -127,6 +139,11 @@ interface BackendAgentProviderDiagnostics {
   providerId: string;
   isAvailable: boolean;
   status: string;
+  providerKind?: string | number;
+  kind?: string | number;
+  supportedOperations?: Array<string | number>;
+  riskProfile?: string | number;
+  metadata?: Record<string, string>;
 }
 
 interface BackendAgentSession {
@@ -178,12 +195,15 @@ function mapBootstrap(response: BackendAgentBootstrapResponse): AgentBootstrapRe
     modes: response.modes ?? ["explain", "troubleshoot", "build"],
     capabilities: (response.capabilities ?? []).map(capability => ({
       id: capability.id,
+      moduleId: capability.moduleId ?? undefined,
       displayName: capability.displayName,
       description: capability.description,
-      kind: capability.requiresApproval ? "proposal" : "answer",
-      risk: capability.requiresApproval ? "review-required" : "read-only",
-      surfaces: ["*"]
+      kind: mapCapabilityKind(capability.kind, capability.requiresApproval),
+      risk: mapCapabilityRisk(capability.risk, capability.requiresApproval),
+      surfaces: capability.surfaces?.length ? capability.surfaces : ["*"],
+      requiredPermissions: capability.requiredPermissions
     })),
+    providers: (response.providers ?? []).map(mapProviderDiagnostics),
     policy: response.policy ?? { contextVisibility: true, requiresApprovalForMutations: true }
   };
 }
@@ -198,18 +218,84 @@ function mapSession(session: BackendAgentSession): AgentCreateSessionResponse {
 
 function mapContextAttachment(attachment: AgentMessageRequest["contextAttachments"][number]) {
   const secretRedacted = attachment.sensitivity === "secret-redacted";
+  const content = isRecord(attachment.content) ? attachment.content : undefined;
+  const references = buildContextReferences(attachment, content);
   return {
     id: attachment.id,
     kind: attachment.contentType,
     displayName: attachment.label,
     sensitivity: mapSensitivity(attachment.sensitivity),
     summary: secretRedacted ? "[secret redacted]" : typeof attachment.content === "string" ? attachment.content : attachment.label,
-    references: {
-      source: attachment.source,
-      sourceId: attachment.sourceId ?? "",
-      scope: attachment.scope
-    }
+    references
   };
+}
+
+function buildContextReferences(attachment: AgentMessageRequest["contextAttachments"][number], content: Record<string, unknown> | undefined) {
+  const references: Record<string, string> = {
+    source: attachment.source,
+    sourceId: attachment.sourceId ?? "",
+    scope: attachment.scope
+  };
+
+  for (const key of ["workflowDefinitionId", "workflowVersionId", "draftId", "revision", "selectedNodeId", "selectedActivityType"]) {
+    const value = content?.[key];
+    if (typeof value === "string" && value.trim()) {
+      references[key] = value;
+    }
+  }
+
+  return references;
+}
+
+function mapProviderDiagnostics(provider: BackendAgentProviderDiagnostics): AgentProviderDiagnostics {
+  return {
+    providerId: provider.providerId,
+    isAvailable: provider.isAvailable,
+    status: provider.status,
+    providerKind: mapProviderKind(provider.providerKind ?? provider.kind),
+    supportedOperations: (provider.supportedOperations ?? []).map(mapProviderOperation),
+    riskProfile: mapProviderRiskProfile(provider.riskProfile),
+    metadata: provider.metadata ?? {}
+  };
+}
+
+function mapCapabilityKind(kind: string | number | undefined, requiresApproval?: boolean): AgentBootstrapResponse["capabilities"][number]["kind"] {
+  const value = normalizeEnum(kind);
+  if (value === "context" || kind === 1) return "context";
+  if (value === "prompt-starter" || kind === 2) return "prompt-starter";
+  if (value === "proposal" || kind === 3) return "proposal";
+  if (value === "action" || kind === 4) return "action";
+  return requiresApproval ? "proposal" : "answer";
+}
+
+function mapCapabilityRisk(risk: string | number | undefined, requiresApproval?: boolean): AgentBootstrapResponse["capabilities"][number]["risk"] {
+  const value = normalizeEnum(risk);
+  if (value === "review-required" || risk === 1) return "review-required";
+  if (value === "destructive" || risk === 2) return "destructive";
+  if (value === "admin" || risk === 3) return "admin";
+  return requiresApproval ? "review-required" : "read-only";
+}
+
+function mapProviderKind(kind: string | number | undefined) {
+  const value = normalizeEnum(kind);
+  if (value === "provider-sdk-binding" || kind === 0) return "provider-sdk-binding";
+  if (value === "agent-harness-provider" || kind === 1) return "agent-harness-provider";
+  return value || "provider-sdk-binding";
+}
+
+function mapProviderOperation(operation: string | number) {
+  const value = normalizeEnum(operation);
+  const numeric = ["chat", "streaming", "tool-approval", "run-status", "artifacts", "skills", "memory", "file-upload"][Number(operation)];
+  return numeric ?? value;
+}
+
+function mapProviderRiskProfile(riskProfile: string | number | undefined) {
+  const value = normalizeEnum(riskProfile);
+  if (value === "read-only" || riskProfile === 0) return "read-only";
+  if (value === "review-required" || riskProfile === 1) return "review-required";
+  if (value === "sandboxed-execution" || riskProfile === 2) return "sandboxed-execution";
+  if (value === "privileged-execution" || riskProfile === 3) return "privileged-execution";
+  return value || "read-only";
 }
 
 function mapProposalDecision(proposal: BackendAgentActionProposal): AgentProposalDecisionResponse {
@@ -242,6 +328,11 @@ function mapSensitivity(sensitivity: AgentMessageRequest["contextAttachments"][n
   return sensitivity;
 }
 
-function normalizeEnum(value: string | number) {
+function normalizeEnum(value: unknown) {
+  if (value === undefined || value === null) return "";
   return String(value).replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }

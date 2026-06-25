@@ -76,6 +76,12 @@ import {
   type WorkflowNodeData
 } from "./workflowAdapter";
 import { ActivityPropertiesPanel } from "./ActivityPropertiesPanel";
+import {
+  applyWorkflowGraphOperationBatch,
+  workflowGraphOperationApplyEvent,
+  workflowGraphOperationUndoEvent,
+  type WorkflowGraphOperationBatch
+} from "./workflowGraphOperationBatch";
 import "./styles.css";
 
 const nodeTypes = { workflowActivity: WorkflowActivityNode };
@@ -130,6 +136,23 @@ interface WorkflowEdgeActions {
 }
 
 const WorkflowEdgeActionsContext = React.createContext<WorkflowEdgeActions | null>(null);
+
+declare global {
+  interface Window {
+    __ELSA_STUDIO_WORKFLOW_CONTEXT__?: {
+      workflowId: string;
+      workflowDefinitionId?: string;
+      workflowVersionId?: string | null;
+      draftId?: string | null;
+      revision?: string | null;
+      selectedNodeId?: string | null;
+      selectedActivityType?: string | null;
+      summary?: string;
+      activities?: Array<{ id: string; type: string; displayName?: string }>;
+      diagnostics?: Array<{ severity: string; message: string }>;
+    };
+  }
+}
 
 export function register(api: ElsaStudioModuleApi) {
   api.featureAreas.add({
@@ -1505,6 +1528,7 @@ function WorkflowEditor({
   const lastSavedDraftSignatureRef = useRef("");
   const saveRequestIdRef = useRef(0);
   const saveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
+  const workflowBatchUndoRef = useRef(new Map<string, WorkflowDraft>());
   const pointerDragRef = useRef<{
     activity: ActivityCatalogItem;
     startX: number;
@@ -1536,6 +1560,99 @@ function WorkflowEditor({
   const canRunTest = !!draft?.state.rootActivity && !busy;
   const findRisksAction = findAiAction(ai, "weaver.workflows.find-draft-risks");
   const proposeUpdateAction = findAiAction(ai, "weaver.workflows.propose-update");
+
+  useEffect(() => {
+    if (!details || !draft) return;
+
+    window.__ELSA_STUDIO_WORKFLOW_CONTEXT__ = {
+      workflowId: details.definition.id,
+      workflowDefinitionId: details.definition.id,
+      workflowVersionId: draft.sourceVersionId ?? null,
+      draftId: draft.id,
+      revision: getDraftRevision(draft),
+      selectedNodeId,
+      selectedActivityType: selectedDescriptor?.typeName ?? (selectedNode ? catalogByVersion.get(selectedNode.activityVersionId)?.activityTypeKey ?? selectedNode.activityVersionId : null),
+      summary: details.definition.name,
+      activities: collectWorkflowContextActivities(draft.state.rootActivity, catalogByVersion),
+      diagnostics: draft.validationErrors.map(error => ({ severity: error.code ?? "warning", message: error.message ?? "Workflow validation issue." }))
+    };
+
+    return () => {
+      if (window.__ELSA_STUDIO_WORKFLOW_CONTEXT__?.workflowId === details.definition.id) {
+        window.__ELSA_STUDIO_WORKFLOW_CONTEXT__ = undefined;
+      }
+    };
+  }, [catalogByVersion, details, draft, selectedDescriptor, selectedNode, selectedNodeId]);
+
+  useEffect(() => {
+    const handleApply = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        batch: WorkflowGraphOperationBatch;
+        respond(result: { ok: true; result: { appliedCount: number; finalActivityIds: string[]; temporaryReferences: Record<string, string>; summary: string; undoToken: string } } | { ok: false; message: string }): void;
+      }>).detail;
+      if (!detail?.batch || !detail.respond) return;
+      if (!draft || !details) {
+        detail.respond({ ok: false, message: "No active workflow draft is open." });
+        return;
+      }
+
+      const batchWorkflowId = detail.batch.workflowDefinitionId;
+      if (batchWorkflowId && batchWorkflowId !== "active-draft" && batchWorkflowId !== details.definition.id) {
+        detail.respond({ ok: false, message: `Batch targets workflow '${batchWorkflowId}', but '${details.definition.id}' is active.` });
+        return;
+      }
+
+      try {
+        const previousDraft = cloneWorkflowDraftForUndo(draft);
+        const applied = applyWorkflowGraphOperationBatch(draft, detail.batch, catalog);
+        const undoToken = `weaver-batch-${Date.now()}`;
+        workflowBatchUndoRef.current.set(undoToken, previousDraft);
+        setDraft(applied.draft);
+        setFrames([]);
+        setSelectedNodeId(applied.finalActivityIds.at(-1) ?? null);
+        setPublishedArtifactId(null);
+        setTestRun(null);
+        setStatus(applied.summary);
+        setError("");
+        detail.respond({ ok: true, result: { ...applied, undoToken } });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        setError(message);
+        detail.respond({ ok: false, message });
+      }
+    };
+
+    const handleUndo = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        undoToken: string;
+        respond(result: { ok: true; summary: string } | { ok: false; message: string }): void;
+      }>).detail;
+      if (!detail?.undoToken || !detail.respond) return;
+
+      const previousDraft = workflowBatchUndoRef.current.get(detail.undoToken);
+      if (!previousDraft) {
+        detail.respond({ ok: false, message: "The Weaver batch undo point is no longer available." });
+        return;
+      }
+
+      workflowBatchUndoRef.current.delete(detail.undoToken);
+      setDraft(previousDraft);
+      setFrames([]);
+      setSelectedNodeId(null);
+      setPublishedArtifactId(null);
+      setTestRun(null);
+      setStatus("Restored workflow draft before Weaver batch.");
+      setError("");
+      detail.respond({ ok: true, summary: "Restored workflow draft before Weaver batch." });
+    };
+
+    window.addEventListener(workflowGraphOperationApplyEvent, handleApply);
+    window.addEventListener(workflowGraphOperationUndoEvent, handleUndo);
+    return () => {
+      window.removeEventListener(workflowGraphOperationApplyEvent, handleApply);
+      window.removeEventListener(workflowGraphOperationUndoEvent, handleUndo);
+    };
+  }, [catalog, details, draft]);
 
   useEffect(() => {
     writeStoredValue(workflowPaletteWidthStorageKey, String(paletteWidth));
@@ -3011,6 +3128,33 @@ function clientPointFromEvent(event: MouseEvent | TouchEvent) {
 
 function getDraftSignature(draft: WorkflowDraft) {
   return JSON.stringify({ state: draft.state, layout: draft.layout });
+}
+
+function getDraftRevision(draft: WorkflowDraft) {
+  return hashString(getDraftSignature(draft));
+}
+
+function collectWorkflowContextActivities(activity: ActivityNode | null | undefined, catalogByVersion: Map<string, ActivityCatalogItem>, result: Array<{ id: string; type: string; displayName?: string }> = []) {
+  if (!activity) return result;
+
+  const catalogItem = catalogByVersion.get(activity.activityVersionId);
+  result.push({
+    id: activity.nodeId,
+    type: catalogItem?.activityTypeKey ?? activity.activityVersionId,
+    displayName: catalogItem ? getActivityDisplay(catalogItem) : undefined
+  });
+
+  for (const slot of getChildSlots(activity)) {
+    for (const child of slot.activities) collectWorkflowContextActivities(child, catalogByVersion, result);
+  }
+
+  return result;
+}
+
+function cloneWorkflowDraftForUndo(draft: WorkflowDraft) {
+  return typeof structuredClone === "function"
+    ? structuredClone(draft)
+    : JSON.parse(JSON.stringify(draft)) as WorkflowDraft;
 }
 
 function createDraftSnapshotId(draft: WorkflowDraft) {
