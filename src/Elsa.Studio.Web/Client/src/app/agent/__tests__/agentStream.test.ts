@@ -172,6 +172,30 @@ describe("agent stream", () => {
     ]);
   });
 
+  it("normalizes PascalCase typed error events", async () => {
+    const events: AgentStreamEvent[] = [];
+    const fetch = vi.fn(async () => new Response(streamFrom([
+      `data: ${JSON.stringify({
+        Id: "evt_error",
+        Kind: 5,
+        ResultKind: 4,
+        Error: { Message: "Workflow draft is stale." }
+      })}\n\n`
+    ]), { status: 200 }));
+
+    subscribeAgentSessionStream(
+      createEndpointContext("https://foundation.example/"),
+      "/_elsa/agent/sessions/agt_01/stream",
+      event => events.push(event),
+      error => { throw error; },
+      { fetch: fetch as typeof globalThis.fetch, defaultMessageId: "msg_01" });
+    await flushPromises();
+
+    expect(events).toEqual([
+      { type: "error", message: "Workflow draft is stale." }
+    ]);
+  });
+
   it("ignores malformed stream frames without failing the subscription", async () => {
     const events: AgentStreamEvent[] = [];
     const errors: Error[] = [];

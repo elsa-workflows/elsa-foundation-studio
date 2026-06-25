@@ -2,6 +2,7 @@ import type { StudioEndpointContext } from "../../sdk";
 import type {
   AgentActionProposal,
   AgentBootstrapResponse,
+  AgentProviderStatus,
   AgentProviderDiagnostics,
   AgentCreateSessionRequest,
   AgentCreateSessionResponse,
@@ -27,9 +28,9 @@ export function createAgentClient(context: StudioEndpointContext): AgentClient {
 
   return {
     async bootstrap() {
-      const response = unwrap(await context.http.getJson<AgentApiResponse<BackendAgentBootstrapResponse>>("/_elsa/agent/bootstrap"));
+      const response = mapBootstrap(unwrap(await context.http.getJson<AgentApiResponse<BackendAgentBootstrapResponse>>("/_elsa/agent/bootstrap")));
       providerId = response.providers?.find(provider => provider.isAvailable)?.providerId;
-      return mapBootstrap(response);
+      return response;
     },
     async createSession(request) {
       return mapSession(unwrap(await context.http.postJson<AgentApiResponse<BackendAgentSession>>("/_elsa/agent/sessions", {
@@ -61,7 +62,7 @@ export function createAgentClient(context: StudioEndpointContext): AgentClient {
       }));
 
       return {
-        messageId: accepted.message.id,
+        messageId: getAcceptedMessageId(accepted),
         status: "pending",
         streamUrl: `/_elsa/agent/sessions/${encodeURIComponent(sessionId)}/stream`
       };
@@ -88,12 +89,12 @@ export function createAgentClient(context: StudioEndpointContext): AgentClient {
         comment: request.comment
       }));
       return {
-        proposalId: result.proposalId,
-        approvalStatus: result.executed ? "executed" : "failed",
+        proposalId: readString(result, "proposalId") ?? proposalId,
+        approvalStatus: getExecutionStatus(result),
         result: {
           resourceType: "agent-proposal",
-          resourceId: result.proposalId,
-          summary: result.message
+          resourceId: readString(result, "proposalId") ?? proposalId,
+          summary: readString(result, "message") ?? readString(result, "summary") ?? "Proposal execution completed."
         }
       };
     },
@@ -147,12 +148,15 @@ interface BackendAgentProviderDiagnostics {
 }
 
 interface BackendAgentSession {
-  id: string;
-  status: string | number;
+  id?: string;
+  sessionId?: string;
+  status?: string | number;
+  contextAttachments?: unknown[];
 }
 
 interface BackendAgentMessageAcceptedResponse {
-  message: BackendAgentMessage;
+  message?: BackendAgentMessage;
+  messageId?: string;
 }
 
 interface BackendAgentMessage {
@@ -160,15 +164,20 @@ interface BackendAgentMessage {
 }
 
 interface BackendAgentActionProposal {
-  id: string;
-  status: string | number;
+  id?: string;
+  proposalId?: string;
+  status?: string | number;
+  approvalStatus?: string | number;
   approvedAt?: string | null;
 }
 
 interface BackendAgentProposalExecutionResult {
-  proposalId: string;
-  executed: boolean;
-  message: string;
+  proposalId?: string;
+  executed?: boolean;
+  message?: string;
+  summary?: string;
+  status?: string | number;
+  approvalStatus?: string | number;
 }
 
 interface BackendAgentFeedback {
@@ -176,42 +185,62 @@ interface BackendAgentFeedback {
 }
 
 function unwrap<T>(response: AgentApiResponse<T>): T {
-  if (response.error) {
-    throw new Error(response.error.message || response.error.code);
+  const error = readRecord(response, "error");
+  if (error) {
+    throw new Error(readString(error, "message") || readString(error, "code") || "Agent backend returned an error.");
   }
 
-  if (response.data === undefined || response.data === null) {
+  const data = readField(response, "data");
+  if (data === undefined || data === null) {
     throw new Error("Agent backend returned an empty response.");
   }
 
-  return response.data;
+  return data as T;
 }
 
 function mapBootstrap(response: BackendAgentBootstrapResponse): AgentBootstrapResponse {
-  const providerStatus = response.providerStatus ?? (response.providers?.some(provider => provider.isAvailable) ? "available" : "unavailable");
+  const providers = readRecordArray(response, "providers").map(mapProviderDiagnostics);
+  const capabilities = readRecordArray(response, "capabilities");
+  const providerStatus = mapProviderStatus(readField(response, "providerStatus"), providers);
   return {
-    enabled: response.enabled ?? providerStatus === "available",
+    enabled: readBoolean(response, "enabled") ?? providerStatus === "available",
     providerStatus,
-    modes: response.modes ?? ["explain", "troubleshoot", "build"],
-    capabilities: (response.capabilities ?? []).map(capability => ({
-      id: capability.id,
-      moduleId: capability.moduleId ?? undefined,
-      displayName: capability.displayName,
-      description: capability.description,
-      kind: mapCapabilityKind(capability.kind, capability.requiresApproval),
-      risk: mapCapabilityRisk(capability.risk, capability.requiresApproval),
-      surfaces: capability.surfaces?.length ? capability.surfaces : ["*"],
-      requiredPermissions: capability.requiredPermissions
-    })),
-    providers: (response.providers ?? []).map(mapProviderDiagnostics),
-    policy: response.policy ?? { contextVisibility: true, requiresApprovalForMutations: true }
+    modes: readStringArray(response, "modes") as AgentBootstrapResponse["modes"] ?? ["explain", "troubleshoot", "build"],
+    capabilities: capabilities.map(mapCapability),
+    providers,
+    policy: readField(response, "policy") as AgentBootstrapResponse["policy"] ?? { contextVisibility: true, requiresApprovalForMutations: true }
   };
+}
+
+function mapCapability(capability: Record<string, unknown>): AgentBootstrapResponse["capabilities"][number] {
+  const id = readString(capability, "id") ?? "";
+  const surfaces = readStringArray(capability, "surfaces");
+  const requiresApproval = readBoolean(capability, "requiresApproval");
+  return {
+    id,
+    moduleId: readString(capability, "moduleId"),
+    displayName: readString(capability, "displayName") ?? (id || "Agent capability"),
+    description: readString(capability, "description") ?? "",
+    kind: mapCapabilityKind(readField(capability, "kind"), requiresApproval),
+    risk: mapCapabilityRisk(readField(capability, "risk"), requiresApproval),
+    surfaces: surfaces?.length ? surfaces : ["*"],
+    requiredPermissions: readStringArray(capability, "requiredPermissions")
+  };
+}
+
+function mapProviderStatus(status: unknown, providers: AgentProviderDiagnostics[]): AgentProviderStatus {
+  const value = normalizeEnum(status);
+  if (value === "available" || value === "unavailable" || value === "disabled" || value === "degraded") {
+    return value;
+  }
+
+  return providers.some(provider => provider.isAvailable) ? "available" : "unavailable";
 }
 
 function mapSession(session: BackendAgentSession): AgentCreateSessionResponse {
   return {
-    sessionId: session.id,
-    status: mapSessionStatus(session.status),
+    sessionId: readString(session, "sessionId") ?? readString(session, "id") ?? "",
+    status: mapSessionStatus(readField(session, "status")),
     contextAttachments: []
   };
 }
@@ -249,13 +278,13 @@ function buildContextReferences(attachment: AgentMessageRequest["contextAttachme
 
 function mapProviderDiagnostics(provider: BackendAgentProviderDiagnostics): AgentProviderDiagnostics {
   return {
-    providerId: provider.providerId,
-    isAvailable: provider.isAvailable,
-    status: provider.status,
-    providerKind: mapProviderKind(provider.providerKind ?? provider.kind),
-    supportedOperations: (provider.supportedOperations ?? []).map(mapProviderOperation),
-    riskProfile: mapProviderRiskProfile(provider.riskProfile),
-    metadata: provider.metadata ?? {}
+    providerId: readString(provider, "providerId") ?? "",
+    isAvailable: readBoolean(provider, "isAvailable") ?? false,
+    status: readString(provider, "status") ?? "unavailable",
+    providerKind: mapProviderKind(readField(provider, "providerKind") ?? readField(provider, "kind")),
+    supportedOperations: readEnumArray(provider, "supportedOperations").map(mapProviderOperation),
+    riskProfile: mapProviderRiskProfile(readField(provider, "riskProfile")),
+    metadata: readField(provider, "metadata") as Record<string, string> | undefined ?? {}
   };
 }
 
@@ -300,20 +329,36 @@ function mapProviderRiskProfile(riskProfile: string | number | undefined) {
 
 function mapProposalDecision(proposal: BackendAgentActionProposal): AgentProposalDecisionResponse {
   return {
-    proposalId: proposal.id,
-    approvalStatus: mapProposalStatus(proposal.status),
-    approvedAt: proposal.approvedAt ?? undefined
+    proposalId: readString(proposal, "proposalId") ?? readString(proposal, "id") ?? "",
+    approvalStatus: mapProposalStatus(readField(proposal, "approvalStatus") ?? readField(proposal, "status")),
+    approvedAt: readString(proposal, "approvedAt")
   };
 }
 
-function mapSessionStatus(status: string | number): AgentCreateSessionResponse["status"] {
+function getExecutionStatus(result: BackendAgentProposalExecutionResult): AgentActionProposal["status"] {
+  const executed = readBoolean(result, "executed");
+  if (executed !== undefined) return executed ? "executed" : "failed";
+  return mapProposalStatus(readField(result, "approvalStatus") ?? readField(result, "status"));
+}
+
+function getAcceptedMessageId(accepted: BackendAgentMessageAcceptedResponse) {
+  const message = readRecord(accepted, "message");
+  const messageId = readString(message, "id") ?? readString(accepted, "messageId");
+  if (!messageId) {
+    throw new Error("Agent backend did not return an accepted message id.");
+  }
+
+  return messageId;
+}
+
+function mapSessionStatus(status: unknown): AgentCreateSessionResponse["status"] {
   const value = normalizeEnum(status);
   if (value === "failed" || status === 2) return "failed";
   if (value === "archived" || status === 1) return "completed";
   return "active";
 }
 
-function mapProposalStatus(status: string | number): AgentActionProposal["status"] {
+function mapProposalStatus(status: unknown): AgentActionProposal["status"] {
   const value = normalizeEnum(status);
   if (value === "approved" || status === 1) return "approved";
   if (value === "denied" || status === 2) return "denied";
@@ -331,6 +376,44 @@ function mapSensitivity(sensitivity: AgentMessageRequest["contextAttachments"][n
 function normalizeEnum(value: unknown) {
   if (value === undefined || value === null) return "";
   return String(value).replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+}
+
+function readString(source: unknown, key: string) {
+  const value = readField(source, key);
+  return typeof value === "string" ? value : undefined;
+}
+
+function readBoolean(source: unknown, key: string) {
+  const value = readField(source, key);
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function readStringArray(source: unknown, key: string) {
+  const value = readField(source, key);
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : undefined;
+}
+
+function readEnumArray(source: unknown, key: string) {
+  const value = readField(source, key);
+  return Array.isArray(value) ? value.filter((item): item is string | number => typeof item === "string" || typeof item === "number") : [];
+}
+
+function readRecord(source: unknown, key: string) {
+  const value = readField(source, key);
+  return isRecord(value) ? value : undefined;
+}
+
+function readRecordArray(source: unknown, key: string) {
+  const value = readField(source, key);
+  return Array.isArray(value) ? value.filter(isRecord) : [];
+}
+
+function readField(source: unknown, key: string) {
+  if (!isRecord(source)) return undefined;
+  if (key in source) return source[key];
+  const lowered = key.toLowerCase();
+  const match = Object.keys(source).find(candidate => candidate.toLowerCase() === lowered);
+  return match ? source[match] : undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

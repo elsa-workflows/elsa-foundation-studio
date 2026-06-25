@@ -213,8 +213,8 @@ function normalizeStreamEvent(value: unknown, defaultMessageId?: string): AgentS
     case "conversation.completed":
       return { type: "message-completed", messageId };
     case "error": {
-      const error = event.error && typeof event.error === "object" ? event.error as Record<string, unknown> : undefined;
-      return { type: "error", message: String(error?.message ?? content ?? "Agent stream failed.") };
+      const error = readObject<Record<string, unknown>>(event, "error") ?? readObject<Record<string, unknown>>(data, "error");
+      return { type: "error", message: readString(error, "message") ?? (content || "Agent stream failed.") };
     }
     case "conversation.error":
     case "conversation.failed":
