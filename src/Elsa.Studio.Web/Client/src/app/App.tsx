@@ -952,8 +952,8 @@ function isNavigationItemActive(item: StudioNavigationContribution, path: string
   return path === item.activePathPrefix || path.startsWith(`${item.activePathPrefix}/`);
 }
 
-function isDashboardPath(path: string) {
-  return path === "/" || path === "/dashboard";
+export function isDashboardPath(path: string) {
+  return path === "/" || path === "/dashboard" || path === "/overview";
 }
 
 export function getStudioNavigation(moduleNavigation: StudioNavigationContribution[]) {
