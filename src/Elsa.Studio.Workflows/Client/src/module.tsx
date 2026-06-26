@@ -160,7 +160,7 @@ export function register(api: ElsaStudioModuleApi) {
   api.featureAreas.add({
     id: "workflows",
     title: "Workflows",
-    description: "Design, publish and run workflow definitions and inspect instances.",
+    description: "Design, publish and run workflow definitions and inspect runs.",
     navGroup: "Workspace",
     ownedPaths: ["/workflows"],
     required: true,
@@ -173,7 +173,7 @@ export function register(api: ElsaStudioModuleApi) {
       items: [
         { title: "Definitions", path: "/workflows/definitions", iconColor: "#0ea5e9" },
         { title: "Executables", path: "/workflows/executables", iconColor: "#0ea5e9" },
-        { title: "Instances", path: "/workflows/instances", iconColor: "#0ea5e9" }
+        { title: "Runs", path: "/workflows/instances", iconColor: "#0ea5e9" }
       ]
     },
     routes: [
@@ -192,13 +192,13 @@ export function register(api: ElsaStudioModuleApi) {
       {
         id: "workflows-instances",
         path: "/workflows/instances",
-        label: "Workflow instances",
+        label: "Workflow runs",
         component: () => <WorkflowInstancesPage context={api.backend} ai={api.ai} />
       },
       {
         id: "workflows-instance-detail",
         path: "/workflows/instances/:workflowExecutionId",
-        label: "Workflow instance",
+        label: "Workflow run",
         component: () => <WorkflowInstanceDetailsPage context={api.backend} ai={api.ai} />
       }
     ]
@@ -273,7 +273,7 @@ function WorkflowExecutablesPage({ context, ai }: { context: StudioEndpointConte
 
 function WorkflowInstancesPage({ context, ai }: { context: StudioEndpointContext; ai: StudioAiContributionApi }) {
   return (
-    <WorkflowsPageFrame title="Instances">
+    <WorkflowsPageFrame title="Runs">
       <WorkflowInstances context={context} ai={ai} />
     </WorkflowsPageFrame>
   );
@@ -283,7 +283,7 @@ function WorkflowInstanceDetailsPage({ context, ai }: { context: StudioEndpointC
   const workflowExecutionId = readWorkflowExecutionIdFromUrl();
 
   return (
-    <WorkflowsPageFrame title="Instance">
+    <WorkflowsPageFrame title="Run">
       <WorkflowInstanceDetailsWorkbench context={context} ai={ai} workflowExecutionId={workflowExecutionId} />
     </WorkflowsPageFrame>
   );
@@ -1045,7 +1045,7 @@ function WorkflowInstances({ context }: { context: StudioEndpointContext; ai: St
         <button type="button" onClick={() => void load()}>Refresh</button>
         <label className="wf-toolbar-field">
           <span>Status</span>
-          <select aria-label="Workflow instance status" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}>
+          <select aria-label="Workflow run status" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}>
             <option value="">All statuses</option>
             <option value="Pending">Pending</option>
             <option value="Running">Running</option>
@@ -1057,12 +1057,12 @@ function WorkflowInstances({ context }: { context: StudioEndpointContext; ai: St
         </label>
       </div>
       {state === "failed" ? <div className="wf-alert"><AlertCircle size={16} /> {error}</div> : null}
-      {state === "loading" ? <div className="wf-empty">Loading workflow instances...</div> : null}
-      {state === "ready" && instances.length === 0 ? <div className="wf-empty">No workflow instances found. Run a published workflow executable to create instance history.</div> : null}
+      {state === "loading" ? <div className="wf-empty">Loading workflow runs...</div> : null}
+      {state === "ready" && instances.length === 0 ? <div className="wf-empty">No workflow runs found. Run a published workflow executable to create history.</div> : null}
       {state === "ready" && instances.length > 0 ? (
-        <div className="wf-grid wf-instance-grid" role="table" aria-label="Workflow instances">
+        <div className="wf-grid wf-instance-grid" role="table" aria-label="Workflow runs">
           <div className="wf-grid-head" role="row">
-            <span>Instance</span>
+            <span>Run</span>
             <span>Status</span>
             <span>Definition</span>
             <span>Activity</span>
@@ -1074,7 +1074,7 @@ function WorkflowInstances({ context }: { context: StudioEndpointContext; ai: St
               type="button"
               className="wf-grid-row"
               role="row"
-              aria-label={`Inspect workflow instance ${instance.workflowExecutionId}`}
+              aria-label={`Inspect workflow run ${instance.workflowExecutionId}`}
               key={instance.workflowExecutionId}
               onClick={() => openInstance(instance.workflowExecutionId)}
             >
@@ -1164,7 +1164,7 @@ function WorkflowInstanceDetailsWorkbench({ context, ai, workflowExecutionId }: 
   return (
     <>
       <div className="wf-toolbar">
-        <button type="button" onClick={goBack}><ChevronLeft size={14} /> Instances</button>
+        <button type="button" onClick={goBack}><ChevronLeft size={14} /> Runs</button>
         <button type="button" onClick={() => void load()}><RotateCcw size={14} /> Refresh</button>
         {data && instanceAction ? (
           <button type="button" onClick={() => dispatchAiAction(ai, instanceAction, data.details)}>
@@ -1172,7 +1172,7 @@ function WorkflowInstanceDetailsWorkbench({ context, ai, workflowExecutionId }: 
           </button>
         ) : null}
       </div>
-      {state === "loading" ? <div className="wf-empty">Loading workflow instance...</div> : null}
+      {state === "loading" ? <div className="wf-empty">Loading workflow run...</div> : null}
       {state === "failed" ? <div className="wf-alert"><AlertCircle size={16} /> {error}</div> : null}
       {state === "ready" && data ? (
         <div className="wf-instance-detail-workbench">
@@ -1237,7 +1237,7 @@ function WorkflowInstanceCanvas({ definitionVersion, definitionVersionError, act
   }, [activityCatalog, definitionVersion, details, selectedEvidenceId]);
 
   return (
-    <section className="wf-instance-canvas-shell" aria-label="Workflow instance canvas">
+    <section className="wf-instance-canvas-shell" aria-label="Workflow run canvas">
       <header>
         <div>
           <span>Definition version</span>
@@ -1256,7 +1256,7 @@ function WorkflowInstanceCanvas({ definitionVersion, definitionVersionError, act
       <div className="wf-instance-canvas">
         {!definitionVersion ? (
           <div className="wf-empty">
-            The workflow instance loaded, but its definition graph could not be resolved for this version.
+            The workflow run loaded, but its definition graph could not be resolved for this version.
             {definitionVersionError ? <small>{formatWorkflowVersionLoadError(definitionVersionError)}</small> : null}
           </div>
         ) : null}
@@ -1296,14 +1296,14 @@ function WorkflowInstanceInspector({ ai, action, summary, details, state, error,
   graphNodeIds?: Set<string>;
 }) {
   if (!summary) {
-    return <aside className="wf-instance-inspector"><div className="wf-empty">Select a workflow instance to inspect activity history.</div></aside>;
+    return <aside className="wf-instance-inspector"><div className="wf-empty">Select a workflow run to inspect activity history.</div></aside>;
   }
 
   return (
-    <aside className="wf-instance-inspector" aria-label="Workflow instance details">
+    <aside className="wf-instance-inspector" aria-label="Workflow run details">
       <header>
         <div>
-          <span>Workflow instance</span>
+          <span>Workflow Instance ID</span>
           <h3>{summary.workflowExecutionId}</h3>
         </div>
         {action ? (
@@ -1328,7 +1328,7 @@ function WorkflowInstanceInspector({ ai, action, summary, details, state, error,
         <dt>Correlation</dt>
         <dd>{summary.correlationId || "None"}</dd>
       </dl>
-      {state === "loading" ? <div className="wf-empty">Loading instance details...</div> : null}
+      {state === "loading" ? <div className="wf-empty">Loading run details...</div> : null}
       {state === "failed" ? <div className="wf-alert"><AlertCircle size={16} /> {error}</div> : null}
       {state === "ready" && details ? (
         <>
