@@ -36,7 +36,7 @@ describe("workflows module", () => {
     })).toEqual({ nodeId: "write-line-1", handleId: "Done" });
   });
 
-  it("registers navigation and definitions route", () => {
+  it("registers Runs navigation while preserving instance routes", () => {
     const api = testApi();
 
     register(api);
@@ -48,13 +48,13 @@ describe("workflows module", () => {
       expect.objectContaining({ id: "workflows", path: "/workflows/definitions", activePathPrefix: "/workflows" }),
       expect.objectContaining({ id: "workflows-definitions", path: "/workflows/definitions", parentId: "workflows" }),
       expect.objectContaining({ id: "workflows-executables", path: "/workflows/executables", parentId: "workflows" }),
-      expect.objectContaining({ id: "workflows-instances", path: "/workflows/instances", parentId: "workflows" })
+      expect.objectContaining({ id: "workflows-runs", label: "Runs", path: "/workflows/instances", parentId: "workflows" })
     ]);
     expect(api.routes.list()).toEqual([
       expect.objectContaining({ id: "workflows-definitions", path: "/workflows/definitions" }),
       expect.objectContaining({ id: "workflows-executables", path: "/workflows/executables" }),
-      expect.objectContaining({ id: "workflows-instances", path: "/workflows/instances" }),
-      expect.objectContaining({ id: "workflows-instance-detail", path: "/workflows/instances/:workflowExecutionId" })
+      expect.objectContaining({ id: "workflows-instances", label: "Workflow runs", path: "/workflows/instances" }),
+      expect.objectContaining({ id: "workflows-instance-detail", label: "Workflow run", path: "/workflows/instances/:workflowExecutionId" })
     ]);
   });
 
@@ -1022,7 +1022,7 @@ describe("workflows module", () => {
     await unmount();
   });
 
-  it("navigates from workflow instances to the wider instance detail route", async () => {
+  it("navigates from workflow runs to the compatible instance detail route", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.startsWith("https://server.example/runtime/workflows/instances")) {
@@ -1035,9 +1035,9 @@ describe("workflows module", () => {
     const { container, unmount } = await renderRegisteredRoute("/workflows/instances");
 
     await waitForText(container, "wfexec-1");
-    expect(container.textContent).toContain("Instances");
+    expect(container.textContent).toContain("Runs");
     expect(container.querySelector("nav[aria-label='Workflow views']")).toBeNull();
-    await click(rowByLabel(container, "Inspect workflow instance wfexec-1"));
+    await click(rowByLabel(container, "Inspect workflow run wfexec-1"));
 
     expect(window.location.pathname).toBe("/workflows/instances/wfexec-1");
     expect(fetchMock).toHaveBeenCalledWith(
@@ -1079,6 +1079,8 @@ describe("workflows module", () => {
     const { container, unmount } = await renderRegisteredRoute("/workflows/instances/wfexec-1");
 
     await waitForText(container, "Definition version");
+    expect(container.textContent).toContain("Run");
+    expect(container.textContent).toContain("Workflow Instance ID");
     expect(container.textContent).toContain("Activity history");
     expect(container.textContent).toContain("WriteLine");
     expect(container.textContent).toContain("No incidents recorded.");
