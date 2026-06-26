@@ -490,6 +490,178 @@ describe("workflows module", () => {
     await unmount();
   });
 
+  it("renders the ordered expanded expression editor contribution and preserves wrapper metadata", async () => {
+    vi.stubGlobal("ResizeObserver", class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === "PUT") return response({ ...workflowDraft(JSON.parse(String(init.body))), validationErrors: [] });
+      if (url.includes("/descriptors/activities")) return response({ items: [writeLineDescriptor()] });
+      if (url.includes("/descriptors/expression-descriptors")) return response({ items: [
+        { type: "Literal", displayName: "Literal" },
+        { type: "JavaScript", displayName: "JavaScript" }
+      ] });
+      if (url.includes("/activities")) return response({ activities: [
+        activity({
+          activityVersionId: "write-line-v1",
+          activityTypeKey: "Elsa.Activities.Primitives.Activities.WriteLine",
+          category: "Primitives",
+          displayName: "Write Line",
+          description: "Writes a line to the console."
+        })
+      ] });
+      if (url.includes("/definitions/definition-1")) return response({
+        definition: definition(),
+        draft: workflowDraft({
+          state: {
+            variables: [],
+            rootActivity: writeLineRoot({
+              text: {
+                typeName: "System.String",
+                expression: { type: "Literal", value: "Before contribution" },
+                memoryReference: { id: "text-memory" }
+              }
+            }),
+            inputs: [],
+            outputs: []
+          }
+        }),
+        versions: []
+      });
+      return response({ definitions: [definition()] });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { container, unmount } = await renderRegisteredRoute("/workflows/definitions?definition=definition-1", api => {
+      api.expressionEditors.add({
+        id: "late-javascript-expanded",
+        order: 200,
+        supports: context => context.syntax === "JavaScript",
+        surfaces: {
+          expanded: ({ value, onChange }) => (
+            <textarea
+              aria-label="Late JavaScript expanded editor"
+              value={value == null ? "" : String(value)}
+              onChange={event => onChange(event.target.value)}
+            />
+          )
+        }
+      });
+      api.expressionEditors.add({
+        id: "preferred-javascript-expanded",
+        order: 50,
+        supports: context => context.syntax === "JavaScript",
+        surfaces: {
+          expanded: ({ value, onChange }) => (
+            <textarea
+              aria-label="Preferred JavaScript expanded editor"
+              value={value == null ? "" : String(value)}
+              onChange={event => onChange(event.target.value)}
+            />
+          )
+        }
+      });
+    });
+
+    await waitForText(container, "Write Line");
+    await click(Array.from(container.querySelectorAll(".react-flow__node")).find(node => node.textContent?.includes("Write Line")) ?? null);
+    await waitForText(container, "Text");
+    await click(container.querySelector(".wf-syntax-picker-trigger"));
+    await click(buttonByText(container, "JavaScript"));
+    await click(buttonByLabel(container, "Open expanded Text editor"));
+
+    expect(textareaByLabel(container, "Preferred JavaScript expanded editor")).toBeTruthy();
+    expect(textareaByLabel(container, "Late JavaScript expanded editor")).toBeNull();
+    expect(container.textContent).not.toContain("No enhanced editor is registered for JavaScript");
+
+    await fill(textareaByLabel(container, "Preferred JavaScript expanded editor"), "return 42;");
+    await click(buttonByText(container, "Save"));
+
+    const putCall = fetchMock.mock.calls.find(([url, init]) => String(url).includes("/drafts/draft-1") && init?.method === "PUT");
+    expect(putCall).toBeTruthy();
+    expect(JSON.parse(String(putCall?.[1]?.body)).state.rootActivity.text).toEqual({
+      typeName: "System.String",
+      expression: { type: "JavaScript", value: "return 42;" },
+      memoryReference: { id: "text-memory" }
+    });
+
+    await unmount();
+  });
+
+  it("falls back for missing expanded expression editors and preserves values across syntax changes", async () => {
+    vi.stubGlobal("ResizeObserver", class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === "PUT") return response({ ...workflowDraft(JSON.parse(String(init.body))), validationErrors: [] });
+      if (url.includes("/descriptors/activities")) return response({ items: [writeLineDescriptor()] });
+      if (url.includes("/descriptors/expression-descriptors")) return response({ items: [
+        { type: "Literal", displayName: "Literal" },
+        { type: "JavaScript", displayName: "JavaScript" }
+      ] });
+      if (url.includes("/activities")) return response({ activities: [
+        activity({
+          activityVersionId: "write-line-v1",
+          activityTypeKey: "Elsa.Activities.Primitives.Activities.WriteLine",
+          category: "Primitives",
+          displayName: "Write Line",
+          description: "Writes a line to the console."
+        })
+      ] });
+      if (url.includes("/definitions/definition-1")) return response({
+        definition: definition(),
+        draft: workflowDraft({
+          state: {
+            variables: [],
+            rootActivity: writeLineRoot({
+              text: {
+                typeName: "System.String",
+                expression: { type: "Literal", value: "Before syntax switch" },
+                memoryReference: { id: "fallback-memory" }
+              }
+            }),
+            inputs: [],
+            outputs: []
+          }
+        }),
+        versions: []
+      });
+      return response({ definitions: [definition()] });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { container, unmount } = await renderRegisteredRoute("/workflows/definitions?definition=definition-1");
+
+    await waitForText(container, "Write Line");
+    await click(Array.from(container.querySelectorAll(".react-flow__node")).find(node => node.textContent?.includes("Write Line")) ?? null);
+    await waitForText(container, "Text");
+    await click(container.querySelector(".wf-syntax-picker-trigger"));
+    await click(buttonByText(container, "JavaScript"));
+    await click(buttonByLabel(container, "Open expanded Text editor"));
+
+    expect(container.textContent).toContain("No enhanced editor is registered for JavaScript. Using the generic text editor.");
+    expect(textareaByLabel(container, "Text expanded value")?.value).toBe("Before syntax switch");
+
+    await fill(textareaByLabel(container, "Text expanded value"), "After fallback edit");
+    await click(buttonByText(container, "Save"));
+
+    const putCall = fetchMock.mock.calls.find(([url, init]) => String(url).includes("/drafts/draft-1") && init?.method === "PUT");
+    expect(putCall).toBeTruthy();
+    expect(JSON.parse(String(putCall?.[1]?.body)).state.rootActivity.text).toEqual({
+      typeName: "System.String",
+      expression: { type: "JavaScript", value: "After fallback edit" },
+      memoryReference: { id: "fallback-memory" }
+    });
+
+    await unmount();
+  });
+
   it("filters the canvas activity picker with keyboard search", async () => {
     vi.stubGlobal("ResizeObserver", class {
       observe() {}
@@ -893,6 +1065,7 @@ function testApi(): ElsaStudioModuleApi {
     navigation,
     routes,
     propertyEditors: registry(),
+    expressionEditors: registry(),
     workflowDesigner: {
       panels: registry()
     },
@@ -1182,6 +1355,17 @@ function flowchartRoot(activities: unknown[]) {
         connectionMetadata: {}
       }
     }
+  };
+}
+
+function writeLineRoot(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    nodeId: "write-line-root",
+    activityVersionId: "write-line-v1",
+    inputs: [],
+    outputs: [],
+    structure: null,
+    ...overrides
   };
 }
 

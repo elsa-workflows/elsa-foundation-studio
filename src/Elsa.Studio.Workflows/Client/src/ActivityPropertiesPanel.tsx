@@ -5,6 +5,8 @@ import type {
   StudioActivityInputDescriptor,
   StudioActivityPropertyEditorContribution,
   StudioActivityPropertyEditorContext,
+  StudioExpressionEditorContribution,
+  StudioExpressionEditorContext,
   StudioExpressionDescriptor
 } from "@elsa-workflows/studio-sdk";
 import type { ActivityNode } from "./workflowTypes";
@@ -23,6 +25,7 @@ export interface ActivityPropertiesPanelProps {
   activity: ActivityNode;
   descriptor: StudioActivityDescriptor | null;
   editors: StudioActivityPropertyEditorContribution[];
+  expressionEditors: StudioExpressionEditorContribution[];
   expressionDescriptors: StudioExpressionDescriptor[];
   descriptorStatus: "loading" | "ready" | "failed";
   onChange(activity: ActivityNode): void;
@@ -32,6 +35,7 @@ export function ActivityPropertiesPanel({
   activity,
   descriptor,
   editors,
+  expressionEditors,
   expressionDescriptors,
   descriptorStatus,
   onChange
@@ -67,6 +71,7 @@ export function ActivityPropertiesPanel({
               activity={activity}
               input={input}
               editors={editors}
+              expressionEditors={expressionEditors}
               expressionDescriptors={syntaxDescriptors}
               onChange={onChange}
             />
@@ -81,12 +86,14 @@ function PropertyRow({
   activity,
   input,
   editors,
+  expressionEditors,
   expressionDescriptors,
   onChange
 }: {
   activity: ActivityNode;
   input: StudioActivityInputDescriptor;
   editors: StudioActivityPropertyEditorContribution[];
+  expressionEditors: StudioExpressionEditorContribution[];
   expressionDescriptors: StudioExpressionDescriptor[];
   onChange(activity: ActivityNode): void;
 }) {
@@ -171,6 +178,8 @@ function PropertyRow({
           value={value}
           syntax={syntax}
           descriptors={expressionDescriptors}
+          activity={activity}
+          expressionEditors={expressionEditors}
           disabled={readOnly}
           onChange={setRaw}
           onSyntaxChange={setSyntax}
@@ -186,6 +195,8 @@ function ExpandedPropertyEditor({
   value,
   syntax,
   descriptors,
+  activity,
+  expressionEditors,
   disabled,
   onChange,
   onSyntaxChange,
@@ -195,6 +206,8 @@ function ExpandedPropertyEditor({
   value: unknown;
   syntax: string;
   descriptors: StudioExpressionDescriptor[];
+  activity: ActivityNode;
+  expressionEditors: StudioExpressionEditorContribution[];
   disabled: boolean;
   onChange(value: unknown): void;
   onSyntaxChange(value: string): void;
@@ -202,6 +215,17 @@ function ExpandedPropertyEditor({
 }) {
   const titleId = useId();
   const displayName = input.displayName || input.name;
+  const expressionContext: StudioExpressionEditorContext = {
+    activity,
+    descriptor: input,
+    expressionDescriptors: descriptors,
+    readOnly: disabled,
+    surface: "expanded",
+    syntax
+  };
+  const expressionEditor = resolveExpressionEditor(expressionEditors, expressionContext);
+  const ExpressionEditorComponent = expressionEditor?.surfaces.expanded;
+  const showFallbackHint = !ExpressionEditorComponent && syntax.toLowerCase() !== "literal";
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -236,13 +260,31 @@ function ExpandedPropertyEditor({
             <span>{formatTypeName(input.typeName)}</span>
           </div>
           {input.description ? <p>{input.description}</p> : null}
-          <textarea
-            aria-label={`${displayName} expanded value`}
-            value={value == null ? "" : String(value)}
-            disabled={disabled}
-            spellCheck={false}
-            onChange={event => onChange(event.target.value)}
-          />
+          {ExpressionEditorComponent ? (
+            <ExpressionEditorComponent
+              descriptor={input}
+              syntax={syntax}
+              value={value}
+              disabled={disabled}
+              context={expressionContext}
+              onChange={onChange}
+            />
+          ) : (
+            <>
+              {showFallbackHint ? (
+                <p className="wf-expression-editor-hint">
+                  No enhanced editor is registered for {syntax}. Using the generic text editor.
+                </p>
+              ) : null}
+              <textarea
+                aria-label={`${displayName} expanded value`}
+                value={value == null ? "" : String(value)}
+                disabled={disabled}
+                spellCheck={false}
+                onChange={event => onChange(event.target.value)}
+              />
+            </>
+          )}
         </div>
         <footer>
           <span>Changes update the draft immediately.</span>
@@ -349,6 +391,15 @@ function resolveEditor(
   return [...editors]
     .sort((left, right) => (left.order ?? 500) - (right.order ?? 500))
     .find(editor => editor.supports(input, context));
+}
+
+function resolveExpressionEditor(
+  editors: StudioExpressionEditorContribution[],
+  context: StudioExpressionEditorContext
+) {
+  return [...editors]
+    .sort((left, right) => (left.order ?? 500) - (right.order ?? 500))
+    .find(editor => !!editor.surfaces[context.surface] && editor.supports(context));
 }
 
 function groupInputs(inputs: StudioActivityInputDescriptor[]) {
