@@ -2,7 +2,7 @@ import React from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Dashboard, Diagnostics, getNavigationSection, getStudioNavigation, getTopLevelNavigationItems } from "../app/App";
+import { Dashboard, Diagnostics, getNavigationSection, getStudioNavigation, getTopLevelNavigationItems, isDashboardPath } from "../app/App";
 import type { ElsaStudioModuleApi, StudioDiagnosticsWidgetContribution, StudioDiagnosticsWidgetProps } from "../sdk";
 
 afterEach(() => {
@@ -164,11 +164,17 @@ describe("navigation sections", () => {
   it("keeps Dashboard owned by the host shell", () => {
     const navigation = getStudioNavigation([
       { id: "dashboard-sample", label: "Dashboard", path: "/dashboard", order: 100 },
+      { id: "overview", label: "Overview", path: "/overview", order: 10 },
       { id: "weather", label: "Weather", path: "/weather", order: 20 }
     ]);
 
     expect(navigation.filter(item => item.path === "/dashboard").map(item => item.id)).toEqual(["dashboard"]);
+    expect(navigation.map(item => item.id)).not.toContain("overview");
     expect(navigation.map(item => item.id)).toContain("weather");
+  });
+
+  it("resolves the legacy Overview path as Dashboard", () => {
+    expect(isDashboardPath("/overview")).toBe(true);
   });
 
   it("groups module and feature management under Settings", () => {
