@@ -21,7 +21,7 @@ import type {
   WorkflowTestRunView
 } from "../workflowTypes";
 const basePath = "/_elsa/workflow-management";
-const publishingBasePath = "/_elsa/publishing";
+const publishingBasePath = "/publishing";
 
 export const workflowKeys = {
   all: ["workflows"] as const,

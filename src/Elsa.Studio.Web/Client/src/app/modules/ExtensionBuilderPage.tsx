@@ -227,17 +227,25 @@ export function ExtensionBuilderPage({ api }: { api: ElsaStudioModuleApi }) {
       setActiveBuild(project.builds?.[0] ?? null);
       const firstFile = projectFiles.find(file => file.type === "file");
       if (firstFile) {
-        const file = await readProjectFile(context, workspaceId, projectId, firstFile.path);
+        const file = await readProjectFile(context, workspaceId, projectId, firstFile.path).catch(() => firstFile.content != null ? firstFile : null);
         if (!canApplyProjectState(mounted.current, requestId, projectDetailsRequestId.current, selectedIds.current, workspaceId, projectId)) return;
-        const content = file.content ?? "";
-        setActiveFilePath(file.path);
-        setEditorText(content);
-        setSavedEditorText(content);
-        setLineHint(null);
+        if (file) {
+          const content = file.content ?? "";
+          setActiveFilePath(file.path);
+          setEditorText(content);
+          setSavedEditorText(content);
+          setLineHint(null);
+        } else {
+          setActiveFilePath("");
+          setEditorText("");
+          setSavedEditorText("");
+          setLineHint(null);
+        }
       } else {
         setActiveFilePath("");
         setEditorText("");
         setSavedEditorText("");
+        setLineHint(null);
       }
     } catch (e) {
       setError(getErrorMessage(e));

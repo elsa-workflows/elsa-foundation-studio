@@ -56,7 +56,7 @@ interface HostHealthEntry {
 }
 
 const builtInNavigation: StudioNavigationContribution[] = [
-  { id: "home", label: "Overview", path: "/", order: 0, iconColor: "#0ea5e9" },
+  { id: "dashboard", label: "Dashboard", path: "/dashboard", order: 0, iconColor: "#0ea5e9" },
   { id: "extension-builder", label: "Extension Builder", path: "/extension-builder", order: 40, iconColor: "#ec4899" },
   { id: "modules", label: "Modules", path: "/modules", order: 80, iconColor: "#8b5cf6" },
   { id: "package-feeds", label: "Package feeds", path: "/package-feeds", order: 90, iconColor: "#f59e0b" },
@@ -146,9 +146,7 @@ function AppContent() {
 
   const routes = useMemo(() => api?.routes.list() ?? [], [api, state]);
   const navigation = useMemo(
-    () => [...builtInNavigation, ...(api?.navigation.list() ?? [])]
-      .filter((item, index, items) => items.findIndex(candidate => candidate.id === item.id) === index)
-      .sort((a, b) => (a.order ?? 500) - (b.order ?? 500)),
+    () => getStudioNavigation(api?.navigation.list() ?? []),
     [api, state]
   );
   const panels = useMemo(
@@ -176,10 +174,11 @@ function AppContent() {
     );
   }
 
-  const activeRoute = findRouteForPath(routes, path);
+  const dashboardPath = isDashboardPath(path);
+  const activeRoute = dashboardPath ? undefined : findRouteForPath(routes, path);
   const ActiveComponent = activeRoute?.component;
   const owningFeatureArea = findFeatureAreaForPath(featureAreas, path);
-  const pageTitle = navigation.find(item => isNavigationItemActive(item, path))?.label ?? activeRoute?.label ?? owningFeatureArea?.title ?? "Studio";
+  const pageTitle = dashboardPath ? "Dashboard" : navigation.find(item => isNavigationItemActive(item, path))?.label ?? activeRoute?.label ?? owningFeatureArea?.title ?? "Studio";
 
   return (
     <>
@@ -192,13 +191,13 @@ function AppContent() {
         backendBaseUrl={backendBaseUrl}
         assistantAction={<AgentLauncher open={assistantOpen} onClick={() => setAssistantOpen(current => !current)} />}
       >
-        {path === "/" ? <Home api={api!} /> : null}
+        {dashboardPath ? <Dashboard api={api!} /> : null}
         {path === "/extension-builder" ? <ExtensionBuilderPage api={api!} /> : null}
         {path === "/modules" ? <ModuleManagementPage api={api!} /> : null}
         {path === "/package-feeds" ? <PackageFeedsPage api={api!} /> : null}
         {path === "/diagnostics/modules" ? <Diagnostics api={api!} /> : null}
         {ActiveComponent ? <ActiveComponent /> : null}
-        {!ActiveComponent && path !== "/" && path !== "/extension-builder" && path !== "/modules" && path !== "/package-feeds" && path !== "/diagnostics/modules" ? (
+        {!ActiveComponent && !dashboardPath && path !== "/extension-builder" && path !== "/modules" && path !== "/package-feeds" && path !== "/diagnostics/modules" ? (
           <div className="empty-state">
             {owningFeatureArea
               ? `${owningFeatureArea.title} owns ${path}, but no route component is registered for it.`
@@ -562,7 +561,7 @@ function BottomPanel({ panels }: { panels: StudioPanelContribution[] }) {
   );
 }
 
-export function Home({ api }: { api: ElsaStudioModuleApi }) {
+export function Dashboard({ api }: { api: ElsaStudioModuleApi }) {
   const widgets = api.dashboardWidgets.list().sort((a, b) => (a.order ?? 500) - (b.order ?? 500));
 
   return (
@@ -823,9 +822,20 @@ function getDefaultNavIconColor(id: string) {
 }
 
 function isNavigationItemActive(item: StudioNavigationContribution, path: string) {
+  if (item.id === "dashboard" && isDashboardPath(path)) return true;
   if (path === item.path) return true;
   if (!item.activePathPrefix) return false;
   return path === item.activePathPrefix || path.startsWith(`${item.activePathPrefix}/`);
+}
+
+function isDashboardPath(path: string) {
+  return path === "/" || path === "/dashboard";
+}
+
+export function getStudioNavigation(moduleNavigation: StudioNavigationContribution[]) {
+  return [...builtInNavigation, ...moduleNavigation.filter(item => !isDashboardPath(item.path))]
+    .filter((item, index, items) => items.findIndex(candidate => candidate.id === item.id) === index)
+    .sort((a, b) => (a.order ?? 500) - (b.order ?? 500));
 }
 
 export function getNavigationSection(item: Pick<StudioNavigationContribution, "id" | "path">): NavigationSection {
