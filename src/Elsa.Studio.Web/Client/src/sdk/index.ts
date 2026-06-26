@@ -338,6 +338,8 @@ export type StudioAgentMode = "explain" | "build" | "troubleshoot" | "operate" |
 export type StudioAgentSensitivity = "public" | "internal" | "sensitive" | "secret-redacted";
 export type StudioAgentCapabilityKind = "answer" | "context" | "prompt-starter" | "proposal" | "action";
 export type StudioAgentRisk = "read-only" | "review-required" | "destructive" | "admin";
+export type StudioAgentToolInvocationMode = "read-only" | "direct" | "proposal" | "privileged";
+export type StudioAgentToolAvailabilityStatus = "available" | "disabled" | "policy-denied" | "unavailable";
 
 export interface StudioAgentSurface {
   route: string;
@@ -404,11 +406,46 @@ export interface StudioAgentActionContribution {
   proposalSchema: unknown;
 }
 
+export interface StudioAgentToolAvailability {
+  status: StudioAgentToolAvailabilityStatus;
+  reason?: string;
+}
+
+export interface StudioAgentToolSlotContribution {
+  id: string;
+  moduleId?: string;
+  displayName: string;
+  description?: string;
+  order?: number;
+  surfaces: string[];
+  invocationModes?: StudioAgentToolInvocationMode[];
+}
+
+export interface StudioAgentToolContractContribution {
+  id: string;
+  slotId: string;
+  moduleId?: string;
+  displayName: string;
+  description: string;
+  order?: number;
+  surfaces: string[];
+  inputSchema: unknown;
+  resourceTargetSchema: unknown;
+  resultSchema: unknown;
+  risk: StudioAgentRisk;
+  requiredPermissions?: string[];
+  availability?: StudioAgentToolAvailability;
+  invocationModes: StudioAgentToolInvocationMode[];
+  resultRendererIds?: string[];
+}
+
 export interface StudioAgentRegistry {
   readonly contextProviders: StudioContributionRegistry<StudioAgentContextProviderContribution>;
   readonly promptStarters: StudioContributionRegistry<StudioAgentPromptStarterContribution>;
   readonly capabilities: StudioContributionRegistry<StudioAgentCapabilityContribution>;
   readonly actions: StudioContributionRegistry<StudioAgentActionContribution>;
+  readonly toolSlots: StudioContributionRegistry<StudioAgentToolSlotContribution>;
+  readonly toolContracts: StudioContributionRegistry<StudioAgentToolContractContribution>;
 }
 
 export type StudioAiPromptMode = "enqueue" | "steer";
