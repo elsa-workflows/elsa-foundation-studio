@@ -7,6 +7,7 @@ import type {
   StudioActivityPropertyEditorContext,
   StudioExpressionEditorContribution,
   StudioExpressionEditorContext,
+  StudioExpressionEditorDiagnostic,
   StudioExpressionDescriptor
 } from "@elsa-workflows/studio-sdk";
 import type { ActivityNode } from "./workflowTypes";
@@ -114,6 +115,9 @@ function PropertyRow({
   } : null;
   const inlineExpressionEditor = inlineExpressionContext ? resolveExpressionEditor(expressionEditors, inlineExpressionContext) : null;
   const InlineExpressionEditorComponent = inlineExpressionEditor?.surfaces.inline;
+  const inlineDiagnostics = inlineExpressionEditor && inlineExpressionContext
+    ? getExpressionEditorDiagnostics(inlineExpressionEditor, inlineExpressionContext, value)
+    : [];
   const useInlineSyntaxPicker = Boolean(wrapped && isSingleLineTextInput(input, editor?.id));
   const canExpandEditor = Boolean(wrapped && isExpandableTextInput(input, editor?.id));
   const [expanded, setExpanded] = useState(false);
@@ -158,6 +162,7 @@ function PropertyRow({
         <div className="wf-expression-field">
           <div className="wf-expression-editor">
             {valueEditor}
+            {renderExpressionDiagnostics(inlineDiagnostics)}
           </div>
           <SyntaxPicker
             label={`${input.displayName || input.name} expression syntax`}
@@ -180,7 +185,10 @@ function PropertyRow({
           ) : null}
         </div>
       ) : (
-        valueEditor
+        <>
+          {valueEditor}
+          {renderExpressionDiagnostics(inlineDiagnostics)}
+        </>
       )}
       {canExpandEditor && !useInlineSyntaxPicker ? (
         <button
@@ -245,6 +253,7 @@ function ExpandedPropertyEditor({
   };
   const expressionEditor = resolveExpressionEditor(expressionEditors, expressionContext);
   const ExpressionEditorComponent = expressionEditor?.surfaces.expanded;
+  const diagnostics = expressionEditor ? getExpressionEditorDiagnostics(expressionEditor, expressionContext, value) : [];
   const showFallbackHint = !ExpressionEditorComponent && syntax.toLowerCase() !== "literal";
 
   useEffect(() => {
@@ -305,6 +314,7 @@ function ExpandedPropertyEditor({
               />
             </>
           )}
+          {renderExpressionDiagnostics(diagnostics)}
         </div>
         <footer>
           <span>Changes update the draft immediately.</span>
@@ -420,6 +430,32 @@ function resolveExpressionEditor(
   return [...editors]
     .sort((left, right) => (left.order ?? 500) - (right.order ?? 500))
     .find(editor => !!editor.surfaces[context.surface] && editor.supports(context));
+}
+
+function getExpressionEditorDiagnostics(
+  editor: StudioExpressionEditorContribution,
+  context: StudioExpressionEditorContext,
+  value: unknown
+) {
+  return editor.diagnostics?.(context, value) ?? [];
+}
+
+function renderExpressionDiagnostics(diagnostics: StudioExpressionEditorDiagnostic[]) {
+  if (diagnostics.length === 0) return null;
+
+  return (
+    <div className="wf-expression-editor-diagnostics" role="status">
+      {diagnostics.map((diagnostic, index) => {
+        const severity = diagnostic.severity ?? "info";
+        return (
+          <p key={`${diagnostic.code ?? "diagnostic"}-${index}`} className={`wf-expression-editor-diagnostic ${severity}`}>
+            {diagnostic.code ? <span>{diagnostic.code}</span> : null}
+            {diagnostic.message}
+          </p>
+        );
+      })}
+    </div>
+  );
 }
 
 function groupInputs(inputs: StudioActivityInputDescriptor[]) {

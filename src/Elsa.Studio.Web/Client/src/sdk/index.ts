@@ -311,11 +311,20 @@ export interface StudioExpressionEditorProps {
   onChange(value: unknown): void;
 }
 
+export type StudioExpressionEditorDiagnosticSeverity = "info" | "warning" | "error";
+
+export interface StudioExpressionEditorDiagnostic {
+  severity?: StudioExpressionEditorDiagnosticSeverity;
+  code?: string;
+  message: string;
+}
+
 export interface StudioExpressionEditorContribution {
   id: string;
   order?: number;
   supports(context: StudioExpressionEditorContext): boolean;
   surfaces: Partial<Record<StudioExpressionEditorSurface, ComponentType<StudioExpressionEditorProps>>>;
+  diagnostics?(context: StudioExpressionEditorContext, value: unknown): StudioExpressionEditorDiagnostic[];
 }
 
 export type StudioAgentMode = "explain" | "build" | "troubleshoot" | "operate" | "administer";
