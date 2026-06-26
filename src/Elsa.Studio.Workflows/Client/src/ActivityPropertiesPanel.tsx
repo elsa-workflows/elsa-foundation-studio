@@ -254,7 +254,7 @@ function ExpandedPropertyEditor({
   const expressionEditor = resolveExpressionEditor(expressionEditors, expressionContext);
   const ExpressionEditorComponent = expressionEditor?.surfaces.expanded;
   const diagnostics = expressionEditor ? getExpressionEditorDiagnostics(expressionEditor, expressionContext, value) : [];
-  const showFallbackHint = !ExpressionEditorComponent && syntax.toLowerCase() !== "literal";
+  const fallbackHint = !ExpressionEditorComponent ? getExpressionEditorFallbackHint(expressionEditors, expressionContext) : null;
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -300,9 +300,9 @@ function ExpandedPropertyEditor({
             />
           ) : (
             <>
-              {showFallbackHint ? (
+              {fallbackHint ? (
                 <p className="wf-expression-editor-hint">
-                  No enhanced editor is registered for {syntax}. Using the generic text editor.
+                  {fallbackHint}
                 </p>
               ) : null}
               <textarea
@@ -438,6 +438,24 @@ function getExpressionEditorDiagnostics(
   value: unknown
 ) {
   return editor.diagnostics?.(context, value) ?? [];
+}
+
+function getExpressionEditorFallbackHint(
+  editors: StudioExpressionEditorContribution[],
+  context: StudioExpressionEditorContext
+) {
+  if (context.syntax.toLowerCase() === "literal") return null;
+
+  const metadata = [...editors]
+    .sort((left, right) => (left.order ?? 500) - (right.order ?? 500))
+    .find(editor => editor.supports(context) && editor.metadata)?.metadata;
+
+  if (!metadata) return `No enhanced editor is registered for ${context.syntax}. Using the generic text editor.`;
+
+  const displayName = metadata.displayName?.trim() || "enhanced editor";
+  const installHint = metadata.installHint?.trim();
+  const baseHint = `No ${displayName} is registered for ${context.syntax}. Using the generic text editor.`;
+  return installHint ? `${baseHint} ${installHint}` : baseHint;
 }
 
 function renderExpressionDiagnostics(diagnostics: StudioExpressionEditorDiagnostic[]) {

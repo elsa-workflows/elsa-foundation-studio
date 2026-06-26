@@ -646,6 +646,7 @@ describe("workflows module", () => {
     await click(buttonByLabel(container, "Open expanded Text editor"));
 
     expect(container.textContent).toContain("No enhanced editor is registered for JavaScript. Using the generic text editor.");
+    expect(container.textContent).not.toContain("Monaco");
     expect(textareaByLabel(container, "Text expanded value")?.value).toBe("Before syntax switch");
 
     await fill(textareaByLabel(container, "Text expanded value"), "After fallback edit");
@@ -657,6 +658,88 @@ describe("workflows module", () => {
       typeName: "System.String",
       expression: { type: "JavaScript", value: "After fallback edit" },
       memoryReference: { id: "fallback-memory" }
+    });
+
+    await unmount();
+  });
+
+  it("uses optional expression editor metadata for missing-enhancement fallback hints", async () => {
+    vi.stubGlobal("ResizeObserver", class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === "PUT") return response({ ...workflowDraft(JSON.parse(String(init.body))), validationErrors: [] });
+      if (url.includes("/descriptors/activities")) return response({ items: [writeLineDescriptor()] });
+      if (url.includes("/descriptors/expression-descriptors")) return response({ items: [
+        { type: "Literal", displayName: "Literal" },
+        { type: "JavaScript", displayName: "JavaScript" }
+      ] });
+      if (url.includes("/activities")) return response({ activities: [
+        activity({
+          activityVersionId: "write-line-v1",
+          activityTypeKey: "Elsa.Activities.Primitives.Activities.WriteLine",
+          category: "Primitives",
+          displayName: "Write Line",
+          description: "Writes a line to the console."
+        })
+      ] });
+      if (url.includes("/definitions/definition-1")) return response({
+        definition: definition(),
+        draft: workflowDraft({
+          state: {
+            variables: [],
+            rootActivity: writeLineRoot({
+              text: {
+                typeName: "System.String",
+                expression: { type: "Literal", value: "Before metadata hint" },
+                memoryReference: { id: "metadata-memory" }
+              }
+            }),
+            inputs: [],
+            outputs: []
+          }
+        }),
+        versions: []
+      });
+      return response({ definitions: [definition()] });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { container, unmount } = await renderRegisteredRoute("/workflows/definitions?definition=definition-1", api => {
+      api.expressionEditors.add({
+        id: "javascript-metadata-only",
+        supports: context => context.syntax === "JavaScript",
+        metadata: {
+          displayName: "JavaScript expression editor module",
+          installHint: "Install the JavaScript editor package to enable the enhanced editor."
+        },
+        surfaces: {}
+      });
+    });
+
+    await waitForText(container, "Write Line");
+    await click(Array.from(container.querySelectorAll(".react-flow__node")).find(node => node.textContent?.includes("Write Line")) ?? null);
+    await waitForText(container, "Text");
+    await click(container.querySelector(".wf-syntax-picker-trigger"));
+    await click(buttonByText(container, "JavaScript"));
+    await click(buttonByLabel(container, "Open expanded Text editor"));
+
+    expect(container.textContent).toContain("No JavaScript expression editor module is registered for JavaScript. Using the generic text editor.");
+    expect(container.textContent).toContain("Install the JavaScript editor package to enable the enhanced editor.");
+    expect(container.textContent).not.toContain("Monaco");
+
+    await fill(textareaByLabel(container, "Text expanded value"), "Edited with metadata fallback");
+    await click(buttonByText(container, "Save"));
+
+    const putCall = fetchMock.mock.calls.find(([url, init]) => String(url).includes("/drafts/draft-1") && init?.method === "PUT");
+    expect(putCall).toBeTruthy();
+    expect(JSON.parse(String(putCall?.[1]?.body)).state.rootActivity.text).toEqual({
+      typeName: "System.String",
+      expression: { type: "JavaScript", value: "Edited with metadata fallback" },
+      memoryReference: { id: "metadata-memory" }
     });
 
     await unmount();
