@@ -9,6 +9,7 @@ import {
   type StudioFeatureAreaContribution,
   type StudioFeatureAreaNavContribution,
   type StudioFeatureAreaNavParent,
+  type StudioDiagnosticsWidgetContribution,
   type StudioModuleDiagnostic,
   type StudioNavigationContribution,
   type StudioRouteContribution
@@ -42,6 +43,7 @@ export function createStudioRegistry(
     navigation,
     routes,
     dashboardWidgets: createContributionRegistry(),
+    diagnosticsWidgets: createContributionRegistry<StudioDiagnosticsWidgetContribution>(),
     panels: createContributionRegistry(),
     toolbarActions: createContributionRegistry(),
     activityEditors: createContributionRegistry(),
