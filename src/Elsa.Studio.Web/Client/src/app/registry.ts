@@ -52,7 +52,9 @@ export function createStudioRegistry(
       contextProviders: createContributionRegistry(),
       promptStarters: createContributionRegistry(),
       capabilities: createContributionRegistry(),
-      actions: createContributionRegistry()
+      actions: createContributionRegistry(),
+      toolSlots: createContributionRegistry(),
+      toolContracts: createContributionRegistry()
     },
     workflowDesigner: {
       nodeRenderers: createContributionRegistry(),
