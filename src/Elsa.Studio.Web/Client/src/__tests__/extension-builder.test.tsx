@@ -17,7 +17,7 @@ describe("extension builder page", () => {
       getJson: async url => url.endsWith("/capabilities") ? deniedCapabilities() : []
     }));
 
-    await flushPromises();
+    await waitForText(container, "You do not have Extension Builder capabilities");
 
     expect(container.textContent).toContain("You do not have Extension Builder capabilities");
     expect(container.textContent).toContain("GetCapabilities");

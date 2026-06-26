@@ -27,12 +27,14 @@ import {
   type XYPosition
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { AlertCircle, Boxes, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, GitBranch, GripVertical, ListTree, Maximize2, Minimize2, Package, Play, Plus, RotateCcw, Save, Search, Sparkles, Terminal, Trash2, X, Zap } from "lucide-react";
+import { AlertCircle, Boxes, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, GitBranch, GripVertical, ListTree, Maximize2, Minimize2, Package, Play, Plus, RefreshCcw, RotateCcw, Save, Search, Sparkles, Terminal, Trash2, X, Zap } from "lucide-react";
 import type { ElsaStudioModuleApi, StudioActivityDescriptor, StudioActivityPropertyEditorContribution, StudioAiContributionApi, StudioAiPromptActionContribution, StudioEndpointContext, StudioExpressionDescriptor, StudioWorkflowDesignerPanelContribution } from "@elsa-workflows/studio-sdk";
 import {
   createDefinition,
   deleteDefinition,
   deleteDefinitionPermanently,
+  deleteExecutable,
+  deleteExecutablePermanently,
   getDefinition,
   getWorkflowDefinitionVersion,
   getWorkflowInstance,
@@ -46,6 +48,7 @@ import {
   promoteDraft,
   publishVersion,
   restoreDefinition,
+  restoreExecutable,
   runExecutable,
   startWorkflowDraftTestRun,
   updateDraft
@@ -748,6 +751,7 @@ function CreateWorkflowDialog({ draft, activities, catalogState, creating, sugge
 }
 
 function WorkflowExecutables({ context, ai, definitionFilter, onDefinitionFilterChange }: { context: StudioEndpointContext; ai: StudioAiContributionApi; definitionFilter: string | null; onDefinitionFilterChange(filter: string | null): void }) {
+  const [listState, setListState] = useState<DefinitionListState>("active");
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
@@ -773,13 +777,13 @@ function WorkflowExecutables({ context, ai, definitionFilter, onDefinitionFilter
     setState("loading");
     setError("");
     try {
-      setExecutables(await listExecutables(context));
+      setExecutables(await listExecutables(context, listState));
       setState("ready");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setState("failed");
     }
-  }, [context]);
+  }, [context, listState]);
 
   useEffect(() => {
     void load();
@@ -791,6 +795,44 @@ function WorkflowExecutables({ context, ai, definitionFilter, onDefinitionFilter
     try {
       await runExecutable(context, executable.artifactId);
       setStatus(`Started ${executable.artifactId}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const softDelete = async (executable: WorkflowExecutableSummary) => {
+    if (!window.confirm(`Delete executable artifact "${executable.artifactId}"? You can restore it from the Deleted view.`)) return;
+    setStatus("");
+    setError("");
+    try {
+      await deleteExecutable(context, executable.artifactId);
+      setStatus(`Deleted ${executable.artifactId}`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const restore = async (executable: WorkflowExecutableSummary) => {
+    setStatus("");
+    setError("");
+    try {
+      await restoreExecutable(context, executable.artifactId);
+      setStatus(`Restored ${executable.artifactId}`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const permanentDelete = async (executable: WorkflowExecutableSummary) => {
+    if (!window.confirm(`Permanently delete executable artifact "${executable.artifactId}"? This cannot be undone.`)) return;
+    setStatus("");
+    setError("");
+    try {
+      await deleteExecutablePermanently(context, executable.artifactId);
+      setStatus(`Permanently deleted ${executable.artifactId}`);
+      await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -818,7 +860,11 @@ function WorkflowExecutables({ context, ai, definitionFilter, onDefinitionFilter
   return (
     <>
       <div className="wf-toolbar">
-        <button type="button" onClick={() => void load()}>Refresh</button>
+        <div className="wf-segmented" role="tablist" aria-label="Executable state">
+          <button type="button" className={listState === "active" ? "active" : ""} aria-selected={listState === "active"} onClick={() => { setListState("active"); setStatus(""); }}>Active</button>
+          <button type="button" className={listState === "deleted" ? "active" : ""} aria-selected={listState === "deleted"} onClick={() => { setListState("deleted"); setStatus(""); }}>Deleted</button>
+        </div>
+        <button type="button" className="wf-icon-button" aria-label="Refresh workflow executables" title="Refresh" onClick={() => void load()}><RefreshCcw size={15} /></button>
         <label className="wf-search wf-executable-definition-filter">
           <Search size={14} />
           <input
@@ -837,9 +883,10 @@ function WorkflowExecutables({ context, ai, definitionFilter, onDefinitionFilter
         ) : null}
       </div>
       {state === "failed" ? <div className="wf-alert"><AlertCircle size={16} /> {error}</div> : null}
+      {state !== "failed" && error ? <div className="wf-alert"><AlertCircle size={16} /> {error}</div> : null}
       {status ? <div className="wf-status-line"><Check size={14} /> {status}</div> : null}
       {state === "loading" ? <div className="wf-empty">Loading workflow executables...</div> : null}
-      {state === "ready" && visibleExecutables.length === 0 ? <div className="wf-empty">{definitionFilter ? "No workflow executables match this definition filter." : "No workflow executables found. Publish a workflow definition to create one."}</div> : null}
+      {state === "ready" && visibleExecutables.length === 0 ? <div className="wf-empty">{getExecutableEmptyMessage(listState, !!definitionFilter)}</div> : null}
       {state === "ready" && visibleExecutables.length > 0 ? (
         <div className="wf-grid wf-executable-grid" role="table" aria-label="Workflow executables">
           <div className="wf-grid-head" role="row">
@@ -847,7 +894,7 @@ function WorkflowExecutables({ context, ai, definitionFilter, onDefinitionFilter
             <span>Version</span>
             <span>Source</span>
             <span>Root</span>
-            <span>Published</span>
+            <span>{listState === "deleted" ? "Deleted" : "Published"}</span>
             <span>Actions</span>
           </div>
           {visibleExecutables.map(executable => (
@@ -868,12 +915,22 @@ function WorkflowExecutables({ context, ai, definitionFilter, onDefinitionFilter
               </span>
               <WorkflowExecutableSourceCell executable={executable} onCopied={markCopied} onCopyFailed={markCopyFailed} />
               <span>{formatExecutableRoot(executable)}</span>
-              <span>{formatDate(executable.publishedAt ?? executable.createdAt)}</span>
+              <span>{formatDate(listState === "deleted" ? executable.deletedAt : (executable.publishedAt ?? executable.createdAt))}</span>
               <span className="wf-row-actions">
-                <button type="button" onClick={() => void run(executable)}><Play size={13} /> Run</button>
-                {explainExecutableAction ? (
-                  <button type="button" onClick={() => explain(executable)}><Sparkles size={13} /> Explain</button>
-                ) : null}
+                {listState === "active" ? (
+                  <>
+                    <button type="button" onClick={() => void run(executable)}><Play size={13} /> Run</button>
+                    {explainExecutableAction ? (
+                      <button type="button" onClick={() => explain(executable)}><Sparkles size={13} /> Explain</button>
+                    ) : null}
+                    <button type="button" className="danger" onClick={() => void softDelete(executable)}><Trash2 size={13} /> Delete</button>
+                  </>
+                ) : (
+                  <>
+                    <button type="button" onClick={() => void restore(executable)}><RotateCcw size={13} /> Restore</button>
+                    <button type="button" className="danger" onClick={() => void permanentDelete(executable)}><Trash2 size={13} /> Delete permanently</button>
+                  </>
+                )}
               </span>
             </div>
           ))}
@@ -986,7 +1043,7 @@ function WorkflowArtifactsPanel({ context, ai, definitionId, publishedArtifactId
     <div className="wf-artifacts-panel">
       <div className="wf-artifacts-toolbar">
         <span>{artifacts.length} artifact{artifacts.length === 1 ? "" : "s"}</span>
-        <button type="button" onClick={() => void load()}><RotateCcw size={13} /> Refresh</button>
+        <button type="button" className="wf-icon-button" aria-label="Refresh workflow artifacts" title="Refresh" onClick={() => void load()}><RefreshCcw size={13} /></button>
         <button type="button" onClick={openExecutablePage}>Open list</button>
       </div>
       {state === "failed" ? <div className="wf-alert compact"><AlertCircle size={14} /> {error}</div> : null}
@@ -1064,7 +1121,7 @@ function WorkflowTestRunsPanel({ context, definitionId, currentRun, runs }: {
     <div id="wf-test-runs-panel" className="wf-test-runs-panel">
       <div className="wf-artifacts-toolbar">
         <span>{uniqueRuns.length} transient run{uniqueRuns.length === 1 ? "" : "s"}</span>
-        <button type="button" onClick={() => void load()}><RotateCcw size={13} /> Refresh</button>
+        <button type="button" className="wf-icon-button" aria-label="Refresh workflow test runs" title="Refresh" onClick={() => void load()}><RefreshCcw size={13} /></button>
         <button type="button" onClick={() => openInstancesPage(definitionId)}>Open list</button>
       </div>
       {currentRun ? (
@@ -1773,6 +1830,13 @@ function executableMatchesDefinitionFilter(executable: WorkflowExecutableSummary
     executable.sourceId,
     executable.sourceVersion
   ].some(value => value?.toLowerCase().includes(normalizedFilter));
+}
+
+function getExecutableEmptyMessage(listState: DefinitionListState, filtered: boolean) {
+  if (filtered) return "No workflow executables match this definition filter.";
+  return listState === "deleted"
+    ? "No deleted workflow executables found."
+    : "No workflow executables found. Publish a workflow definition to create one.";
 }
 
 function executableBelongsToDefinition(executable: WorkflowExecutableSummary, definitionId: string) {
@@ -3136,7 +3200,7 @@ function WorkflowEditor({
             <button type="button" onClick={() => dispatchAiAction(ai, proposeUpdateAction, { definition: details.definition, draft })}><Sparkles size={15} /> Propose</button>
           ) : null}
           <button type="button" disabled={busy} onClick={() => void save()}><Save size={15} /> Save</button>
-          <button type="button" disabled={busy} onClick={() => void promoteAndPublish()}><GitBranch size={15} /> Promote</button>
+          <button type="button" disabled={busy} onClick={() => void promoteAndPublish()}><GitBranch size={15} /> Publish</button>
           {renderedTestRun ? (
             <TestRunStatus
               testRun={renderedTestRun}

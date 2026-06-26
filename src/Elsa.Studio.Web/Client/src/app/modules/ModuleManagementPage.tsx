@@ -174,9 +174,8 @@ export function ModuleManagementPage({ api }: { api: ElsaStudioModuleApi }) {
         </div>
         <StudioToolbar>
           <StudioToolbarGroup>
-            <button type="button" className="studio-button" onClick={() => refreshHost(activeHost.id)} disabled={activeState.state === "loading"}>
+            <button type="button" className="studio-icon-button" aria-label="Refresh modules" title="Refresh" onClick={() => refreshHost(activeHost.id)} disabled={activeState.state === "loading"}>
               <RefreshCcw size={15} />
-              {activeState.state === "loading" ? "Refreshing" : "Refresh"}
             </button>
           </StudioToolbarGroup>
         </StudioToolbar>

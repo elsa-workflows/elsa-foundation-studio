@@ -167,7 +167,7 @@ function mapCapabilities(bootstrap: AgentBootstrapResponse): WeaverCapabilities 
     streaming: bootstrap.enabled !== false && bootstrap.providerStatus !== "unavailable" && availableProviders.length > 0,
     conversationPersistence: true,
     proposalReview: bootstrap.policy?.requiresApprovalForMutations ?? (bootstrap.capabilities ?? []).some(capability => capability.requiresApproval || capability.risk === "review-required"),
-    supportedAttachmentKinds: ["workflow.definition", "workflow.instance", "studio.context"],
+    supportedAttachmentKinds: ["workflow.definition", "workflow.instance", "workflow.execution", "workflow.diagnostics", "studio.context"],
     agents: availableProviders.map(provider => ({
       name: provider.providerId,
       displayName: provider.providerId,
@@ -205,19 +205,58 @@ async function createAgentSession(context: StudioEndpointContext, providerId?: s
 }
 
 function mapAttachment(attachment: StudioAiContextAttachment) {
+  const kind = normalizeAttachmentKind(attachment.kind);
+  const references = buildAttachmentReferences(attachment, kind);
+  const sourceId = references.sourceId || attachment.referenceId || "";
+
   return {
-    id: attachment.id ?? `${attachment.kind}:${attachment.referenceId ?? attachment.scope ?? "context"}`,
-    kind: attachment.kind,
-    displayName: attachment.kind,
+    id: attachment.id ?? `${kind}:${sourceId || attachment.scope || "context"}`,
+    kind,
+    displayName: formatLabel(kind),
     sensitivity: "public",
-    summary: attachment.referenceId ?? attachment.scope ?? attachment.kind,
-    references: {
-      source: attachment.kind,
-      sourceId: attachment.referenceId ?? "",
-      scope: attachment.scope ?? ""
-    },
+    summary: sourceId || attachment.scope || kind,
+    references,
     metadata: attachment.metadata ?? {}
   };
+}
+
+function normalizeAttachmentKind(kind: string) {
+  const normalized = kind.trim().toLowerCase();
+  const aliases: Record<string, string> = {
+    "workflow-definition": "workflow.definition",
+    "workflow-create-draft": "workflow.definition",
+    "workflow-executable": "workflow.execution",
+    "workflow-instance": "workflow.instance",
+    "workflow-diagnostics": "workflow.diagnostics",
+    "studio-context": "studio.context"
+  };
+  return aliases[normalized] ?? normalized;
+}
+
+function buildAttachmentReferences(attachment: StudioAiContextAttachment, kind: string) {
+  const metadata = attachment.metadata ?? {};
+  const references: Record<string, string> = {
+    source: kind.startsWith("workflow.") ? "workflow" : kind,
+    sourceId: attachment.referenceId ?? readMetadataString(metadata, "artifactId") ?? readMetadataString(metadata, "definitionId") ?? readMetadataString(metadata, "id") ?? "",
+    scope: attachment.scope ?? ""
+  };
+
+  addReference(references, "workflowDefinitionId", readMetadataString(metadata, "workflowDefinitionId") ?? readMetadataString(metadata, "definitionId"));
+  addReference(references, "workflowVersionId", readMetadataString(metadata, "workflowVersionId") ?? readMetadataString(metadata, "definitionVersionId") ?? readMetadataString(metadata, "sourceId"));
+  addReference(references, "artifactId", readMetadataString(metadata, "artifactId"));
+  addReference(references, "workflowExecutionId", readMetadataString(metadata, "workflowExecutionId") ?? readMetadataString(metadata, "instanceId"));
+  addReference(references, "selectedActivityId", attachment.activityId ?? readMetadataString(metadata, "selectedActivityId"));
+
+  return references;
+}
+
+function addReference(references: Record<string, string>, key: string, value: string | undefined) {
+  if (value?.trim()) references[key] = value;
+}
+
+function readMetadataString(metadata: Record<string, unknown>, key: string) {
+  const value = metadata[key];
+  return typeof value === "string" && value.trim() ? value : undefined;
 }
 
 function normalizeStreamEvent(value: WeaverStreamEvent | Record<string, unknown>): WeaverStreamEvent | null {

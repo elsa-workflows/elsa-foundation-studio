@@ -346,10 +346,10 @@ describe("workflows module", () => {
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url.includes("/_demo/workflows/executables")) return response([
+      if (url.includes("/_elsa/workflow-management/executables")) return response({ executables: [
         executable({ artifactId: "artifact-current", definitionId: "definition-1", artifactVersion: "2.0.0" }),
         executable({ artifactId: "artifact-other", definitionId: "definition-2", sourceId: "definition-2" })
-      ]);
+      ] });
       if (url.includes("/activities")) return response({ activities: [
         activity({
           activityVersionId: "write-line-v1",
@@ -753,12 +753,12 @@ describe("workflows module", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (init?.method === "POST") return response(null, 204);
-      expect(url).toBe("https://server.example/_demo/workflows/executables");
-      return response([executable({
+      expect(url).toBe("https://server.example/_elsa/workflow-management/executables?state=active");
+      return response({ executables: [executable({
         rootActivityType: "Elsa.Activities.Flowchart.Activities.Flowchart",
         sourceKind: "WorkflowDefinitionVersion",
         sourceId: "version-1"
-      })]);
+      })] });
     });
     vi.stubGlobal("fetch", fetchMock);
     const { container, unmount } = await renderRegisteredRoute("/workflows/executables");
@@ -776,6 +776,50 @@ describe("workflows module", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       "https://server.example/_elsa/workflow-management/executables/artifact-1/run",
       expect.objectContaining({ method: "POST" })
+    );
+
+    await unmount();
+  });
+
+  it("soft-deletes, restores, and permanently deletes executable artifacts", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === "DELETE" || init?.method === "POST") return response(null, 204);
+      if (url.includes("state=deleted")) return response({ executables: [
+        executable({ artifactId: "artifact-restore", deletedAt: "2026-06-26T00:00:00Z" }),
+        executable({ artifactId: "artifact-destroy", deletedAt: "2026-06-26T00:01:00Z" })
+      ] });
+      return response({ executables: [executable()] });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("confirm", vi.fn(() => true));
+    const { container, unmount } = await renderRegisteredRoute("/workflows/executables");
+
+    await waitForText(container, "artifact-1");
+    await click(buttonByText(container, "Delete"));
+
+    expect(window.confirm).toHaveBeenCalledWith("Delete executable artifact \"artifact-1\"? You can restore it from the Deleted view.");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://server.example/_elsa/workflow-management/executables/artifact-1",
+      expect.objectContaining({ method: "DELETE" })
+    );
+
+    await click(buttonByText(container, "Deleted"));
+    await waitForText(container, "artifact-restore");
+    expect(container.textContent).toContain("Delete permanently");
+    expect(container.textContent).not.toContain("Run");
+
+    await click(buttonByText(container, "Restore"));
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://server.example/_elsa/workflow-management/executables/artifact-restore/restore",
+      expect.objectContaining({ method: "POST" })
+    );
+
+    await click(buttonByText(container, "Delete permanently"));
+    expect(window.confirm).toHaveBeenCalledWith("Permanently delete executable artifact \"artifact-restore\"? This cannot be undone.");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://server.example/_elsa/workflow-management/executables/artifact-restore/permanent",
+      expect.objectContaining({ method: "DELETE" })
     );
 
     await unmount();

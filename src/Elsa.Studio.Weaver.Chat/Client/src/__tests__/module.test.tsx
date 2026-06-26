@@ -88,6 +88,40 @@ describe("weaver chat module", () => {
     ]);
   });
 
+  it("normalizes workflow prompt attachments to backend policy context kinds", async () => {
+    const context = agentContext();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(streamFrom([
+      `data: ${JSON.stringify({ Kind: 4, Id: "evt_1" })}\n\n`
+    ]))));
+
+    await streamWeaverChat(context, {
+      message: "Explain this workflow executable.",
+      agent: "deterministic-workflow-authoring",
+      attachments: [{
+        kind: "workflow-executable",
+        referenceId: "artifact-1",
+        metadata: {
+          artifactId: "artifact-1",
+          definitionId: "definition-1",
+          sourceId: "version-1"
+        }
+      }]
+    }, () => {});
+
+    expect(context.http.postJson).toHaveBeenCalledWith("/_elsa/agent/sessions/agt_01/messages", expect.objectContaining({
+      contextAttachments: [expect.objectContaining({
+        id: "workflow.execution:artifact-1",
+        kind: "workflow.execution",
+        references: expect.objectContaining({
+          source: "workflow",
+          sourceId: "artifact-1",
+          workflowDefinitionId: "definition-1",
+          workflowVersionId: "version-1"
+        })
+      })]
+    }));
+  });
+
   it("automatically submits enqueued prompt actions", async () => {
     const backend = agentContext();
     vi.stubGlobal("fetch", vi.fn(async () => new Response(streamFrom([

@@ -552,9 +552,8 @@ export function ExtensionBuilderPage({ api }: { api: ElsaStudioModuleApi }) {
         </div>
         <StudioToolbar>
           <StudioToolbarGroup>
-            <button type="button" className="studio-button" onClick={() => bootstrap()} disabled={state === "loading" || operationBusy}>
+            <button type="button" className="studio-icon-button" aria-label="Refresh extension builder" title="Refresh" onClick={() => bootstrap()} disabled={state === "loading" || operationBusy}>
               <RefreshCcw size={15} />
-              Refresh
             </button>
           </StudioToolbarGroup>
         </StudioToolbar>
@@ -1105,9 +1104,8 @@ function RuntimePanel({
     <div className="modules-inspector-section">
       <div className="extension-builder-runtime-heading">
         <h4>Runtime status</h4>
-        <button type="button" className="studio-button" disabled={busy} onClick={onRefreshRuntime}>
+        <button type="button" className="studio-icon-button" aria-label="Refresh runtime status" title="Refresh" disabled={busy} onClick={onRefreshRuntime}>
           <RefreshCcw size={15} />
-          Refresh
         </button>
       </div>
       {!runtimeStatus ? <p className="modules-muted">Runtime status is not available for this project yet.</p> : null}

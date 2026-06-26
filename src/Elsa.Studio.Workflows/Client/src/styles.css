@@ -142,6 +142,14 @@
   background: var(--wf-panel-muted);
 }
 
+.wf-toolbar button.wf-icon-button,
+.wf-artifacts-toolbar button.wf-icon-button {
+  width: 32px;
+  min-width: 32px;
+  padding: 0;
+  justify-content: center;
+}
+
 .wf-editor-actions button:disabled {
   color: var(--wf-muted-text);
   opacity: 0.6;
