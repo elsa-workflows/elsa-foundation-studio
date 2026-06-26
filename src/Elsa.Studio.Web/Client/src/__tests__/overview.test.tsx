@@ -66,6 +66,37 @@ describe("dashboard", () => {
 
     await unmount();
   });
+
+  it("renders dashboard widgets in deterministic order", async () => {
+    stubBackendFetch();
+    const { container, unmount } = await renderDashboard(stubApi({
+      backendGetJson: async () => healthyRegistry(),
+      widgets: [
+        { id: "beta", title: "Beta", component: () => <div>Beta widget</div> },
+        { id: "alpha", title: "Alpha", component: () => <div>Alpha widget</div> },
+        { id: "first", title: "First", order: 10, component: () => <div>First widget</div> }
+      ]
+    }));
+
+    await flushPromises();
+
+    expect(visibleText(container)).toMatch(/First widget.*Alpha widget.*Beta widget/s);
+
+    await unmount();
+  });
+
+  it("shows a useful Dashboard empty state when no widgets are registered", async () => {
+    stubBackendFetch();
+    const { container, unmount } = await renderDashboard(stubApi({
+      backendGetJson: async () => healthyRegistry()
+    }));
+
+    await flushPromises();
+
+    expect(container.textContent).toContain("No dashboard widgets are registered.");
+
+    await unmount();
+  });
 });
 
 describe("diagnostics", () => {
