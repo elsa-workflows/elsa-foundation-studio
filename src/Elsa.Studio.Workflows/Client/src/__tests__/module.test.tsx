@@ -662,6 +662,194 @@ describe("workflows module", () => {
     await unmount();
   });
 
+  it("renders the ordered inline expression editor contribution and preserves wrapper metadata", async () => {
+    vi.stubGlobal("ResizeObserver", class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === "PUT") return response({ ...workflowDraft(JSON.parse(String(init.body))), validationErrors: [] });
+      if (url.includes("/descriptors/activities")) return response({ items: [writeLineDescriptor()] });
+      if (url.includes("/descriptors/expression-descriptors")) return response({ items: [
+        { type: "Literal", displayName: "Literal" },
+        { type: "JavaScript", displayName: "JavaScript" }
+      ] });
+      if (url.includes("/activities")) return response({ activities: [
+        activity({
+          activityVersionId: "write-line-v1",
+          activityTypeKey: "Elsa.Activities.Primitives.Activities.WriteLine",
+          category: "Primitives",
+          displayName: "Write Line",
+          description: "Writes a line to the console."
+        })
+      ] });
+      if (url.includes("/definitions/definition-1")) return response({
+        definition: definition(),
+        draft: workflowDraft({
+          state: {
+            variables: [],
+            rootActivity: writeLineRoot({
+              text: {
+                typeName: "System.String",
+                expression: { type: "Literal", value: "Before inline contribution" },
+                memoryReference: { id: "inline-memory" }
+              }
+            }),
+            inputs: [],
+            outputs: []
+          }
+        }),
+        versions: []
+      });
+      return response({ definitions: [definition()] });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { container, unmount } = await renderRegisteredRoute("/workflows/definitions?definition=definition-1", api => {
+      api.expressionEditors.add({
+        id: "late-javascript-inline",
+        order: 200,
+        supports: context => context.syntax === "JavaScript",
+        surfaces: {
+          inline: ({ value, onChange }) => (
+            <textarea
+              aria-label="Late JavaScript inline editor"
+              value={value == null ? "" : String(value)}
+              onChange={event => onChange(event.target.value)}
+            />
+          )
+        }
+      });
+      api.expressionEditors.add({
+        id: "preferred-javascript-inline",
+        order: 50,
+        supports: context => context.syntax === "JavaScript",
+        surfaces: {
+          inline: ({ value, onChange }) => (
+            <textarea
+              aria-label="Preferred JavaScript inline editor"
+              value={value == null ? "" : String(value)}
+              onChange={event => onChange(event.target.value)}
+            />
+          )
+        }
+      });
+    });
+
+    await waitForText(container, "Write Line");
+    await click(Array.from(container.querySelectorAll(".react-flow__node")).find(node => node.textContent?.includes("Write Line")) ?? null);
+    await waitForText(container, "Text");
+    await click(container.querySelector(".wf-syntax-picker-trigger"));
+    await click(buttonByText(container, "JavaScript"));
+
+    expect(textareaByLabel(container, "Preferred JavaScript inline editor")).toBeTruthy();
+    expect(textareaByLabel(container, "Late JavaScript inline editor")).toBeNull();
+
+    await fill(textareaByLabel(container, "Preferred JavaScript inline editor"), "return 7;");
+    await click(buttonByText(container, "Save"));
+
+    const putCall = fetchMock.mock.calls.find(([url, init]) => String(url).includes("/drafts/draft-1") && init?.method === "PUT");
+    expect(putCall).toBeTruthy();
+    expect(JSON.parse(String(putCall?.[1]?.body)).state.rootActivity.text).toEqual({
+      typeName: "System.String",
+      expression: { type: "JavaScript", value: "return 7;" },
+      memoryReference: { id: "inline-memory" }
+    });
+
+    await unmount();
+  });
+
+  it("falls back inline independently when only an expanded expression editor is registered", async () => {
+    vi.stubGlobal("ResizeObserver", class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === "PUT") return response({ ...workflowDraft(JSON.parse(String(init.body))), validationErrors: [] });
+      if (url.includes("/descriptors/activities")) return response({ items: [writeLineDescriptor()] });
+      if (url.includes("/descriptors/expression-descriptors")) return response({ items: [
+        { type: "Literal", displayName: "Literal" },
+        { type: "JavaScript", displayName: "JavaScript" }
+      ] });
+      if (url.includes("/activities")) return response({ activities: [
+        activity({
+          activityVersionId: "write-line-v1",
+          activityTypeKey: "Elsa.Activities.Primitives.Activities.WriteLine",
+          category: "Primitives",
+          displayName: "Write Line",
+          description: "Writes a line to the console."
+        })
+      ] });
+      if (url.includes("/definitions/definition-1")) return response({
+        definition: definition(),
+        draft: workflowDraft({
+          state: {
+            variables: [],
+            rootActivity: writeLineRoot({
+              text: {
+                typeName: "System.String",
+                expression: { type: "Literal", value: "Before inline fallback" },
+                memoryReference: { id: "surface-memory" }
+              }
+            }),
+            inputs: [],
+            outputs: []
+          }
+        }),
+        versions: []
+      });
+      return response({ definitions: [definition()] });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { container, unmount } = await renderRegisteredRoute("/workflows/definitions?definition=definition-1", api => {
+      api.expressionEditors.add({
+        id: "javascript-expanded-only",
+        supports: context => context.syntax === "JavaScript",
+        surfaces: {
+          expanded: ({ value, onChange }) => (
+            <textarea
+              aria-label="Expanded-only JavaScript editor"
+              value={value == null ? "" : String(value)}
+              onChange={event => onChange(event.target.value)}
+            />
+          )
+        }
+      });
+    });
+
+    await waitForText(container, "Write Line");
+    await click(Array.from(container.querySelectorAll(".react-flow__node")).find(node => node.textContent?.includes("Write Line")) ?? null);
+    await waitForText(container, "Text");
+    await click(container.querySelector(".wf-syntax-picker-trigger"));
+    await click(buttonByText(container, "JavaScript"));
+
+    expect(textareaByLabel(container, "Expanded-only JavaScript editor")).toBeNull();
+    expect(container.querySelector<HTMLInputElement>(".wf-property-row input[type='text']")?.value).toBe("Before inline fallback");
+
+    await fill(container.querySelector<HTMLInputElement>(".wf-property-row input[type='text']"), "Inline fallback edit");
+    await click(buttonByLabel(container, "Open expanded Text editor"));
+
+    expect(textareaByLabel(container, "Expanded-only JavaScript editor")?.value).toBe("Inline fallback edit");
+
+    await fill(textareaByLabel(container, "Expanded-only JavaScript editor"), "Expanded editor edit");
+    await click(buttonByText(container, "Save"));
+
+    const putCall = fetchMock.mock.calls.find(([url, init]) => String(url).includes("/drafts/draft-1") && init?.method === "PUT");
+    expect(putCall).toBeTruthy();
+    expect(JSON.parse(String(putCall?.[1]?.body)).state.rootActivity.text).toEqual({
+      typeName: "System.String",
+      expression: { type: "JavaScript", value: "Expanded editor edit" },
+      memoryReference: { id: "surface-memory" }
+    });
+
+    await unmount();
+  });
+
   it("filters the canvas activity picker with keyboard search", async () => {
     vi.stubGlobal("ResizeObserver", class {
       observe() {}
