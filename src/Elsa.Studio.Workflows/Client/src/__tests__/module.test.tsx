@@ -872,7 +872,17 @@ describe("workflows module", () => {
     const requestBody = JSON.parse(testRunCall?.body ?? "{}");
     expect(requestBody.definitionId).toBe("definition-1");
     expect(requestBody.snapshotId).toMatch(/^draft-1-[0-9a-f]{8}$/);
-    expect(JSON.stringify(requestBody.state)).toContain("write-line-v1");
+    expect(requestBody.state.rootActivity).toMatchObject({
+      nodeId: "root",
+      activityVersionId: "flowchart-v1",
+      structure: {
+        kind: "elsa.flowchart.structure",
+        payload: {
+          activities: [expect.objectContaining({ activityVersionId: "write-line-v1" })]
+        }
+      }
+    });
+    expect(calls.some(call => call.method === "POST" && urlPath(call.url) === "/_elsa/publishing/workflows/drafts/test-runs")).toBe(false);
     expect(calls.some(call => call.url.includes("/drafts/draft-1/promote") && call.method === "POST")).toBe(false);
     expect(calls.some(call => call.url.includes("/versions/") && call.method === "POST")).toBe(false);
     expect(calls.some(call => call.url.includes("/executables/") && call.method === "POST")).toBe(false);
