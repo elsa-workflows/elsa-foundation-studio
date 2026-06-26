@@ -104,6 +104,16 @@ function PropertyRow({
   const wrapped = input.isWrapped !== false ? readWrappedInput(activity, input) : null;
   const syntax = wrapped?.expression.type ?? "Literal";
   const value = getLiteralEditorValue(activity, input);
+  const inlineExpressionContext: StudioExpressionEditorContext | null = wrapped ? {
+    activity,
+    descriptor: input,
+    expressionDescriptors,
+    readOnly,
+    surface: "inline",
+    syntax
+  } : null;
+  const inlineExpressionEditor = inlineExpressionContext ? resolveExpressionEditor(expressionEditors, inlineExpressionContext) : null;
+  const InlineExpressionEditorComponent = inlineExpressionEditor?.surfaces.inline;
   const useInlineSyntaxPicker = Boolean(wrapped && isSingleLineTextInput(input, editor?.id));
   const canExpandEditor = Boolean(wrapped && isExpandableTextInput(input, editor?.id));
   const [expanded, setExpanded] = useState(false);
@@ -117,6 +127,16 @@ function PropertyRow({
     if (!wrapped) return;
     onChange(writeInputValue(activity, input, withSyntax(wrapped, nextSyntax)));
   };
+  const valueEditor = InlineExpressionEditorComponent && inlineExpressionContext ? (
+    <InlineExpressionEditorComponent
+      descriptor={input}
+      syntax={syntax}
+      value={value}
+      disabled={readOnly}
+      context={inlineExpressionContext}
+      onChange={setRaw}
+    />
+  ) : renderEditor(EditorComponent, input, value, readOnly, context, setRaw);
 
   return (
     <div className="wf-property-row">
@@ -137,7 +157,7 @@ function PropertyRow({
       {useInlineSyntaxPicker ? (
         <div className="wf-expression-field">
           <div className="wf-expression-editor">
-            {renderEditor(EditorComponent, input, value, readOnly, context, setRaw)}
+            {valueEditor}
           </div>
           <SyntaxPicker
             label={`${input.displayName || input.name} expression syntax`}
@@ -160,7 +180,7 @@ function PropertyRow({
           ) : null}
         </div>
       ) : (
-        renderEditor(EditorComponent, input, value, readOnly, context, setRaw)
+        valueEditor
       )}
       {canExpandEditor && !useInlineSyntaxPicker ? (
         <button
