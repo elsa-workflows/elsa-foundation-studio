@@ -319,12 +319,19 @@ export interface StudioExpressionEditorDiagnostic {
   message: string;
 }
 
+export interface StudioExpressionEditorMetadata {
+  displayName?: string;
+  installHint?: string;
+  packageId?: string;
+}
+
 export interface StudioExpressionEditorContribution {
   id: string;
   order?: number;
   supports(context: StudioExpressionEditorContext): boolean;
   surfaces: Partial<Record<StudioExpressionEditorSurface, ComponentType<StudioExpressionEditorProps>>>;
   diagnostics?(context: StudioExpressionEditorContext, value: unknown): StudioExpressionEditorDiagnostic[];
+  metadata?: StudioExpressionEditorMetadata;
 }
 
 export type StudioAgentMode = "explain" | "build" | "troubleshoot" | "operate" | "administer";
