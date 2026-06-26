@@ -850,6 +850,176 @@ describe("workflows module", () => {
     await unmount();
   });
 
+  it("renders expanded expression editor diagnostics without blocking saves", async () => {
+    vi.stubGlobal("ResizeObserver", class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === "PUT") return response({ ...workflowDraft(JSON.parse(String(init.body))), validationErrors: [] });
+      if (url.includes("/descriptors/activities")) return response({ items: [writeLineDescriptor()] });
+      if (url.includes("/descriptors/expression-descriptors")) return response({ items: [
+        { type: "Literal", displayName: "Literal" },
+        { type: "JavaScript", displayName: "JavaScript" }
+      ] });
+      if (url.includes("/activities")) return response({ activities: [
+        activity({
+          activityVersionId: "write-line-v1",
+          activityTypeKey: "Elsa.Activities.Primitives.Activities.WriteLine",
+          category: "Primitives",
+          displayName: "Write Line",
+          description: "Writes a line to the console."
+        })
+      ] });
+      if (url.includes("/definitions/definition-1")) return response({
+        definition: definition(),
+        draft: workflowDraft({
+          state: {
+            variables: [],
+            rootActivity: writeLineRoot({
+              text: {
+                typeName: "System.String",
+                expression: { type: "JavaScript", value: "bad expanded expression" },
+                memoryReference: { id: "expanded-diagnostic-memory" }
+              }
+            }),
+            inputs: [],
+            outputs: []
+          }
+        }),
+        versions: []
+      });
+      return response({ definitions: [definition()] });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { container, unmount } = await renderRegisteredRoute("/workflows/definitions?definition=definition-1", api => {
+      api.expressionEditors.add({
+        id: "diagnostic-javascript-expanded",
+        supports: context => context.syntax === "JavaScript",
+        diagnostics: (_context, value) => String(value).includes("bad")
+          ? [{ severity: "warning", code: "JS001", message: "Review this JavaScript expression." }]
+          : [],
+        surfaces: {
+          expanded: ({ value, onChange }) => (
+            <textarea
+              aria-label="Diagnostic JavaScript expanded editor"
+              value={value == null ? "" : String(value)}
+              onChange={event => onChange(event.target.value)}
+            />
+          )
+        }
+      });
+    });
+
+    await waitForText(container, "Write Line");
+    await click(Array.from(container.querySelectorAll(".react-flow__node")).find(node => node.textContent?.includes("Write Line")) ?? null);
+    await waitForText(container, "Text");
+    await click(buttonByLabel(container, "Open expanded Text editor"));
+
+    expect(container.textContent).toContain("JS001");
+    expect(container.textContent).toContain("Review this JavaScript expression.");
+
+    await fill(textareaByLabel(container, "Diagnostic JavaScript expanded editor"), "bad but saveable");
+    await click(buttonByText(container, "Save"));
+
+    const putCall = fetchMock.mock.calls.find(([url, init]) => String(url).includes("/drafts/draft-1") && init?.method === "PUT");
+    expect(putCall).toBeTruthy();
+    expect(JSON.parse(String(putCall?.[1]?.body)).state.rootActivity.text).toEqual({
+      typeName: "System.String",
+      expression: { type: "JavaScript", value: "bad but saveable" },
+      memoryReference: { id: "expanded-diagnostic-memory" }
+    });
+
+    await unmount();
+  });
+
+  it("renders inline expression editor diagnostics without blocking draft updates", async () => {
+    vi.stubGlobal("ResizeObserver", class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === "PUT") return response({ ...workflowDraft(JSON.parse(String(init.body))), validationErrors: [] });
+      if (url.includes("/descriptors/activities")) return response({ items: [writeLineDescriptor()] });
+      if (url.includes("/descriptors/expression-descriptors")) return response({ items: [
+        { type: "Literal", displayName: "Literal" },
+        { type: "JavaScript", displayName: "JavaScript" }
+      ] });
+      if (url.includes("/activities")) return response({ activities: [
+        activity({
+          activityVersionId: "write-line-v1",
+          activityTypeKey: "Elsa.Activities.Primitives.Activities.WriteLine",
+          category: "Primitives",
+          displayName: "Write Line",
+          description: "Writes a line to the console."
+        })
+      ] });
+      if (url.includes("/definitions/definition-1")) return response({
+        definition: definition(),
+        draft: workflowDraft({
+          state: {
+            variables: [],
+            rootActivity: writeLineRoot({
+              text: {
+                typeName: "System.String",
+                expression: { type: "JavaScript", value: "warn inline" },
+                memoryReference: { id: "inline-diagnostic-memory" }
+              }
+            }),
+            inputs: [],
+            outputs: []
+          }
+        }),
+        versions: []
+      });
+      return response({ definitions: [definition()] });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { container, unmount } = await renderRegisteredRoute("/workflows/definitions?definition=definition-1", api => {
+      api.expressionEditors.add({
+        id: "diagnostic-javascript-inline",
+        supports: context => context.syntax === "JavaScript",
+        diagnostics: (_context, value) => String(value).includes("warn")
+          ? [{ severity: "info", message: "Inline advisory diagnostic." }]
+          : [],
+        surfaces: {
+          inline: ({ value, onChange }) => (
+            <textarea
+              aria-label="Diagnostic JavaScript inline editor"
+              value={value == null ? "" : String(value)}
+              onChange={event => onChange(event.target.value)}
+            />
+          )
+        }
+      });
+    });
+
+    await waitForText(container, "Write Line");
+    await click(Array.from(container.querySelectorAll(".react-flow__node")).find(node => node.textContent?.includes("Write Line")) ?? null);
+    await waitForText(container, "Text");
+
+    expect(container.textContent).toContain("Inline advisory diagnostic.");
+
+    await fill(textareaByLabel(container, "Diagnostic JavaScript inline editor"), "warn and save");
+    await click(buttonByText(container, "Save"));
+
+    const putCall = fetchMock.mock.calls.find(([url, init]) => String(url).includes("/drafts/draft-1") && init?.method === "PUT");
+    expect(putCall).toBeTruthy();
+    expect(JSON.parse(String(putCall?.[1]?.body)).state.rootActivity.text).toEqual({
+      typeName: "System.String",
+      expression: { type: "JavaScript", value: "warn and save" },
+      memoryReference: { id: "inline-diagnostic-memory" }
+    });
+
+    await unmount();
+  });
+
   it("filters the canvas activity picker with keyboard search", async () => {
     vi.stubGlobal("ResizeObserver", class {
       observe() {}
