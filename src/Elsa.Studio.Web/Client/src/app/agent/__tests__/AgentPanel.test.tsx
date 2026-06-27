@@ -139,6 +139,59 @@ describe("AgentPanel", () => {
     unmount();
   });
 
+  it("clears published session indicator state when closed during streaming", async () => {
+    const api = createStudioRegistry({
+      hostVersion: "1.0.0",
+      sdkVersion: "1.0.0",
+      ...createEndpointContext("https://studio.example/")
+    }, "https://foundation.example/");
+    api.agent.capabilities.add({
+      id: "studio.explain",
+      displayName: "Explain",
+      description: "Explain the active screen.",
+      kind: "answer",
+      risk: "read-only",
+      surfaces: ["*"]
+    });
+    api.agent.promptStarters.add({
+      id: "studio.prompt",
+      label: "Explain screen",
+      prompt: "Explain this screen.",
+      surfaces: ["*"],
+      requiredCapabilities: ["studio.explain"]
+    });
+    const client = stubClient();
+    const onSessionIndicatorChange = vi.fn();
+    const subscribeStream = vi.fn((_context, _streamUrl, onEvent: (event: AgentStreamEvent) => void) => {
+      onEvent({ type: "message-started", messageId: "msg_01", role: "assistant" });
+      return { close() {} };
+    });
+    const { container, unmount } = render(
+      <AgentPanel
+        api={api}
+        surface={{ route: "/" }}
+        client={client}
+        subscribeStream={subscribeStream}
+        onClose={() => {}}
+        onSessionIndicatorChange={onSessionIndicatorChange}
+      />
+    );
+
+    await waitForText(container, "Explain screen");
+    clickButton(container, "Explain screen");
+    await flushPromises();
+    await flushPromises();
+
+    expect(onSessionIndicatorChange).toHaveBeenCalledWith([expect.objectContaining({
+      id: "agt_01",
+      status: "active"
+    })]);
+
+    unmount();
+
+    expect(onSessionIndicatorChange).toHaveBeenLastCalledWith([]);
+  });
+
   it("shows disabled state when the backend reports the agent unavailable", async () => {
     const api = createStudioRegistry({
       hostVersion: "1.0.0",
@@ -294,6 +347,72 @@ describe("AgentPanel", () => {
     expect(container.textContent).toContain("Add timeout");
     expect(client.approveProposal).toHaveBeenCalledTimes(1);
     expect(client.approveProposal).toHaveBeenCalledWith("prop_01", { revision: "rev_01" });
+
+    unmount();
+  });
+
+  it("publishes session indicator state for pending proposals", async () => {
+    const api = createStudioRegistry({
+      hostVersion: "1.0.0",
+      sdkVersion: "1.0.0",
+      ...createEndpointContext("https://studio.example/")
+    }, "https://foundation.example/");
+    api.agent.promptStarters.add({
+      id: "workflow.prompt",
+      label: "Create proposal",
+      prompt: "Create a proposal.",
+      surfaces: ["*"],
+      requiredCapabilities: ["workflow.propose-change"]
+    });
+    api.agent.capabilities.add({
+      id: "workflow.propose-change",
+      displayName: "Propose change",
+      description: "Create workflow proposal.",
+      kind: "proposal",
+      risk: "review-required",
+      surfaces: ["*"]
+    });
+    const client = stubClient();
+    const onSessionIndicatorChange = vi.fn();
+    const subscribeStream = vi.fn((_context, _streamUrl, onEvent: (event: AgentStreamEvent) => void) => {
+      onEvent({
+        type: "proposal-created",
+        proposalId: "prop_01",
+        messageId: "msg_01",
+        proposal: {
+          title: "Rename workflow",
+          summary: "Renames the workflow.",
+          status: "awaiting-approval",
+          baseRevision: "rev_01",
+          toolId: "workflow.rename",
+          invocationMode: "proposal",
+          resourceTarget: { resourceType: "workflow-definition", resourceId: "wf_01" }
+        }
+      });
+      onEvent({ type: "message-completed", messageId: "msg_01" });
+      return { close() {} };
+    });
+    const { container, unmount } = render(
+      <AgentPanel
+        api={api}
+        surface={{ route: "/" }}
+        client={client}
+        subscribeStream={subscribeStream}
+        onClose={() => {}}
+        onSessionIndicatorChange={onSessionIndicatorChange}
+      />
+    );
+
+    await flushPromises();
+    clickButton(container, "Create proposal");
+    await flushPromises();
+    await flushPromises();
+
+    expect(onSessionIndicatorChange).toHaveBeenCalledWith([expect.objectContaining({
+      id: "agt_01",
+      status: "waiting",
+      pendingProposals: 1
+    })]);
 
     unmount();
   });
