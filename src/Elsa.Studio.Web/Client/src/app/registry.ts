@@ -54,7 +54,8 @@ export function createStudioRegistry(
       capabilities: createContributionRegistry(),
       actions: createContributionRegistry(),
       toolSlots: createContributionRegistry(),
-      toolContracts: createContributionRegistry()
+      toolContracts: createContributionRegistry(),
+      resultRenderers: createContributionRegistry()
     },
     workflowDesigner: {
       nodeRenderers: createContributionRegistry(),
