@@ -166,6 +166,8 @@ export interface WorkflowTestRunView {
   workflowExecutionId?: string | null;
   status: string;
   commandDispatchStatus?: string | null;
+  activityCount?: number | null;
+  incidentCount?: number | null;
   reason?: string | null;
   expiresAt?: string | null;
 }
