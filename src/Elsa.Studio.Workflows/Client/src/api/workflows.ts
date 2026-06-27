@@ -173,6 +173,7 @@ export async function listExecutables(context: StudioEndpointContext) {
 
 export interface ListWorkflowInstancesRequest {
   status?: string;
+  runKind?: string;
   definitionId?: string;
   correlationId?: string;
   take?: number;
@@ -181,6 +182,7 @@ export interface ListWorkflowInstancesRequest {
 export async function listWorkflowInstances(context: StudioEndpointContext, request: ListWorkflowInstancesRequest = {}) {
   const parameters = new URLSearchParams();
   if (request.status) parameters.set("status", request.status);
+  if (request.runKind) parameters.set("runKind", request.runKind);
   if (request.definitionId) parameters.set("definitionId", request.definitionId);
   if (request.correlationId) parameters.set("correlationId", request.correlationId);
   if (request.take) parameters.set("take", String(request.take));

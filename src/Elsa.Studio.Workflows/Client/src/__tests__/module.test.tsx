@@ -1039,7 +1039,16 @@ describe("workflows module", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.startsWith("https://server.example/runtime/workflows/instances")) {
-        return response([workflowInstance()]);
+        if (url.includes("runKind=TestRun")) {
+          return response([workflowInstance({
+            workflowExecutionId: "wfexec-test",
+            artifactId: "artifact-test",
+            runKind: "TestRun",
+            activityCount: 2,
+            incidentCount: 1
+          })]);
+        }
+        return response([workflowInstance({ runKind: "PublishedRun" })]);
       }
 
       throw new Error(`Unexpected request ${url}`);
@@ -1049,12 +1058,22 @@ describe("workflows module", () => {
 
     await waitForText(container, "wfexec-1");
     expect(container.textContent).toContain("Runs");
+    expect(container.textContent).toContain("Published Run");
     expect(container.querySelector("nav[aria-label='Workflow views']")).toBeNull();
-    await click(rowByLabel(container, "Inspect workflow run wfexec-1"));
+    await select(selectByLabel(container, "Run Kind"), "TestRun");
+    await waitForText(container, "wfexec-test");
+    expect(container.textContent).toContain("Test Run");
+    expect(container.textContent).toContain("2 activities");
+    expect(container.textContent).toContain("1 incidents");
+    await click(rowByLabel(container, "Inspect workflow run wfexec-test"));
 
-    expect(window.location.pathname).toBe("/workflows/instances/wfexec-1");
+    expect(window.location.pathname).toBe("/workflows/instances/wfexec-test");
     expect(fetchMock).toHaveBeenCalledWith(
       "https://server.example/runtime/workflows/instances?take=100",
+      expect.any(Object)
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://server.example/runtime/workflows/instances?runKind=TestRun&take=100",
       expect.any(Object)
     );
 
@@ -1094,6 +1113,7 @@ describe("workflows module", () => {
     await waitForText(container, "Definition version");
     expect(container.textContent).toContain("Run");
     expect(container.textContent).toContain("Workflow Instance ID");
+    expect(container.textContent).toContain("Published Run");
     expect(container.textContent).toContain("Activity history");
     expect(container.textContent).toContain("WriteLine");
     expect(container.textContent).toContain("No incidents recorded.");
@@ -1105,6 +1125,24 @@ describe("workflows module", () => {
       "https://server.example/_elsa/workflow-management/versions/version-1",
       expect.any(Object)
     );
+
+    await unmount();
+  });
+
+  it("shows a not-found state only when the run record is absent", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("https://server.example/runtime/workflows/instances/wfexec-missing")) {
+        return response({ error: "Workflow run was not found." }, 404);
+      }
+
+      throw new Error(`Unexpected request ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { container, unmount } = await renderRegisteredRoute("/workflows/instances/wfexec-missing");
+
+    await waitForText(container, "Run wfexec-missing was not found.");
+    expect(container.textContent).not.toContain("Definition graph unavailable");
 
     await unmount();
   });
@@ -1353,6 +1391,7 @@ function workflowInstance(overrides: Partial<Record<string, unknown>> = {}) {
     artifactVersion: "1.0.0",
     definitionId: "definition-1",
     definitionVersionId: "version-1",
+    runKind: "PublishedRun",
     status: "Completed",
     subStatus: null,
     correlationId: "correlation-1",
