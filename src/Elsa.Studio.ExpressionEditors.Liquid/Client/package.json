@@ -1,5 +1,5 @@
 {
-  "name": "@elsa-workflows/studio-expression-editors-javascript",
+  "name": "@elsa-workflows/studio-expression-editors-liquid",
   "private": true,
   "version": "1.0.0",
   "type": "module",
