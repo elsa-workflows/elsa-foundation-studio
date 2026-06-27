@@ -190,6 +190,12 @@ export interface WorkflowExecutableSummary {
   resumeTargetCount: number;
 }
 
+export interface WorkflowExecutableRunResponse {
+  workflowExecutionId?: string | null;
+  runId?: string | null;
+  executionId?: string | null;
+}
+
 export interface WorkflowInstanceSummary {
   workflowExecutionId: string;
   artifactId: string;

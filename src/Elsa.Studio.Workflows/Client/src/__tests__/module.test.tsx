@@ -752,7 +752,23 @@ describe("workflows module", () => {
   it("renders workflow executables and runs an artifact", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (init?.method === "POST") return response(null, 204);
+      if (init?.method === "POST") return response({ workflowExecutionId: "wfexec-published-1" });
+      if (url.startsWith("https://server.example/runtime/workflows/instances/wfexec-published-1")) {
+        return response(workflowInstanceDetails({
+          instance: workflowInstance({ workflowExecutionId: "wfexec-published-1" })
+        }));
+      }
+      if (url.startsWith("https://server.example/_elsa/workflow-management/versions/version-1")) {
+        return response(workflowDefinitionVersionDetails());
+      }
+      if (url.startsWith("https://server.example/_elsa/workflow-management/activities")) {
+        return response({ activities: [activity({
+          activityVersionId: "write-line-v1",
+          activityTypeKey: "Elsa.Activities.Primitives.Activities.WriteLine",
+          category: "Primitives",
+          displayName: "Write Line"
+        })] });
+      }
       expect(url).toBe("https://server.example/_demo/workflows/executables");
       return response([executable({
         rootActivityType: "Elsa.Activities.Flowchart.Activities.Flowchart",
@@ -772,11 +788,14 @@ describe("workflows module", () => {
     expect(container.textContent).not.toContain("Elsa.Activities.Flowchart.Activities.Flowchart");
 
     await click(buttonByText(container, "Run"));
+    await waitForText(container, "Open Run wfexec-published-1");
+    await click(buttonByText(container, "Open Run wfexec-published-1"));
 
     expect(fetchMock).toHaveBeenCalledWith(
       "https://server.example/_elsa/workflow-management/executables/artifact-1/run",
       expect.objectContaining({ method: "POST" })
     );
+    expect(window.location.pathname).toBe("/workflows/instances/wfexec-published-1");
 
     await unmount();
   });
