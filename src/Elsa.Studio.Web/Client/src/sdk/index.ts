@@ -439,6 +439,33 @@ export interface StudioAgentToolContractContribution {
   resultRendererIds?: string[];
 }
 
+export interface StudioAgentResourceTarget {
+  resourceType: string;
+  resourceId?: string;
+  displayName?: string;
+  moduleId?: string;
+  route?: string;
+  summary?: string;
+}
+
+export interface StudioAgentResultRendererProps {
+  proposal: unknown;
+  resourceTarget?: StudioAgentResourceTarget;
+  result: unknown;
+  resultType?: string;
+}
+
+export interface StudioAgentResultRendererContribution {
+  id: string;
+  moduleId?: string;
+  displayName: string;
+  order?: number;
+  resourceTypes?: string[];
+  resultTypes?: string[];
+  component: ComponentType<StudioAgentResultRendererProps>;
+  supports?(props: StudioAgentResultRendererProps): boolean;
+}
+
 export interface StudioAgentRegistry {
   readonly contextProviders: StudioContributionRegistry<StudioAgentContextProviderContribution>;
   readonly promptStarters: StudioContributionRegistry<StudioAgentPromptStarterContribution>;
@@ -446,6 +473,7 @@ export interface StudioAgentRegistry {
   readonly actions: StudioContributionRegistry<StudioAgentActionContribution>;
   readonly toolSlots: StudioContributionRegistry<StudioAgentToolSlotContribution>;
   readonly toolContracts: StudioContributionRegistry<StudioAgentToolContractContribution>;
+  readonly resultRenderers: StudioContributionRegistry<StudioAgentResultRendererContribution>;
 }
 
 export type StudioAiPromptMode = "enqueue" | "steer";

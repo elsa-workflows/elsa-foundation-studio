@@ -132,6 +132,115 @@ describe("AgentProposalReview", () => {
     expect(onExecute).not.toHaveBeenCalled();
     unmount();
   });
+
+  it("uses a matching module result renderer for proposal payloads", () => {
+    const { container, unmount } = render(
+      <AgentProposalReview
+        proposals={[{
+          id: "prop_04",
+          title: "Preview workflow diff",
+          summary: "Shows a workflow graph diff.",
+          risk: "review-required",
+          status: "awaiting-approval",
+          revision: "rev_04",
+          resourceTarget: {
+            resourceType: "workflow-definition",
+            resourceId: "order-flow"
+          },
+          resultRendererId: "workflow.diff",
+          resultType: "workflow-diff",
+          result: { added: 2 }
+        }]}
+        resultRenderers={[{
+          id: "workflow.diff",
+          displayName: "Workflow diff renderer",
+          resourceTypes: ["workflow-definition"],
+          component: ({ result }) => <span>Workflow renderer: {(result as { added: number }).added} added</span>
+        }]}
+        onApprove={() => {}}
+        onDeny={() => {}}
+        onExecute={() => {}}
+      />
+    );
+
+    expect(container.textContent).toContain("Workflow renderer: 2 added");
+    expect(container.textContent).not.toContain("Structured result");
+    unmount();
+  });
+
+  it("prioritizes explicitly requested result renderers over generic matches", () => {
+    const { container, unmount } = render(
+      <AgentProposalReview
+        proposals={[{
+          id: "prop_04b",
+          title: "Preview workflow diff",
+          summary: "Shows a workflow graph diff.",
+          risk: "review-required",
+          status: "awaiting-approval",
+          revision: "rev_04",
+          resourceTarget: {
+            resourceType: "workflow-definition",
+            resourceId: "order-flow"
+          },
+          resultRendererId: "workflow.diff",
+          resultType: "workflow-diff",
+          result: { added: 2 }
+        }]}
+        resultRenderers={[
+          {
+            id: "generic.workflow",
+            displayName: "Generic workflow renderer",
+            order: 1,
+            resourceTypes: ["workflow-definition"],
+            component: () => <span>Generic workflow renderer</span>
+          },
+          {
+            id: "workflow.diff",
+            displayName: "Workflow diff renderer",
+            order: 500,
+            component: ({ result }) => <span>Explicit renderer: {(result as { added: number }).added} added</span>
+          }
+        ]}
+        onApprove={() => {}}
+        onDeny={() => {}}
+        onExecute={() => {}}
+      />
+    );
+
+    expect(container.textContent).toContain("Explicit renderer: 2 added");
+    expect(container.textContent).not.toContain("Generic workflow renderer");
+    unmount();
+  });
+
+  it("falls back to structured result rendering when no renderer matches", () => {
+    const { container, unmount } = render(
+      <AgentProposalReview
+        proposals={[{
+          id: "prop_05",
+          title: "Preview extension plan",
+          summary: "Shows an extension build plan.",
+          risk: "review-required",
+          status: "awaiting-approval",
+          revision: "rev_05",
+          resourceTarget: {
+            resourceType: "extension-resource",
+            resourceId: "stripe-extension"
+          },
+          resultType: "extension-build-plan",
+          result: { steps: ["compile", "package"] }
+        }]}
+        resultRenderers={[]}
+        onApprove={() => {}}
+        onDeny={() => {}}
+        onExecute={() => {}}
+      />
+    );
+
+    expect(container.textContent).toContain("Structured result");
+    expect(container.textContent).toContain("\"compile\"");
+    expect(container.textContent).toContain("\"package\"");
+    unmount();
+  });
 });
 
 function render(element: React.ReactElement) {
