@@ -1,15 +1,46 @@
 import { describe, expect, it } from "vitest";
 import type { StudioAgentResourceTarget, StudioAgentToolContractContribution } from "../../../sdk";
-import { evaluateAgentToolInvocation } from "../agentToolPolicy";
+import {
+  createToolInvocationAudit,
+  evaluateAgentToolInvocation,
+  evaluateToolInvocationPolicy,
+  type AgentToolInvocationRequest
+} from "../agentToolPolicy";
+
+const target: StudioAgentResourceTarget = {
+  resourceType: "workflow-definition",
+  resourceId: "order-flow",
+  displayName: "Order flow"
+};
+
+const baseRequest: AgentToolInvocationRequest = {
+  toolId: "workflow.inspect",
+  moduleId: "workflows",
+  sessionId: "agt_01",
+  invocationMode: "read-only",
+  risk: "read-only",
+  resourceTarget: {
+    resourceType: "workflow-definition",
+    resourceId: "wf_01",
+    displayName: "Order workflow"
+  },
+  requiredPermissions: ["workflows.read"]
+};
+
+const baseContext = {
+  actor: "studio-user",
+  sessionId: "agt_01",
+  permissions: ["workflows.read", "workflows.write"],
+  hostPolicy: {
+    contextVisibility: true,
+    requiresApprovalForMutations: false,
+    allowDirectToolInvocations: true
+  },
+  now: () => new Date("2026-06-27T00:00:00.000Z")
+};
 
 describe("agent tool policy", () => {
-  const target: StudioAgentResourceTarget = {
-    resourceType: "workflow-definition",
-    resourceId: "order-flow",
-    displayName: "Order flow"
-  };
-
-  it("allows read-only invocations and records audit context", () => {
+  it("allows SDK read-only invocations and records audit context", () => {
     const result = evaluateAgentToolInvocation({
       actorId: "user-1",
       sessionId: "session-1",
@@ -37,7 +68,7 @@ describe("agent tool policy", () => {
     expect(result.audit.recordedAt).toEqual(expect.any(String));
   });
 
-  it("allows direct invocation only when host and module policy allow the tool risk", () => {
+  it("allows SDK direct invocation only when host and module policy allow the tool risk", () => {
     const directTool = tool({
       id: "workflow.repair",
       risk: "review-required",
@@ -73,7 +104,7 @@ describe("agent tool policy", () => {
     });
   });
 
-  it("denies host policy, missing permissions, and privileged invocations without dual approval", () => {
+  it("denies SDK host policy, missing permissions, and privileged invocations without dual approval", () => {
     const hostDenied = evaluateAgentToolInvocation({
       actorId: "user-1",
       sessionId: "session-1",
@@ -115,7 +146,7 @@ describe("agent tool policy", () => {
     expect(privilegedDenied.disabledReason).toBe("Privileged invocation requires Host Policy and Module Policy approval.");
   });
 
-  it("records proposal and failed invocation outcomes", () => {
+  it("records SDK proposal and failed invocation outcomes", () => {
     const proposal = evaluateAgentToolInvocation({
       actorId: "user-1",
       sessionId: "session-1",
@@ -168,6 +199,94 @@ describe("agent tool policy", () => {
         outcome: "failed",
         reason: "Proposal backend timed out."
       }
+    });
+  });
+
+  it("allows UI read-only and direct invocations when Host Policy and Module Policy allow them", () => {
+    const readOnly = evaluateToolInvocationPolicy(baseRequest, baseContext);
+    const direct = evaluateToolInvocationPolicy({
+      ...baseRequest,
+      toolId: "workflow.rename",
+      invocationMode: "direct",
+      risk: "review-required",
+      requiredPermissions: ["workflows.write"]
+    }, {
+      ...baseContext,
+      modulePolicy: { allowedInvocationModes: ["direct"] }
+    });
+
+    expect(readOnly.allowed).toBe(true);
+    expect(readOnly.audit).toMatchObject({
+      actor: "studio-user",
+      sessionId: "agt_01",
+      toolId: "workflow.inspect",
+      target: baseRequest.resourceTarget,
+      risk: "read-only",
+      policyResult: "allowed",
+      outcome: "allowed"
+    });
+    expect(direct.allowed).toBe(true);
+    expect(direct.audit.invocationMode).toBe("direct");
+  });
+
+  it("requires a proposal when direct mutation is disabled by Host Policy", () => {
+    const decision = evaluateToolInvocationPolicy({
+      ...baseRequest,
+      toolId: "workflow.rename",
+      invocationMode: "direct",
+      risk: "review-required",
+      requiredPermissions: ["workflows.write"]
+    }, {
+      ...baseContext,
+      hostPolicy: {
+        contextVisibility: true,
+        requiresApprovalForMutations: true,
+        allowDirectToolInvocations: false
+      }
+    });
+
+    expect(decision.allowed).toBe(false);
+    expect(decision.policyResult).toBe("proposal-required");
+    expect(decision.outcome).toBe("proposal-created");
+    expect(decision.reason).toContain("reviewed proposal");
+  });
+
+  it("denies UI privileged and policy-blocked invocations", () => {
+    const privileged = evaluateToolInvocationPolicy({
+      ...baseRequest,
+      toolId: "workflow.admin",
+      invocationMode: "privileged",
+      risk: "admin"
+    }, baseContext);
+    const denied = evaluateToolInvocationPolicy(baseRequest, {
+      ...baseContext,
+      hostPolicy: {
+        contextVisibility: true,
+        requiresApprovalForMutations: false,
+        deniedToolIds: ["workflow.inspect"]
+      }
+    });
+
+    expect(privileged.allowed).toBe(false);
+    expect(privileged.reason).toContain("privileged");
+    expect(denied.allowed).toBe(false);
+    expect(denied.reason).toBe("Host Policy denied tool workflow.inspect.");
+  });
+
+  it("creates failed UI audit outcomes with the required accountability fields", () => {
+    const audit = createToolInvocationAudit(baseRequest, baseContext, "allowed", "failed", "Backend failed.");
+
+    expect(audit).toMatchObject({
+      state: "failed",
+      outcome: "Backend failed.",
+      actor: "studio-user",
+      sessionId: "agt_01",
+      toolId: "workflow.inspect",
+      target: baseRequest.resourceTarget,
+      risk: "read-only",
+      invocationMode: "read-only",
+      policyResult: "allowed",
+      recordedAt: "2026-06-27T00:00:00.000Z"
     });
   });
 });
