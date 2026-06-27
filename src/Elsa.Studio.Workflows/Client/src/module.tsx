@@ -50,7 +50,7 @@ import {
   startWorkflowDraftTestRun,
   updateDraft
 } from "./api/workflows";
-import type { ActivityCatalogItem, ActivityExecutionStateSummary, ActivityNode, DefinitionListState, IncidentStateSummary, WorkflowDefinitionDetails, WorkflowDefinitionVersionDetails, WorkflowDraft, WorkflowExecutableSummary, WorkflowInstanceDetails, WorkflowInstanceSummary, WorkflowTestRunView } from "./workflowTypes";
+import type { ActivityCatalogItem, ActivityExecutionStateSummary, ActivityNode, DefinitionListState, IncidentStateSummary, WorkflowDefinitionDetails, WorkflowDefinitionVersionDetails, WorkflowDraft, WorkflowExecutableRunResponse, WorkflowExecutableSummary, WorkflowInstanceDetails, WorkflowInstanceSummary, WorkflowTestRunView } from "./workflowTypes";
 import {
   applyRuntimeOverlays,
   buildCanvas,
@@ -122,6 +122,11 @@ type WorkflowEditorOperation = "idle" | "saving" | "promoting" | "testRunPrepari
 interface WorkflowTestRunState {
   draftSignature: string;
   view: WorkflowTestRunView;
+}
+
+interface ExecutableRunState {
+  artifactId: string;
+  workflowExecutionId: string | null;
 }
 
 export type WorkflowConnectSource = { nodeId: string; handleId: string | null };
@@ -731,6 +736,7 @@ function WorkflowExecutables({ context, ai, definitionFilter, onDefinitionFilter
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
+  const [lastRun, setLastRun] = useState<ExecutableRunState | null>(null);
   const [executables, setExecutables] = useState<WorkflowExecutableSummary[]>([]);
   const normalizedDefinitionFilter = definitionFilter?.trim().toLowerCase() ?? "";
   const visibleExecutables = useMemo(
@@ -767,9 +773,12 @@ function WorkflowExecutables({ context, ai, definitionFilter, onDefinitionFilter
 
   const run = async (executable: WorkflowExecutableSummary) => {
     setStatus("");
+    setLastRun(null);
     setError("");
     try {
-      await runExecutable(context, executable.artifactId);
+      const result = await runExecutable(context, executable.artifactId);
+      const workflowExecutionId = readExecutableRunWorkflowExecutionId(result);
+      setLastRun({ artifactId: executable.artifactId, workflowExecutionId });
       setStatus(`Started ${executable.artifactId}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -781,17 +790,20 @@ function WorkflowExecutables({ context, ai, definitionFilter, onDefinitionFilter
 
     if (dispatchAiAction(ai, explainExecutableAction, executable)) {
       setError("");
+      setLastRun(null);
       setStatus(`Sent ${executable.artifactId} to Weaver`);
     }
   };
 
   const markCopied = (label: string) => {
     setError("");
+    setLastRun(null);
     setStatus(`Copied ${label}`);
   };
 
   const markCopyFailed = (label: string) => {
     setStatus("");
+    setLastRun(null);
     setError(`Could not copy ${label}.`);
   };
 
@@ -817,7 +829,7 @@ function WorkflowExecutables({ context, ai, definitionFilter, onDefinitionFilter
         ) : null}
       </div>
       {state === "failed" ? <div className="wf-alert"><AlertCircle size={16} /> {error}</div> : null}
-      {status ? <div className="wf-status-line"><Check size={14} /> {status}</div> : null}
+      {status ? <ExecutableRunStatusLine status={status} run={lastRun} /> : null}
       {state === "loading" ? <div className="wf-empty">Loading workflow executables...</div> : null}
       {state === "ready" && visibleExecutables.length === 0 ? <div className="wf-empty">{definitionFilter ? "No workflow executables match this definition filter." : "No workflow executables found. Publish a workflow definition to create one."}</div> : null}
       {state === "ready" && visibleExecutables.length > 0 ? (
@@ -881,6 +893,24 @@ function WorkflowExecutableSourceCell({ executable, onCopied, onCopyFailed }: { 
   );
 }
 
+function ExecutableRunStatusLine({ status, run, compact = false }: { status: string; run: ExecutableRunState | null; compact?: boolean }) {
+  const openRun = () => {
+    if (!run?.workflowExecutionId) return;
+    window.history.pushState({}, "", `/workflows/instances/${encodeURIComponent(run.workflowExecutionId)}`);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  };
+
+  return (
+    <div className={`wf-status-line${compact ? " compact" : ""}`}>
+      <Check size={compact ? 13 : 14} />
+      <span>{status}</span>
+      {run?.workflowExecutionId ? (
+        <button type="button" onClick={openRun}>Open Run {run.workflowExecutionId}</button>
+      ) : null}
+    </div>
+  );
+}
+
 function CopyValueButton({ value, ariaLabel, copiedLabel, onCopied, onCopyFailed }: { value: string | null | undefined; ariaLabel: string; copiedLabel: string; onCopied(label: string): void; onCopyFailed(label: string): void }) {
   if (!value) return null;
 
@@ -906,6 +936,7 @@ function WorkflowArtifactsPanel({ context, ai, definitionId, publishedArtifactId
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
+  const [lastRun, setLastRun] = useState<ExecutableRunState | null>(null);
   const [artifacts, setArtifacts] = useState<WorkflowExecutableSummary[]>([]);
   const explainExecutableAction = findAiAction(ai, "weaver.workflows.explain-executable");
 
@@ -929,9 +960,11 @@ function WorkflowArtifactsPanel({ context, ai, definitionId, publishedArtifactId
 
   const run = async (artifact: WorkflowExecutableSummary) => {
     setStatus("");
+    setLastRun(null);
     setError("");
     try {
-      await runExecutable(context, artifact.artifactId);
+      const result = await runExecutable(context, artifact.artifactId);
+      setLastRun({ artifactId: artifact.artifactId, workflowExecutionId: readExecutableRunWorkflowExecutionId(result) });
       setStatus(`Started ${artifact.artifactId}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -943,6 +976,7 @@ function WorkflowArtifactsPanel({ context, ai, definitionId, publishedArtifactId
 
     if (dispatchAiAction(ai, explainExecutableAction, artifact)) {
       setError("");
+      setLastRun(null);
       setStatus(`Sent ${artifact.artifactId} to Weaver`);
     }
   };
@@ -954,11 +988,13 @@ function WorkflowArtifactsPanel({ context, ai, definitionId, publishedArtifactId
 
   const markCopied = (label: string) => {
     setError("");
+    setLastRun(null);
     setStatus(`Copied ${label}`);
   };
 
   const markCopyFailed = (label: string) => {
     setStatus("");
+    setLastRun(null);
     setError(`Could not copy ${label}.`);
   };
 
@@ -970,7 +1006,7 @@ function WorkflowArtifactsPanel({ context, ai, definitionId, publishedArtifactId
         <button type="button" onClick={openExecutablePage}>Open list</button>
       </div>
       {state === "failed" ? <div className="wf-alert compact"><AlertCircle size={14} /> {error}</div> : null}
-      {status ? <div className="wf-status-line compact"><Check size={13} /> {status}</div> : null}
+      {status ? <ExecutableRunStatusLine status={status} run={lastRun} compact /> : null}
       {state === "loading" ? <p className="wf-muted">Loading artifacts...</p> : null}
       {state === "ready" && artifacts.length === 0 ? <p className="wf-muted">No published artifacts for this workflow yet.</p> : null}
       {state === "ready" && artifacts.length > 0 ? (
@@ -1675,6 +1711,11 @@ function formatExecutableSourceKind(sourceKind?: string | null) {
     .replace(/\s+/g, " ")
     .trim()
     .replace(/\b\w/g, letter => letter.toUpperCase());
+}
+
+function readExecutableRunWorkflowExecutionId(response: WorkflowExecutableRunResponse | null | undefined) {
+  const workflowExecutionId = response?.workflowExecutionId ?? response?.runId ?? response?.executionId;
+  return typeof workflowExecutionId === "string" && workflowExecutionId.trim() ? workflowExecutionId : null;
 }
 
 async function copyTextToClipboard(value: string) {

@@ -258,6 +258,22 @@
   padding: 10px 12px;
 }
 
+.wf-status-line span {
+  min-width: 0;
+}
+
+.wf-status-line button {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  padding: 0;
+  text-decoration: underline;
+}
+
 .wf-alert.compact,
 .wf-status-line.compact {
   margin: 0;

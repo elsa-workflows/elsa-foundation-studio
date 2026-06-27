@@ -13,6 +13,7 @@ import type {
   StartWorkflowDraftTestRunRequest,
   WorkflowInstanceDetails,
   WorkflowInstanceSummary,
+  WorkflowExecutableRunResponse,
   WorkflowExecutableSummary,
   WorkflowDefinitionDetails,
   WorkflowDefinitionVersionDetails,
@@ -164,7 +165,7 @@ export async function startWorkflowDraftTestRun(context: StudioEndpointContext, 
 }
 
 export async function runExecutable(context: StudioEndpointContext, artifactId: string) {
-  return context.http.postJson<unknown>(`${basePath}/executables/${encodeURIComponent(artifactId)}/run`, {});
+  return context.http.postJson<WorkflowExecutableRunResponse>(`${basePath}/executables/${encodeURIComponent(artifactId)}/run`, {});
 }
 
 export async function listExecutables(context: StudioEndpointContext) {
