@@ -197,6 +197,7 @@ export interface WorkflowInstanceSummary {
   definitionVersionId: string;
   artifactVersion: string;
   artifactHash: string;
+  runKind?: string | null;
   status: string;
   subStatus?: string | null;
   createdAt: string;

@@ -371,7 +371,7 @@
 
 .wf-instance-grid .wf-grid-head,
 .wf-instance-grid .wf-grid-row {
-  grid-template-columns: minmax(170px, 1.2fr) 132px minmax(160px, 1fr) 120px 150px 88px;
+  grid-template-columns: minmax(170px, 1.2fr) 112px 132px minmax(160px, 1fr) 120px 150px 88px;
 }
 
 .wf-instance-detail-workbench {
@@ -2567,7 +2567,7 @@
 
   .wf-instance-grid .wf-grid-head,
   .wf-instance-grid .wf-grid-row {
-    grid-template-columns: minmax(160px, 1fr) 132px minmax(90px, auto);
+    grid-template-columns: minmax(160px, 1fr) 112px minmax(90px, auto);
   }
 
   .wf-grid-head span:nth-child(3),
@@ -2587,9 +2587,11 @@
   .wf-instance-grid .wf-grid-head span:nth-child(4),
   .wf-instance-grid .wf-grid-head span:nth-child(5),
   .wf-instance-grid .wf-grid-head span:nth-child(6),
+  .wf-instance-grid .wf-grid-head span:nth-child(7),
   .wf-instance-grid .wf-grid-row span:nth-child(4),
   .wf-instance-grid .wf-grid-row span:nth-child(5),
-  .wf-instance-grid .wf-grid-row span:nth-child(6) {
+  .wf-instance-grid .wf-grid-row span:nth-child(6),
+  .wf-instance-grid .wf-grid-row span:nth-child(7) {
     display: none;
   }
 
