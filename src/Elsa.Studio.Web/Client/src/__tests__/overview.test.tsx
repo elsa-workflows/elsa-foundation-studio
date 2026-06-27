@@ -117,11 +117,13 @@ describe("diagnostics", () => {
 
   it("shows a useful empty state when no diagnostics widgets are registered", async () => {
     const { container, unmount } = await renderDiagnostics(stubApi({
-      backendGetJson: async () => healthyRegistry()
+      backendGetJson: async () => healthyRegistry(),
+      diagnostics: [{ moduleId: "Elsa.Studio.FeatureManagement", status: "available", reason: "Module manifest accepted." }]
     }));
 
     expect(container.textContent).toContain("No diagnostics widgets are registered.");
     expect(container.textContent).not.toContain("Module diagnostics");
+    expect(container.textContent).not.toContain("Module manifest accepted.");
 
     await unmount();
   });
@@ -232,6 +234,7 @@ function stubApi(options: {
   backendGetJson: (url: string) => Promise<unknown>;
   widgets?: Array<{ id: string; title: string; order?: number; component: React.ComponentType }>;
   diagnosticsWidgets?: StudioDiagnosticsWidgetContribution[];
+  diagnostics?: Array<{ moduleId: string; status: string; reason: string }>;
 }): ElsaStudioModuleApi {
   return {
     host: {
@@ -260,7 +263,7 @@ function stubApi(options: {
     },
     diagnostics: {
       add() {},
-      list: () => []
+      list: () => options.diagnostics ?? []
     }
   } as ElsaStudioModuleApi;
 }
