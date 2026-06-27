@@ -888,11 +888,15 @@ describe("workflows module", () => {
     expect(calls.some(call => call.url.includes("/executables/") && call.method === "POST")).toBe(false);
     expect(container.querySelector(".wf-test-run-capsule")).toBeNull();
     expect(container.querySelector(".wf-test-run-popover")).toBeNull();
+    expect(container.querySelector("[aria-label='Inspector panel tabs'] [role='tab'][aria-selected='true']")?.textContent).toContain("Runtime");
     await click(buttonByText(container, "Test run dispatched"));
     await waitForText(container, "test-run-1");
-    expect(container.textContent).toContain("Ephemeral - not promoted");
+    expect(container.textContent).toContain("Runtime");
+    expect(container.textContent).toContain("Ephemeral - not saved, promoted, or published.");
     expect(container.textContent).toContain("artifact-transient-1");
     expect(container.textContent).toContain("wfexec-1");
+    expect(container.textContent).toContain("1 activity");
+    expect(container.textContent).toContain("0 incidents");
 
     await unmount();
   });
@@ -946,13 +950,12 @@ describe("workflows module", () => {
     await waitForText(container, "Run");
     await click(buttonByText(container, "Run"));
     await waitForText(container, "Test run dispatched");
-    expect(container.textContent).not.toContain("artifact-transient-1");
-    expect(container.textContent).not.toContain("wfexec-1");
-    await click(buttonByText(container, "Test run dispatched"));
+    expect(container.querySelector("[aria-label='Inspector panel tabs'] [role='tab'][aria-selected='true']")?.textContent).toContain("Runtime");
     await waitForText(container, "test-run-1");
     expect(container.textContent).toContain("artifact-transient-1");
     expect(container.textContent).toContain("wfexec-1");
 
+    await click(buttonByText(container, "Inspector"));
     await click(container.querySelector(".wf-canvas .react-flow__node"));
     await waitForText(container, "Text");
     await fill(container.querySelector<HTMLInputElement>(".wf-property-row input[type='text']"), "Stale capsule clearing");
@@ -998,11 +1001,11 @@ describe("workflows module", () => {
     await waitForText(container, "Run");
     await click(buttonByText(container, "Run"));
     await waitForText(container, "Test run rejected");
-    await click(buttonByText(container, "Test run rejected"));
+    expect(container.querySelector("[aria-label='Inspector panel tabs'] [role='tab'][aria-selected='true']")?.textContent).toContain("Runtime");
     await waitForText(container, "Workflow version has no root activity to publish.");
 
     expect(container.textContent).toContain("Test run rejected");
-    expect(container.textContent).toContain("Ephemeral - not promoted");
+    expect(container.textContent).toContain("Ephemeral - not saved, promoted, or published.");
     expect(fetchMock.mock.calls.some(([url, init]) => init?.method === "POST" && String(url).includes("/drafts/draft-1/promote"))).toBe(false);
 
     await unmount();
@@ -1335,6 +1338,8 @@ function testRunView(overrides: Partial<Record<string, unknown>> = {}) {
     workflowExecutionId: "wfexec-1",
     status: "DispatchAccepted",
     commandDispatchStatus: "Accepted",
+    activityCount: 1,
+    incidentCount: 0,
     reason: null,
     expiresAt: "2026-06-24T12:00:00Z",
     ...overrides

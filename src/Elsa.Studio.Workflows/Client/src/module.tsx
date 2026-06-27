@@ -1817,7 +1817,6 @@ function WorkflowEditor({
   const [status, setStatus] = useState("");
   const [operation, setOperation] = useState<WorkflowEditorOperation>("idle");
   const [testRun, setTestRun] = useState<WorkflowTestRunState | null>(null);
-  const [testRunDetailsOpen, setTestRunDetailsOpen] = useState(false);
   const [autosaveEnabled, setAutosaveEnabled] = useState(false);
   const [publishedArtifactId, setPublishedArtifactId] = useState<string | null>(null);
   const [expandedPaletteCategories, setExpandedPaletteCategories] = useState<Set<string>>(() => new Set());
@@ -1889,11 +1888,6 @@ function WorkflowEditor({
       }
     };
   }, [catalogByVersion, details, draft, selectedDescriptor, selectedNode, selectedNodeId]);
-
-  useEffect(() => {
-    if (!draft || !testRun) return;
-    if (testRun.draftSignature !== getDraftSignature(draft)) setTestRunDetailsOpen(false);
-  }, [draft, testRun]);
 
   useEffect(() => {
     const handleApply = (event: Event) => {
@@ -2475,7 +2469,6 @@ function WorkflowEditor({
     const draftSnapshot = draft;
     const draftSignature = getDraftSignature(draftSnapshot);
     setTestRun(null);
-    setTestRunDetailsOpen(false);
     setStatus("Preparing test run...");
     try {
       setOperation("testRunPreparing");
@@ -2490,6 +2483,8 @@ function WorkflowEditor({
         state: draftSnapshot.state
       });
       setTestRun({ draftSignature, view: nextTestRun });
+      setActiveRightPanelId("runtime");
+      setInspectorCollapsed(false);
       setStatus(isRejectedTestRun(nextTestRun) ? "Test run rejected" : "Test run dispatched");
     } catch (e) {
       setStatus("");
@@ -2785,6 +2780,10 @@ function WorkflowEditor({
     ? testRun.view
     : null;
   const visibleStatus = renderedTestRun && status.startsWith("Test run") ? "" : status;
+  const openWorkflowRun = (workflowExecutionId: string) => {
+    window.history.pushState({}, "", `/workflows/instances/${encodeURIComponent(workflowExecutionId)}`);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  };
   const panelContext: WorkflowDesignerPanelContext = {
     definition: details.definition,
     draft,
@@ -2824,6 +2823,13 @@ function WorkflowEditor({
       order: 0,
       icon: <ListTree size={15} />,
       render: renderInspectorPanel
+    },
+    {
+      id: "runtime",
+      title: "Runtime",
+      order: 5,
+      icon: <Play size={15} />,
+      render: () => <WorkflowRuntimePanel testRun={renderedTestRun} onOpenRun={openWorkflowRun} />
     },
     {
       id: "artifacts",
@@ -2962,8 +2968,10 @@ function WorkflowEditor({
           {renderedTestRun ? (
             <TestRunStatus
               testRun={renderedTestRun}
-              open={testRunDetailsOpen}
-              onToggle={() => setTestRunDetailsOpen(open => !open)}
+              onOpenDetails={() => {
+                setActiveRightPanelId("runtime");
+                setInspectorCollapsed(false);
+              }}
             />
           ) : null}
           <button
@@ -3425,12 +3433,10 @@ function ValidationPanel({ draft }: { draft: WorkflowDraft }) {
 
 function TestRunStatus({
   testRun,
-  open,
-  onToggle
+  onOpenDetails
 }: {
   testRun: WorkflowTestRunView;
-  open: boolean;
-  onToggle(): void;
+  onOpenDetails(): void;
 }) {
   const rejected = isRejectedTestRun(testRun);
   return (
@@ -3438,33 +3444,65 @@ function TestRunStatus({
       <button
         type="button"
         className="wf-test-run-trigger"
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        onClick={onToggle}
+        onClick={onOpenDetails}
       >
         {rejected ? <AlertCircle size={16} /> : <Check size={16} />}
         {rejected ? "Test run rejected" : "Test run dispatched"}
-        <ChevronDown size={14} />
       </button>
-      {open ? (
-        <section className="wf-test-run-popover" role="dialog" aria-label="Test run details">
-          <div className="wf-test-run-popover-heading">
-            <strong>{rejected ? "Rejected by the server" : "Transient run accepted"}</strong>
-            <span>Ephemeral - not promoted</span>
-          </div>
-          {rejected && testRun.reason ? <p>{testRun.reason}</p> : null}
-          <dl>
-            <div><dt>Status</dt><dd title={testRun.status}>{testRun.status}</dd></div>
-            {testRun.commandDispatchStatus ? <div><dt>Dispatch</dt><dd title={testRun.commandDispatchStatus}>{testRun.commandDispatchStatus}</dd></div> : null}
-            <div><dt>Test run</dt><dd title={testRun.testRunId}>{testRun.testRunId}</dd></div>
-            {testRun.artifactId ? <div><dt>Artifact</dt><dd title={testRun.artifactId}>{testRun.artifactId}</dd></div> : null}
-            {testRun.workflowExecutionId ? <div><dt>Execution</dt><dd title={testRun.workflowExecutionId}>{testRun.workflowExecutionId}</dd></div> : null}
-            {testRun.expiresAt ? <div><dt>Expires</dt><dd title={formatDate(testRun.expiresAt)}>{formatDate(testRun.expiresAt)}</dd></div> : null}
-          </dl>
-        </section>
-      ) : null}
     </div>
   );
+}
+
+function WorkflowRuntimePanel({ testRun, onOpenRun }: {
+  testRun: WorkflowTestRunView | null;
+  onOpenRun(workflowExecutionId: string): void;
+}) {
+  if (!testRun) {
+    return (
+      <div className="wf-runtime-panel">
+        <div className="wf-empty">Run the draft to see Runtime Evidence.</div>
+      </div>
+    );
+  }
+
+  const rejected = isRejectedTestRun(testRun);
+  const workflowExecutionId = testRun.workflowExecutionId;
+  return (
+    <div className="wf-runtime-panel">
+      <section className="wf-runtime-card" data-state={rejected ? "rejected" : "accepted"}>
+        <header>
+          <div>
+            <span>Latest Test Run</span>
+            <h3>{rejected ? "Rejected by the server" : "Transient run accepted"}</h3>
+          </div>
+          <WorkflowStatusBadge status={testRun.status} subStatus={testRun.commandDispatchStatus ?? undefined} />
+        </header>
+        <p>Ephemeral - not saved, promoted, or published.</p>
+        {rejected && testRun.reason ? <div className="wf-runtime-reason"><AlertCircle size={14} /> {testRun.reason}</div> : null}
+        <dl className="wf-runtime-meta">
+          <div><dt>Dispatch</dt><dd title={testRun.commandDispatchStatus ?? testRun.status}>{testRun.commandDispatchStatus ?? testRun.status}</dd></div>
+          <div><dt>Test Run</dt><dd title={testRun.testRunId}>{testRun.testRunId}</dd></div>
+          <div><dt>Artifact</dt><dd title={testRun.artifactId ?? "None"}>{testRun.artifactId ?? "None"}</dd></div>
+          <div>
+            <dt>Run / Instance</dt>
+            <dd title={workflowExecutionId ?? "None"}>
+              {workflowExecutionId ? (
+                <button type="button" onClick={() => onOpenRun(workflowExecutionId)}>{workflowExecutionId}</button>
+              ) : "None"}
+            </dd>
+          </div>
+          <div><dt>Activities</dt><dd>{formatEvidenceCount(testRun.activityCount, "activity")}</dd></div>
+          <div><dt>Incidents</dt><dd>{formatEvidenceCount(testRun.incidentCount, "incident")}</dd></div>
+          <div><dt>Expires</dt><dd title={testRun.expiresAt ? formatDate(testRun.expiresAt) : "None"}>{testRun.expiresAt ? formatDate(testRun.expiresAt) : "None"}</dd></div>
+        </dl>
+      </section>
+    </div>
+  );
+}
+
+function formatEvidenceCount(count: number | null | undefined, label: string) {
+  if (typeof count !== "number") return "Available on linked Run";
+  return `${count} ${label}${count === 1 ? "" : "s"}`;
 }
 
 function createNodeId(activity: ActivityCatalogItem) {
