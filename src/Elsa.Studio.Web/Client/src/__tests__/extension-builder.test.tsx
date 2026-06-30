@@ -554,6 +554,42 @@ describe("extension builder page", () => {
     await unmount();
   });
 
+  it("blocks navigation and keeps the edit when an auto-save flush fails", async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === "PUT") throw new Error("Request failed with 503.");
+      if (String(url).includes("/log")) return new Response("", { status: 200, headers: { "content-type": "text/plain" } });
+      return new Response(JSON.stringify({}), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { container, unmount } = await renderExtensionBuilderPage(stubApi());
+    await openSolution(container);
+    await waitForText(container, "Activities/HelloActivity.cs");
+
+    const editor = await waitForElement<HTMLTextAreaElement>(container, "[aria-label='Project file editor']");
+    await waitFor(() => editor.value.includes("HelloActivity"), "Expected editor content to load.");
+    await fill(editor, `${editor.value}\n// will fail to save`);
+
+    // The flush fails, so going back must NOT proceed (no silent data loss).
+    await clickButton(container, "Solutions");
+    await flushPromises();
+
+    expect(container.textContent).toContain("503");
+    expect(container.querySelector(".extension-builder-solution-card")).toBeNull(); // still in the workspace
+    expect(container.querySelector("[aria-label='Project file editor']")).not.toBeNull();
+
+    await unmount();
+  });
+
+  it("keeps Save available as a force-save when the file is clean", async () => {
+    const { container, unmount } = await renderExtensionBuilderPage(stubApi());
+    await openSolution(container);
+    await waitForText(container, "Activities/HelloActivity.cs");
+
+    expect(buttonContaining(container, "Save")?.disabled).toBe(false);
+
+    await unmount();
+  });
+
   it("auto-saves the active file after a debounce when auto-save is on", async () => {
     const fetchMock = mockFetch();
     const { container, unmount } = await renderExtensionBuilderPage(stubApi());
