@@ -6,7 +6,7 @@ import type {
   ExtensionRepositorySummary,
   ExtensionWorkspace
 } from "../extensionBuilderApi";
-import { formatRemoteState, runtimeTone } from "./helpers";
+import { buildTone, formatRemoteState } from "./helpers";
 
 export interface HomeStat {
   label: string;
@@ -172,7 +172,7 @@ export function HomeView({
             >
               <div className="extension-builder-solution-card-top">
                 <Package size={20} />
-                <StatusChip tone={runtimeTone(repository.latestBuildStatus)}>{repository.latestBuildStatus ?? "new"}</StatusChip>
+                <StatusChip tone={buildTone(repository.latestBuildStatus)}>{repository.latestBuildStatus ?? "new"}</StatusChip>
               </div>
               <h4>{repository.name}</h4>
               <p className="modules-muted">{repository.owner ?? "current owner"} · {repository.projectCount} project(s)</p>

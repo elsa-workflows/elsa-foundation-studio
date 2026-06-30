@@ -101,6 +101,10 @@ export function BottomDock({
   onDiagnosticSelect(diagnostic: BuildDiagnostic): void;
 }) {
   const tabs = advanced ? dockTabs : dockTabs.filter(tab => tab.id === "build");
+  // Clamp to a tab that actually exists in the current mode. Promotion handlers may set the
+  // active tab to "promote"/"runtime" even in simple mode, where only "build" is rendered;
+  // without this the dock would open to an empty body.
+  const effectiveTab: InspectorTab = tabs.some(tab => tab.id === activeTab) ? activeTab : "build";
   const changeCount = (sourceControlStatus?.changedFiles ?? []).length;
   const diagnosticCount = (activeBuild?.diagnostics ?? []).length;
 
@@ -117,9 +121,9 @@ export function BottomDock({
             key={tab.id}
             type="button"
             role="tab"
-            aria-selected={open && tab.id === activeTab}
-            className={open && tab.id === activeTab ? "active" : ""}
-            onClick={() => selectTab(tab.id as InspectorTab)}
+            aria-selected={open && tab.id === effectiveTab}
+            className={open && tab.id === effectiveTab ? "active" : ""}
+            onClick={() => selectTab(tab.id)}
           >
             {tab.label}
             {tab.id === "source" && changeCount > 0 ? <span className="extension-builder-dock-badge warn">{changeCount}</span> : null}
@@ -135,7 +139,7 @@ export function BottomDock({
 
       {open ? (
         <div className="extension-builder-dock-body">
-          {activeTab === "build" ? (
+          {effectiveTab === "build" ? (
             <BuildPanel
               advanced={advanced}
               activeBuild={activeBuild}
@@ -155,7 +159,7 @@ export function BottomDock({
             />
           ) : null}
 
-          {advanced && activeTab === "source" ? (
+          {advanced && effectiveTab === "source" ? (
             <SourceControlPanel
               status={sourceControlStatus}
               diff={sourceControlDiff}
@@ -172,7 +176,7 @@ export function BottomDock({
             />
           ) : null}
 
-          {advanced && activeTab === "promote" ? (
+          {advanced && effectiveTab === "promote" ? (
             <PromotePanel
               capabilities={capabilities}
               activeBuild={activeBuild}
@@ -185,7 +189,7 @@ export function BottomDock({
             />
           ) : null}
 
-          {advanced && activeTab === "runtime" ? (
+          {advanced && effectiveTab === "runtime" ? (
             <RuntimePanel
               capabilities={capabilities}
               runtimeStatus={runtimeStatus}

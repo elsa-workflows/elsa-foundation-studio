@@ -81,6 +81,27 @@ describe("extension builder page", () => {
     await unmount();
   });
 
+  it("keeps the build panel visible when promoting a package in simplified mode", async () => {
+    // In simplified mode only the build tab exists; promotion handlers still switch the active
+    // inspector tab to runtime/promote, so the dock must clamp back to build instead of rendering
+    // an empty body.
+    const { container, unmount } = await renderExtensionBuilderPage(stubApi(), { advanced: false });
+    await waitForText(container, "Team Extensions");
+    await openSolution(container);
+    await openDock(container, "Build output");
+
+    await waitForText(container, "Package outputs");
+    await clickButton(container, "Promote package");
+    await flushPromises();
+
+    // The dock stays on the build panel (no Runtime/Promote tab to switch to) and is not blank.
+    expect(container.textContent).toContain("Package outputs");
+    expect(container.querySelector(".extension-builder-dock-body")?.textContent?.trim()).not.toBe("");
+    expect(hasTab(container, "Runtime")).toBe(false);
+
+    await unmount();
+  });
+
   it("creates an extension in a single step (repository, working copy, and project)", async () => {
     const postJson = vi.fn(async (url: string, body: unknown) => {
       if (url.endsWith("/workspaces")) return managedWorkspace();

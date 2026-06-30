@@ -147,7 +147,10 @@ export function ExtensionBuilderPage({ api }: { api: ElsaStudioModuleApi }) {
   const canBuild = !!capabilities?.canBuild && !!selectedProject && !editorDirty && !isBuildRunning(activeBuild);
   const canPromote = !!capabilities?.canPromote && !!latestArtifact && isBuildForCurrentRevision(activeBuild, selectedProject);
   const defaultWorkingBranchName = useMemo(() => `extension-builder/${sessionId}`, [sessionId]);
-  const inWorkspace = !!enteredWorkspaceId && (selectedWorkspace?.id === enteredWorkspaceId || selectedRepository?.id === enteredWorkspaceId);
+  // Only enter the workspace view when a backing workspace record is actually resolved. A
+  // repository summary can exist without a hydrated workspace; entering on the repository alone
+  // would strand the user on a shell with no editable content.
+  const inWorkspace = !!enteredWorkspaceId && selectedWorkspace?.id === enteredWorkspaceId;
 
   function clearBuildPoll() {
     if (pollTimerId.current) {
