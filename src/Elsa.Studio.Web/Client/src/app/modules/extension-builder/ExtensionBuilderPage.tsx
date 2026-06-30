@@ -218,7 +218,17 @@ export function ExtensionBuilderPage({ api }: { api: ElsaStudioModuleApi }) {
     const edit = latestEdit.current;
     const key = `${edit.workspaceId}::${edit.path}`;
     if (edit.autoSave && edit.dirty && edit.canEdit && edit.workspaceId && edit.path && lastSavedContent.current.get(key) !== edit.content) {
-      void writeRepositoryFile(context, edit.workspaceId, edit.path, { content: edit.content }).catch(() => {});
+      // Chain onto the serialized save queue rather than writing directly, so this best-effort flush
+      // cannot land out of order with an auto-save of older content that is still in flight. Re-check
+      // the saved content at execution time to avoid a redundant write if the queue already caught up.
+      saveChain.current = saveChain.current
+        .catch(() => {})
+        .then(() => {
+          if (lastSavedContent.current.get(key) === edit.content) return;
+          lastSavedContent.current.set(key, edit.content);
+          return writeRepositoryFile(context, edit.workspaceId, edit.path, { content: edit.content });
+        })
+        .catch(() => {});
     }
   }, []);
 
