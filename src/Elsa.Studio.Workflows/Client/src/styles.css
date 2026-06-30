@@ -3175,6 +3175,43 @@
   gap: 6px;
 }
 
+.wf-collection-item--dragging {
+  opacity: 0.5;
+}
+
+.wf-collection-item--drop-target {
+  box-shadow: inset 0 2px 0 0 var(--wf-accent);
+  border-radius: var(--wf-radius-sm);
+}
+
+.wf-collection-item-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 28px;
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--wf-muted-text);
+  cursor: grab;
+  touch-action: none;
+}
+
+.wf-collection-item-handle:hover:not(:disabled),
+.wf-collection-item-handle:focus-visible {
+  color: var(--wf-accent);
+}
+
+.wf-collection-item-handle:active:not(:disabled) {
+  cursor: grabbing;
+}
+
+.wf-collection-item-handle:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .wf-collection-item-editor {
   flex: 1;
   min-width: 0;

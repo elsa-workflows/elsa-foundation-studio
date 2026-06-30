@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from "react";
-import { ChevronDown, ChevronUp, Maximize2, Plus, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronUp, GripVertical, Maximize2, Plus, Trash2, X } from "lucide-react";
 import type {
   StudioActivityDescriptor,
   StudioActivityInputDescriptor,
@@ -300,6 +300,20 @@ function CollectionLiteralEditor({
   const replaceAt = (index: number, next: unknown) =>
     onChange(items.map((current, position) => (position === index ? next : current)));
 
+  // Drag-to-reorder state: `dragIndex` is the row being dragged, `dropIndex` the
+  // row currently hovered as a drop target. `handleIndex` gates the row's
+  // `draggable` attribute so a drag only starts from the grip handle, leaving
+  // text selection inside the element editors untouched.
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const [handleIndex, setHandleIndex] = useState<number | null>(null);
+
+  const resetDrag = () => {
+    setDragIndex(null);
+    setDropIndex(null);
+    setHandleIndex(null);
+  };
+
   return (
     <div className="wf-collection-editor">
       {items.length === 0 ? (
@@ -307,7 +321,40 @@ function CollectionLiteralEditor({
       ) : (
         <ul className="wf-collection-items">
           {items.map((item, index) => (
-            <li key={index} className="wf-collection-item">
+            <li
+              key={index}
+              className={[
+                "wf-collection-item",
+                dragIndex === index ? "wf-collection-item--dragging" : "",
+                dropIndex === index && dragIndex !== index ? "wf-collection-item--drop-target" : ""
+              ].filter(Boolean).join(" ")}
+              draggable={!disabled && handleIndex === index}
+              onDragStart={() => setDragIndex(index)}
+              onDragOver={event => {
+                if (disabled || dragIndex === null) return;
+                event.preventDefault();
+                if (dropIndex !== index) setDropIndex(index);
+              }}
+              onDrop={event => {
+                event.preventDefault();
+                if (dragIndex !== null && dragIndex !== index) {
+                  onChange(moveCollectionItem(items, dragIndex, index));
+                }
+                resetDrag();
+              }}
+              onDragEnd={resetDrag}
+            >
+              <button
+                type="button"
+                className="wf-collection-item-handle"
+                aria-label={`Drag ${label} item ${index + 1} to reorder`}
+                disabled={disabled}
+                tabIndex={-1}
+                onMouseDown={() => setHandleIndex(index)}
+                onMouseUp={() => setHandleIndex(null)}
+              >
+                <GripVertical size={13} />
+              </button>
               <div className="wf-collection-item-editor">
                 {renderEditor(ElementComponent, elementDescriptor, item, disabled, elementContext, next => replaceAt(index, next))}
               </div>
