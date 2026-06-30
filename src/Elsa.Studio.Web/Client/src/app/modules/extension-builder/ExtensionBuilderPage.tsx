@@ -72,11 +72,13 @@ import {
   mergeBuildHistory,
   patchProject,
   readAdvancedPreference,
+  readAutoSavePreference,
   runtimeTone,
   upsertEditorTab,
   upsertFile,
   validateProjectDraft,
-  writeAdvancedPreference
+  writeAdvancedPreference,
+  writeAutoSavePreference
 } from "./helpers";
 import { BottomDock } from "./BottomDock";
 import { EditorSurface } from "./EditorSurface";
@@ -113,6 +115,8 @@ export function ExtensionBuilderPage({ api }: { api: ElsaStudioModuleApi }) {
   const [buildTargetPath, setBuildTargetPath] = useState("");
   const [activeInspectorTab, setActiveInspectorTab] = useState<InspectorTab>("build");
   const [advanced, setAdvanced] = useState(readAdvancedPreference);
+  const [autoSave, setAutoSave] = useState(readAutoSavePreference);
+  const [autoSaving, setAutoSaving] = useState(false);
   const [enteredWorkspaceId, setEnteredWorkspaceId] = useState("");
   const [dockOpen, setDockOpen] = useState(false);
   const [extensionName, setExtensionName] = useState("");
@@ -136,10 +140,12 @@ export function ExtensionBuilderPage({ api }: { api: ElsaStudioModuleApi }) {
   const runtimeStatusRequestId = useRef(0);
   const selectedIds = useRef({ workspaceId: "", projectId: "" });
   const hydratedSelectionKey = useRef("");
+  const activeFilePathRef = useRef("");
   const selectedWorkspace = workspaces.find(workspace => workspace.id === selectedWorkspaceId) ?? (!selectedWorkspaceId ? workspaces[0] ?? null : null);
   const selectedRepository = repositories.find(repository => repository.id === selectedWorkspaceId) ?? repositories.find(repository => repository.id === selectedWorkspace?.id) ?? repositories[0] ?? null;
   const selectedProject = selectedWorkspace?.projects.find(project => project.id === selectedProjectId) ?? selectedWorkspace?.projects[0] ?? null;
   selectedIds.current = { workspaceId: selectedWorkspace?.id ?? "", projectId: selectedProject?.id ?? "" };
+  activeFilePathRef.current = activeFilePath;
   const fileRows = useMemo(() => [...files].sort((a, b) => fileSortKey(a).localeCompare(fileSortKey(b))), [files]);
   const projectTemplates = useMemo(() => templates.filter(template => template.scope === "Project"), [templates]);
   const activeTab = editorTabs.find(tab => tab.path === activeFilePath) ?? null;
@@ -184,6 +190,23 @@ export function ExtensionBuilderPage({ api }: { api: ElsaStudioModuleApi }) {
     writeAdvancedPreference(advanced);
     if (!advanced) setActiveInspectorTab("build");
   }, [advanced]);
+
+  useEffect(() => {
+    writeAutoSavePreference(autoSave);
+  }, [autoSave]);
+
+  // Debounced auto-save of the active file. The timer is keyed on the edited content, so each
+  // keystroke reschedules it; it fires ~1s after the user stops typing.
+  useEffect(() => {
+    if (!autoSave || !editorDirty || !activeFilePath || !selectedWorkspace || !capabilities?.canEditFiles || operationBusy) {
+      return;
+    }
+    const workspaceId = selectedWorkspace.id;
+    const path = activeFilePath;
+    const content = editorText;
+    const handle = window.setTimeout(() => { void autoSaveFile(workspaceId, path, content); }, 1000);
+    return () => window.clearTimeout(handle);
+  }, [autoSave, editorText, editorDirty, activeFilePath, selectedWorkspace?.id, capabilities?.canEditFiles, operationBusy]);
 
   useEffect(() => {
     if (projectTemplates.length === 0 || projectDraft.templateId) return;
@@ -408,19 +431,19 @@ export function ExtensionBuilderPage({ api }: { api: ElsaStudioModuleApi }) {
     api.dialogs.confirm({ message: "Discard unsaved file changes?", confirmLabel: "Discard", tone: "danger" });
 
   async function openSolution(workspaceId: string) {
-    if (editorDirty && !(await confirmDiscard())) return;
+    if (!(await ensureSavedBeforeLeaving())) return;
     setSelectedWorkspaceId(workspaceId);
     setEnteredWorkspaceId(workspaceId);
     setDockOpen(false);
   }
 
   async function backToHome() {
-    if (editorDirty && !(await confirmDiscard())) return;
+    if (!(await ensureSavedBeforeLeaving())) return;
     setEnteredWorkspaceId("");
   }
 
   async function openFile(workspaceId: string, path: string, options?: { force?: boolean }) {
-    if (!options?.force && editorDirty && !(await confirmDiscard())) return false;
+    if (!options?.force && !(await ensureSavedBeforeLeaving())) return false;
     setError(null);
     try {
       const file = await readRepositoryFile(context, workspaceId, path);
@@ -463,10 +486,38 @@ export function ExtensionBuilderPage({ api }: { api: ElsaStudioModuleApi }) {
     }
   }
 
+  // Lightweight save used by auto-save: persists the file and marks it saved without the full
+  // tree/source/metadata refresh that the explicit Save performs.
+  async function autoSaveFile(workspaceId: string, path: string, content: string) {
+    setAutoSaving(true);
+    try {
+      const saved = await writeRepositoryFile(context, workspaceId, path, { content });
+      if (!mounted.current || selectedIds.current.workspaceId !== workspaceId) return;
+      setEditorTabs(current => current.map(tab => tab.path === path ? { ...tab, savedContent: content } : tab));
+      setFiles(current => upsertFile(current, saved));
+      if (activeFilePathRef.current === path) setSavedEditorText(content);
+      clearSourceDependentState();
+    } catch (e) {
+      if (mounted.current) setError(getErrorMessage(e));
+    } finally {
+      if (mounted.current) setAutoSaving(false);
+    }
+  }
+
+  // Navigation guard: when auto-save is on, flush the active file instead of prompting to discard.
+  async function ensureSavedBeforeLeaving() {
+    if (!editorDirty) return true;
+    if (autoSave && selectedWorkspace && activeFilePath && capabilities?.canEditFiles) {
+      await autoSaveFile(selectedWorkspace.id, activeFilePath, editorText);
+      return true;
+    }
+    return confirmDiscard();
+  }
+
   async function handleSelectEditorTab(path: string) {
     const tab = editorTabs.find(item => item.path === path);
     if (!tab) return;
-    if (editorDirty && activeFilePath !== path && !(await confirmDiscard())) return;
+    if (activeFilePath !== path && !(await ensureSavedBeforeLeaving())) return;
     setActiveFilePath(tab.path);
     setEditorText(tab.content);
     setSavedEditorText(tab.savedContent);
@@ -476,7 +527,13 @@ export function ExtensionBuilderPage({ api }: { api: ElsaStudioModuleApi }) {
   async function handleCloseEditorTab(path: string) {
     const tab = editorTabs.find(item => item.path === path);
     if (!tab) return;
-    if (tab.content !== tab.savedContent && !(await confirmDiscard())) return;
+    if (tab.content !== tab.savedContent) {
+      if (autoSave && selectedWorkspace && capabilities?.canEditFiles) {
+        await autoSaveFile(selectedWorkspace.id, tab.path, tab.content);
+      } else if (!(await confirmDiscard())) {
+        return;
+      }
+    }
     const remaining = editorTabs.filter(item => item.path !== path);
     setEditorTabs(remaining);
     if (activeFilePath === path) {
@@ -1091,7 +1148,11 @@ export function ExtensionBuilderPage({ api }: { api: ElsaStudioModuleApi }) {
             </div>
             <div className="extension-builder-commandbar-right">
               {selectedProject ? <StatusChip tone={runtimeTone(selectedProject.runtimeStatus)}>{selectedProject.runtimeStatus ?? selectedProject.latestBuildStatus ?? "new"}</StatusChip> : null}
-              <button type="button" className="studio-button" disabled={operationBusy || !capabilities!.canEditFiles || !activeFilePath} title={!capabilities!.canEditFiles ? "Requires canEditFiles" : undefined} onClick={handleSaveFile}>
+              <label className="extension-builder-autosave-toggle" title="Automatically save edits as you type">
+                <input type="checkbox" aria-label="Auto-save" checked={autoSave} disabled={operationBusy} onChange={event => setAutoSave(event.target.checked)} />
+                <span>Auto-save</span>
+              </label>
+              <button type="button" className="studio-button" disabled={operationBusy || !capabilities!.canEditFiles || !activeFilePath || !editorDirty} title={!capabilities!.canEditFiles ? "Requires canEditFiles" : autoSave ? "Auto-save is on — saves as you type" : undefined} onClick={handleSaveFile}>
                 <Save size={15} />
                 Save
               </button>
@@ -1134,7 +1195,7 @@ export function ExtensionBuilderPage({ api }: { api: ElsaStudioModuleApi }) {
                   activeFilePath={activeFilePath}
                   onRefresh={() => loadProjectDetails(selectedWorkspace.id, selectedProject?.id ?? "", selectedSolutionPath || null)}
                   onSelectProject={async projectId => {
-                    if (editorDirty && !(await confirmDiscard())) return;
+                    if (!(await ensureSavedBeforeLeaving())) return;
                     setSelectedProjectId(projectId);
                   }}
                   onTemplateDraftChange={setTemplateDraft}
@@ -1162,6 +1223,7 @@ export function ExtensionBuilderPage({ api }: { api: ElsaStudioModuleApi }) {
                   activeFilePath={activeFilePath}
                   editorText={editorText}
                   editorDirty={editorDirty}
+                  autoSaving={autoSaving}
                   lineHint={lineHint}
                   diagnostics={activeBuild?.diagnostics ?? []}
                   onSelectEditorTab={handleSelectEditorTab}
