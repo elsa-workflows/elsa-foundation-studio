@@ -12,7 +12,6 @@ import {
   friendlyDriverLabel,
   friendlyTypeLabel,
   generateUniqueName,
-  inputDefaultValueKeys,
   isPlainRecord,
   literalDefault,
   readArgumentType,
@@ -298,8 +297,8 @@ function RemoveCell({ label, onRemove }: { label: string; onRemove(): void }) {
   );
 }
 
-// Reads/writes a row's default value as a display string, hiding the per-collection storage difference
-// (variables keep an ArgumentValue; inputs keep a plain `defaultValue` string).
+// Reads/writes a row's default value as a display string. Only Variables carry a default (an
+// ArgumentValue) — the backend Input/Output records have no default member, so no input adapter exists.
 interface DefaultAdapter {
   read(item: Record<string, unknown>): string;
   write(value: string): Record<string, unknown>;
@@ -310,14 +309,23 @@ const variableDefaultAdapter: DefaultAdapter = {
   write: value => ({ default: literalDefault(value) })
 };
 
-const inputDefaultAdapter: DefaultAdapter = {
-  read: item => readStringField(item, inputDefaultValueKeys),
-  write: value => ({ defaultValue: value === "" ? null : value })
-};
+// The backend Input/Output `IsRequired` flag; a first-class bool, default false.
+const requiredKeys = ["isRequired", "IsRequired"];
+
+function RequiredCell({ checked, ariaLabel, onChange }: {
+  checked: boolean;
+  ariaLabel: string;
+  onChange(value: boolean): void;
+}) {
+  return (
+    <input type="checkbox" aria-label={ariaLabel} checked={checked} onChange={event => onChange(event.target.checked)} />
+  );
+}
 
 interface ArgumentColumns {
   default: boolean;
   storage: boolean;
+  required?: boolean;
 }
 
 // One row editor for all three collections. They share Name / Type / Collection-kind; Variables and
@@ -350,7 +358,7 @@ function ArgumentsEditor({
     patch
   });
 
-  const headers = ["Name", "Type", "Collection", ...(columns.default ? ["Default"] : []), ...(columns.storage ? ["Storage"] : [])];
+  const headers = ["Name", "Type", "Collection", ...(columns.default ? ["Default"] : []), ...(columns.storage ? ["Storage"] : []), ...(columns.required ? ["Required"] : [])];
   const noun = namePrefix.toLowerCase();
 
   return (
@@ -414,6 +422,15 @@ function ArgumentsEditor({
                 />
               </td>
             ) : null}
+            {columns.required ? (
+              <td>
+                <RequiredCell
+                  ariaLabel={`${namePrefix} required`}
+                  checked={readStringField(item, requiredKeys) === "true"}
+                  onChange={value => update(index, { isRequired: value })}
+                />
+              </td>
+            ) : null}
             <RemoveCell label={`Remove ${noun} ${name || index + 1}`} onRemove={() => remove(index)} />
           </tr>
         );
@@ -474,8 +491,7 @@ function InputsEditor({ items, typeOptions, storageOptions, editorForAlias, onCh
       emptyLabel="No inputs defined."
       create={(name, alias) => createInput({ name, alias })}
       patch={(existing, next) => updateInput(existing as WorkflowInput, next)}
-      columns={{ default: true, storage: true }}
-      defaultAdapter={inputDefaultAdapter}
+      columns={{ default: false, storage: true, required: true }}
       onChange={onChange}
     />
   );
