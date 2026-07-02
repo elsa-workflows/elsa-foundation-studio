@@ -17,6 +17,7 @@ import {
   readArgumentType,
   readStringField,
   readVariableDefault,
+  referenceKeyKeys,
   storageDriverKeys,
   updateInput,
   updateOutput,
@@ -297,21 +298,6 @@ function RemoveCell({ label, onRemove }: { label: string; onRemove(): void }) {
   );
 }
 
-// Reads/writes a row's default value as a display string. Only Variables carry a default (an
-// ArgumentValue) — the backend Input/Output records have no default member, so no input adapter exists.
-interface DefaultAdapter {
-  read(item: Record<string, unknown>): string;
-  write(value: string): Record<string, unknown>;
-}
-
-const variableDefaultAdapter: DefaultAdapter = {
-  read: item => readVariableDefault((item as VariableDefinition).default),
-  write: value => ({ default: literalDefault(value) })
-};
-
-// The backend Input/Output `IsRequired` flag; a first-class bool, default false.
-const requiredKeys = ["isRequired", "IsRequired"];
-
 function RequiredCell({ checked, ariaLabel, onChange }: {
   checked: boolean;
   ariaLabel: string;
@@ -322,6 +308,8 @@ function RequiredCell({ checked, ariaLabel, onChange }: {
   );
 }
 
+// Which optional columns a collection renders. Only Variables carry a Default (an ArgumentValue); the
+// backend Input/Output records have no default member. Inputs alone carry the `isRequired` flag.
 interface ArgumentColumns {
   default: boolean;
   storage: boolean;
@@ -333,7 +321,7 @@ interface ArgumentColumns {
 function ArgumentsEditor({
   items, typeOptions, storageOptions, editorForAlias,
   namePrefix, nameKeys, title, addLabel, emptyLabel,
-  create, patch, columns, defaultAdapter, warnings, onChange
+  create, patch, columns, warnings, onChange
 }: {
   items: Record<string, unknown>[];
   typeOptions: PickerOption[] | null;
@@ -347,7 +335,6 @@ function ArgumentsEditor({
   create(name: string, alias?: string): Record<string, unknown>;
   patch(existing: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown>;
   columns: ArgumentColumns;
-  defaultAdapter?: DefaultAdapter;
   warnings?: Map<string, string>;
   onChange(next: unknown[]): void;
 }) {
@@ -373,7 +360,7 @@ function ArgumentsEditor({
       {items.map((item, index) => {
         const name = readStringField(item, nameKeys);
         const argType = readArgumentType(item);
-        const referenceKey = readStringField(item, ["referenceKey", "ReferenceKey"]);
+        const referenceKey = readStringField(item, referenceKeyKeys);
         const warning = referenceKey ? warnings?.get(referenceKey) : undefined;
         // A collection's default is a single scalar editor only for a `Single` type; collection defaults
         // fall back to free text (editing a list/array default inline is out of scope).
@@ -400,13 +387,14 @@ function ArgumentsEditor({
                 onChange={kind => update(index, { type: { alias: argType.alias, collectionKind: kind } })}
               />
             </td>
-            {columns.default && defaultAdapter ? (
+            {columns.default ? (
               <td>
+                {/* Only Variables render this column; the value is their ArgumentValue default. */}
                 <DefaultValueCell
                   ariaLabel={`${namePrefix} default value`}
-                  value={defaultAdapter.read(item)}
+                  value={readVariableDefault((item as VariableDefinition).default)}
                   editor={editor}
-                  onChange={value => update(index, defaultAdapter.write(value))}
+                  onChange={value => update(index, { default: literalDefault(value) })}
                 />
               </td>
             ) : null}
@@ -426,7 +414,7 @@ function ArgumentsEditor({
               <td>
                 <RequiredCell
                   ariaLabel={`${namePrefix} required`}
-                  checked={readStringField(item, requiredKeys) === "true"}
+                  checked={item.isRequired === true}
                   onChange={value => update(index, { isRequired: value })}
                 />
               </td>
@@ -464,7 +452,6 @@ export function VariablesEditor({ items, typeOptions, storageOptions, editorForA
       create={(name, alias) => createVariable({ name, alias })}
       patch={(existing, next) => updateVariable(existing as VariableDefinition, next)}
       columns={{ default: true, storage: true }}
-      defaultAdapter={variableDefaultAdapter}
       warnings={warnings}
       onChange={onChange}
     />

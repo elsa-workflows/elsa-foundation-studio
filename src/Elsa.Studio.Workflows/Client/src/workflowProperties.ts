@@ -184,3 +184,4 @@ export function readStringField(record: Record<string, unknown>, keys: string[])
 export const variableNameKeys = ["name", "Name"];
 export const argumentNameKeys = ["name", "Name"];
 export const storageDriverKeys = ["storageDriverType", "StorageDriverType"];
+export const referenceKeyKeys = ["referenceKey", "ReferenceKey"];

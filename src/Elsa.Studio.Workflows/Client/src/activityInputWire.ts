@@ -1,4 +1,4 @@
-import { generateId, readArgumentType } from "./workflowProperties";
+import { generateId, readArgumentType, readStringField, referenceKeyKeys } from "./workflowProperties";
 import type { ActivityNode, WorkflowDefinitionState } from "./workflowTypes";
 
 /**
@@ -109,16 +109,12 @@ function normalizeArgumentRecord(record: Record<string, unknown>, keepStorage: b
   const next = omitKeys(record, droppedArgumentKeys);
   // Backfill a stable referenceKey when a legacy/foreign record lacks one (inputs/outputs authored before
   // the typed-argument-model didn't carry it). Only-when-missing keeps this idempotent and lossless.
-  if (!isNonEmptyString(record.referenceKey) && !isNonEmptyString(record.ReferenceKey)) {
+  if (!readStringField(record, referenceKeyKeys).trim()) {
     next.referenceKey = generateId();
   }
   next.type = readArgumentType(record);
   if (keepStorage) next.storageDriverType = readWireStorageDriver(record.storageDriverType ?? record.StorageDriverType);
   return next;
-}
-
-function isNonEmptyString(value: unknown): boolean {
-  return typeof value === "string" && value.trim().length > 0;
 }
 
 function omitKeys(record: Record<string, unknown>, keys: string[]): Record<string, unknown> {
