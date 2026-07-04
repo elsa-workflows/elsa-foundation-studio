@@ -1,5 +1,7 @@
 using ConsoleLogStreaming.AspNetCore.DependencyInjection;
+using ConsoleLogStreaming.Core;
 using ConsoleLogStreaming.Core.DependencyInjection;
+using ConsoleLogStreaming.Core.Providers;
 using Elsa.Studio.ConsoleStream.Handlers;
 using Elsa.Studio.Core.Events;
 using Elsa.Studio.Core.Services;
@@ -20,6 +22,13 @@ public static class ConsoleStreamStudioServiceCollectionExtensions
     /// WebSocket/EventSource handshakes) without leaking the key into access logs on other management endpoints.
     /// </summary>
     public const string HubPath = $"{EndpointPrefix}/hub";
+
+    /// <summary>
+    /// Minimum interval between live-stream batch releases. Bounds the long-polling feedback loop
+    /// (one captured stdout line completing one pending poll 1:1) at ~10 poll round-trips per second
+    /// even when a host logs per-request at Information — see <see cref="PacedConsoleLogProvider"/>.
+    /// </summary>
+    internal static readonly TimeSpan StreamReleaseInterval = TimeSpan.FromMilliseconds(100);
 
     /// <summary>
     /// Registers the per-shell Studio integration for the console stream: the UI module manifest
@@ -53,6 +62,15 @@ public static class ConsoleStreamStudioServiceCollectionExtensions
             aspNetCoreOptions.SourcesPath = $"{EndpointPrefix}/sources";
             aspNetCoreOptions.HubPath = HubPath;
         });
+
+        // Wrap the default in-memory provider so live streams release in time-gated batches. The
+        // process-wide host builds its provider from this factory on first use; the call is a no-op
+        // (returns false) if a provider factory was already configured or the host is running, so
+        // repeated registration is safe. Consumers that need a custom IConsoleLogProvider should
+        // configure it before calling this method and are then expected to pace it themselves.
+        ConsoleLogStreamingHost.ConfigureProvider(context => new PacedConsoleLogProvider(
+            new InMemoryConsoleLogProvider(context.Options, context.RedactionPipeline, context.SourceRegistry),
+            StreamReleaseInterval));
 
         return services;
     }
