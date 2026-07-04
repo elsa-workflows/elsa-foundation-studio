@@ -54,6 +54,39 @@ public sealed class ModuleManagementAuthTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task AllowsRequestWithValidBearerToken()
+    {
+        // The SignalR client sends its access token as "Authorization: Bearer <token>" on negotiate and long-poll requests.
+        var client = await StartGatedHostAsync(apiKey: ValidKey);
+        client.DefaultRequestHeaders.Authorization = new("Bearer", ValidKey);
+
+        var response = await client.PostAsync("/gated", content: null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AllowsRequestWithValidAccessTokenQueryParameter()
+    {
+        // WebSocket and SSE requests cannot carry headers from a browser; SignalR falls back to ?access_token=.
+        var client = await StartGatedHostAsync(apiKey: ValidKey);
+
+        var response = await client.PostAsync($"/gated?{ModuleManagementAuth.AccessTokenQueryParameterName}={ValidKey}", content: null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task RejectsRequestWithWrongAccessTokenQueryParameter()
+    {
+        var client = await StartGatedHostAsync(apiKey: ValidKey);
+
+        var response = await client.PostAsync($"/gated?{ModuleManagementAuth.AccessTokenQueryParameterName}=not-the-key", content: null);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
     public async Task FailsClosedWhenNoKeyConfiguredAndAnonymousNotAllowed()
     {
         var client = await StartGatedHostAsync(apiKey: null, allowAnonymous: false);

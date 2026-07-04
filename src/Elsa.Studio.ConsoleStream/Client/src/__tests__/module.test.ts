@@ -186,6 +186,18 @@ describe("console stream module", () => {
     expect(options.headers).toEqual({ "x-elsa-module-management-key": "secret" });
   });
 
+  it("exposes a header-only management key through accessTokenFactory so WebSockets can authenticate", async () => {
+    // Browsers cannot attach custom headers to WebSocket/SSE requests; the factory lets SignalR send the key
+    // as the access_token query parameter instead of degrading the connection to long polling.
+    const options = createConsoleConnectionOptions({
+      baseUrl: "https://server.example",
+      headers: { "X-Elsa-Module-Management-Key": "secret" },
+      http: { getJson: async () => ({}) }
+    });
+
+    expect(await options.accessTokenFactory?.()).toBe("secret");
+  });
+
   it("omits accessTokenFactory on the anonymous context", () => {
     expect(createConsoleConnectionOptions({ baseUrl: "https://server.example", http: { getJson: async () => ({}) } }).accessTokenFactory)
       .toBeUndefined();

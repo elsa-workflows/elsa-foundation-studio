@@ -23,6 +23,14 @@ internal static class ModuleManagementAuth
     /// <summary>The request header carrying the management API key. Matches the header the Studio SPA already attaches.</summary>
     public const string ApiKeyHeaderName = "X-Elsa-Module-Management-Key";
 
+    /// <summary>
+    /// The query-string parameter carrying the management API key. Browsers cannot attach custom headers to
+    /// WebSocket or EventSource requests, so the SignalR client sends its access token as <c>access_token</c>
+    /// (the standard SignalR convention) — without this fallback the console-stream hub's WebSocket handshake
+    /// is rejected and every connection degrades to long polling.
+    /// </summary>
+    public const string AccessTokenQueryParameterName = "access_token";
+
     private const string ApiKeyConfigurationKey = "Studio:BackendModuleManagementApiKey";
     private const string AllowAnonymousConfigurationKey = "Studio:AllowAnonymousManagementApi";
 
@@ -83,13 +91,33 @@ internal sealed class ModuleManagementApiKeyHandler(
                 : AuthenticateResult.Fail("The Studio management API key is not configured."));
         }
 
-        if (!Request.Headers.TryGetValue(ModuleManagementAuth.ApiKeyHeaderName, out var providedKey))
+        var providedKey = GetProvidedKey();
+        if (providedKey is null)
             return Task.FromResult(AuthenticateResult.NoResult());
 
-        if (!CryptographicEquals(providedKey.ToString(), configuredKey))
+        if (!CryptographicEquals(providedKey, configuredKey))
             return Task.FromResult(AuthenticateResult.Fail("The supplied management API key is invalid."));
 
         return Task.FromResult(Success("module-management"));
+    }
+
+    private string? GetProvidedKey()
+    {
+        if (Request.Headers.TryGetValue(ModuleManagementAuth.ApiKeyHeaderName, out var headerKey))
+            return headerKey.ToString();
+
+        // The SignalR JavaScript client sends its access token as "Authorization: Bearer <token>" where it can
+        // set headers (negotiate, long polling) and as the access_token query parameter where it cannot
+        // (WebSockets, server-sent events).
+        var authorization = Request.Headers.Authorization.ToString();
+        const string bearerPrefix = "Bearer ";
+        if (authorization.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase))
+            return authorization[bearerPrefix.Length..];
+
+        if (Request.Query.TryGetValue(ModuleManagementAuth.AccessTokenQueryParameterName, out var queryKey))
+            return queryKey.ToString();
+
+        return null;
     }
 
     private AuthenticateResult Success(string name)
