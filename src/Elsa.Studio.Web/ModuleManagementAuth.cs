@@ -140,17 +140,8 @@ internal sealed class ModuleManagementApiKeyHandler(
             : AuthenticateResult.NoResult());
     }
 
-    private bool IsQueryTokenPathAllowed()
-    {
-        var path = Request.Path;
-        foreach (var prefix in Options.QueryTokenPathPrefixes)
-        {
-            if (path.StartsWithSegments(prefix, StringComparison.OrdinalIgnoreCase))
-                return true;
-        }
-
-        return false;
-    }
+    private bool IsQueryTokenPathAllowed() =>
+        Options.QueryTokenPathPrefixes.Any(prefix => Request.Path.StartsWithSegments(prefix, StringComparison.OrdinalIgnoreCase));
 
     private AuthenticateResult Success(string name)
     {
