@@ -112,8 +112,6 @@ const consoleStreamServerTimeoutInMilliseconds = 120_000;
 const consoleStreamKeepAliveIntervalInMilliseconds = 15_000;
 const consoleStreamTimeoutMessage = "Server timeout elapsed without receiving a message from the server.";
 const autoScrollStorageKey = "elsa-studio-console-stream-autoscroll";
-// Lowercase because createSignalRHeaders round-trips through Headers, which normalizes names to lowercase.
-const moduleManagementKeyHeaderName = "x-elsa-module-management-key";
 // eslint-disable-next-line no-control-regex -- \x1b (ESC) is required to match ANSI SGR sequences.
 const ansiEscapePattern = /\x1b\[([0-9;]*)m/g;
 const ansiForegroundClasses: Record<number, string> = {
@@ -545,19 +543,11 @@ export function createConsoleFilter(sourceId: string | null) {
 export function createConsoleConnectionOptions(context: StudioEndpointContext): signalR.IHttpConnectionOptions {
   const headers = createSignalRHeaders(context.headers);
   const baseOptions: signalR.IHttpConnectionOptions = headers ? { headers } : {};
-  // When the shell runs authenticated it supplies an accessTokenFactory (built from the auth manager); the
-  // hub negotiate/connect requests then carry the same bearer token the HTTP client attaches.
-  if (context.accessTokenFactory) {
-    return { ...baseOptions, accessTokenFactory: context.accessTokenFactory };
-  }
-
-  // Browsers cannot attach custom headers to WebSocket or EventSource requests, so a header-only management
-  // key forces the connection down to long polling. Exposing the key through an accessTokenFactory makes the
-  // SignalR client send it as the access_token query parameter on those transports (and as a bearer header
-  // elsewhere), which the management API-key gate accepts. Anonymous deployments keep the plain options.
-  const managementKey = headers?.[moduleManagementKeyHeaderName];
-  return managementKey
-    ? { ...baseOptions, accessTokenFactory: () => managementKey }
+  // The shell decides the hub credential and hands it over as context.accessTokenFactory (a user JWT, the
+  // host management key, or none). The module is a dumb consumer: pass it straight through so WebSocket/SSE
+  // transports carry it as the access_token query parameter instead of degrading to long polling.
+  return context.accessTokenFactory
+    ? { ...baseOptions, accessTokenFactory: context.accessTokenFactory }
     : baseOptions;
 }
 

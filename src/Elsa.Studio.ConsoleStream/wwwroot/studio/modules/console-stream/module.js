@@ -1,9 +1,9 @@
 import { useState as I, useRef as Ce, useMemo as ie, useCallback as ce, useEffect as V } from "react";
 var ae = { exports: {} }, W = {};
-var ye;
+var ve;
 function Ke() {
-  if (ye) return W;
-  ye = 1;
+  if (ve) return W;
+  ve = 1;
   var n = /* @__PURE__ */ Symbol.for("react.transitional.element"), e = /* @__PURE__ */ Symbol.for("react.fragment");
   function t(o, s, r) {
     var c = null;
@@ -22,12 +22,12 @@ function Ke() {
   }
   return W.Fragment = e, W.jsx = t, W.jsxs = t, W;
 }
-var ve;
+var ye;
 function Ge() {
-  return ve || (ve = 1, ae.exports = Ke()), ae.exports;
+  return ye || (ye = 1, ae.exports = Ke()), ae.exports;
 }
 var f = Ge();
-class R extends Error {
+class x extends Error {
   /** Constructs a new instance of {@link @microsoft/signalr.HttpError}.
    *
    * @param {string} errorMessage A descriptive error message.
@@ -363,7 +363,7 @@ class ht extends ee {
     }
     if (!r.ok) {
       const l = await Ee(r, "text");
-      throw new R(l || r.statusText, r.status);
+      throw new x(l || r.statusText, r.status);
     }
     const a = await Ee(r, e.responseType);
     return new Ne(r.status, r.statusText, a);
@@ -407,9 +407,9 @@ class ut extends ee {
       }), e.responseType && (s.responseType = e.responseType), e.abortSignal && (e.abortSignal.onabort = () => {
         s.abort(), o(new T());
       }), e.timeout && (s.timeout = e.timeout), s.onload = () => {
-        e.abortSignal && (e.abortSignal.onabort = null), s.status >= 200 && s.status < 300 ? t(new Ne(s.status, s.statusText, s.response || s.responseText)) : o(new R(s.response || s.responseText || s.statusText, s.status));
+        e.abortSignal && (e.abortSignal.onabort = null), s.status >= 200 && s.status < 300 ? t(new Ne(s.status, s.statusText, s.response || s.responseText)) : o(new x(s.response || s.responseText || s.statusText, s.status));
       }, s.onerror = () => {
-        this._logger.log(i.Warning, `Error from HTTP request. ${s.status}: ${s.statusText}.`), o(new R(s.statusText, s.status));
+        this._logger.log(i.Warning, `Error from HTTP request. ${s.status}: ${s.statusText}.`), o(new x(s.statusText, s.status));
       }, s.ontimeout = () => {
         this._logger.log(i.Warning, "Timeout from HTTP request."), o(new de());
       }, s.send(e.content);
@@ -434,40 +434,40 @@ class dt extends ee {
     return this._httpClient.getCookieString(e);
   }
 }
-class v {
+class y {
   static write(e) {
-    return `${e}${v.RecordSeparator}`;
+    return `${e}${y.RecordSeparator}`;
   }
   static parse(e) {
-    if (e[e.length - 1] !== v.RecordSeparator)
+    if (e[e.length - 1] !== y.RecordSeparator)
       throw new Error("Message is incomplete.");
-    const t = e.split(v.RecordSeparator);
+    const t = e.split(y.RecordSeparator);
     return t.pop(), t;
   }
 }
-v.RecordSeparatorCode = 30;
-v.RecordSeparator = String.fromCharCode(v.RecordSeparatorCode);
+y.RecordSeparatorCode = 30;
+y.RecordSeparator = String.fromCharCode(y.RecordSeparatorCode);
 class gt {
   // Handshake request is always JSON
   writeHandshakeRequest(e) {
-    return v.write(JSON.stringify(e));
+    return y.write(JSON.stringify(e));
   }
   parseHandshakeResponse(e) {
     let t, o;
     if (D(e)) {
-      const a = new Uint8Array(e), l = a.indexOf(v.RecordSeparatorCode);
+      const a = new Uint8Array(e), l = a.indexOf(y.RecordSeparatorCode);
       if (l === -1)
         throw new Error("Message is incomplete.");
       const u = l + 1;
       t = String.fromCharCode.apply(null, Array.prototype.slice.call(a.slice(0, u))), o = a.byteLength > u ? a.slice(u).buffer : null;
     } else {
-      const a = e, l = a.indexOf(v.RecordSeparator);
+      const a = e, l = a.indexOf(y.RecordSeparator);
       if (l === -1)
         throw new Error("Message is incomplete.");
       const u = l + 1;
       t = a.substring(0, u), o = a.length > u ? a.substring(u) : null;
     }
-    const s = v.parse(t), r = JSON.parse(s[0]);
+    const s = y.parse(t), r = JSON.parse(s[0]);
     if (r.type)
       throw new Error("Expected a handshake response from the server.");
     return [o, r];
@@ -1139,7 +1139,7 @@ var S;
 (function(n) {
   n[n.Text = 1] = "Text", n[n.Binary = 2] = "Binary";
 })(S || (S = {}));
-let yt = class {
+let vt = class {
   constructor() {
     this._isAborted = !1, this.onabort = null;
   }
@@ -1159,7 +1159,7 @@ class Te {
     return this._pollAbort.aborted;
   }
   constructor(e, t, o) {
-    this._httpClient = e, this._logger = t, this._pollAbort = new yt(), this._options = o, this._running = !1, this.onreceive = null, this.onclose = null;
+    this._httpClient = e, this._logger = t, this._pollAbort = new vt(), this._options = o, this._running = !1, this.onreceive = null, this.onclose = null;
   }
   async connect(e, t) {
     if (b.isRequired(e, "url"), b.isRequired(t, "transferFormat"), b.isIn(t, S, "transferFormat"), this._url = e, this._logger.log(i.Trace, "(LongPolling transport) Connecting."), t === S.Binary && typeof XMLHttpRequest < "u" && typeof new XMLHttpRequest().responseType != "string")
@@ -1174,7 +1174,7 @@ class Te {
     const a = `${e}&_=${Date.now()}`;
     this._logger.log(i.Trace, `(LongPolling transport) polling: ${a}.`);
     const l = await this._httpClient.get(a, c);
-    l.statusCode !== 200 ? (this._logger.log(i.Error, `(LongPolling transport) Unexpected response code: ${l.statusCode}.`), this._closeError = new R(l.statusText || "", l.statusCode), this._running = !1) : this._running = !0, this._receiving = this._poll(this._url, c);
+    l.statusCode !== 200 ? (this._logger.log(i.Error, `(LongPolling transport) Unexpected response code: ${l.statusCode}.`), this._closeError = new x(l.statusText || "", l.statusCode), this._running = !1) : this._running = !0, this._receiving = this._poll(this._url, c);
   }
   async _poll(e, t) {
     try {
@@ -1183,7 +1183,7 @@ class Te {
           const o = `${e}&_=${Date.now()}`;
           this._logger.log(i.Trace, `(LongPolling transport) polling: ${o}.`);
           const s = await this._httpClient.get(o, t);
-          s.statusCode === 204 ? (this._logger.log(i.Information, "(LongPolling transport) Poll terminated by server."), this._running = !1) : s.statusCode !== 200 ? (this._logger.log(i.Error, `(LongPolling transport) Unexpected response code: ${s.statusCode}.`), this._closeError = new R(s.statusText || "", s.statusCode), this._running = !1) : s.content ? (this._logger.log(i.Trace, `(LongPolling transport) data received. ${O(s.content, this._options.logMessageContent)}.`), this.onreceive && this.onreceive(s.content)) : this._logger.log(i.Trace, "(LongPolling transport) Poll timed out, reissuing.");
+          s.statusCode === 204 ? (this._logger.log(i.Information, "(LongPolling transport) Poll terminated by server."), this._running = !1) : s.statusCode !== 200 ? (this._logger.log(i.Error, `(LongPolling transport) Unexpected response code: ${s.statusCode}.`), this._closeError = new x(s.statusText || "", s.statusCode), this._running = !1) : s.content ? (this._logger.log(i.Trace, `(LongPolling transport) data received. ${O(s.content, this._options.logMessageContent)}.`), this.onreceive && this.onreceive(s.content)) : this._logger.log(i.Trace, "(LongPolling transport) Poll timed out, reissuing.");
         } catch (o) {
           this._running ? o instanceof de ? this._logger.log(i.Trace, "(LongPolling transport) Poll timed out, reissuing.") : (this._closeError = o, this._running = !1) : this._logger.log(i.Trace, `(LongPolling transport) Poll errored after shutdown: ${o.message}`);
         }
@@ -1211,7 +1211,7 @@ class Te {
       } catch (c) {
         r = c;
       }
-      r ? r instanceof R && (r.statusCode === 404 ? this._logger.log(i.Trace, "(LongPolling transport) A 404 response was returned from sending a DELETE request.") : this._logger.log(i.Trace, `(LongPolling transport) Error sending a DELETE request: ${r}`)) : this._logger.log(i.Trace, "(LongPolling transport) DELETE request accepted.");
+      r ? r instanceof x && (r.statusCode === 404 ? this._logger.log(i.Trace, "(LongPolling transport) A 404 response was returned from sending a DELETE request.") : this._logger.log(i.Trace, `(LongPolling transport) Error sending a DELETE request: ${r}`)) : this._logger.log(i.Trace, "(LongPolling transport) DELETE request accepted.");
     } finally {
       this._logger.log(i.Trace, "(LongPolling transport) Stop finished."), this._raiseOnClose();
     }
@@ -1223,7 +1223,7 @@ class Te {
     }
   }
 }
-class vt {
+class yt {
   constructor(e, t, o, s) {
     this._httpClient = e, this._accessToken = t, this._logger = o, this._options = s, this.onreceive = null, this.onclose = null;
   }
@@ -1438,7 +1438,7 @@ class Et {
       return (!a.negotiateVersion || a.negotiateVersion < 1) && (a.connectionToken = a.connectionId), a.useStatefulReconnect && this._options._useStatefulReconnect !== !0 ? Promise.reject(new ke("Client didn't negotiate Stateful Reconnect but the server did.")) : a;
     } catch (c) {
       let a = "Failed to complete negotiation with the server: " + c;
-      return c instanceof R && c.statusCode === 404 && (a = a + " Either this is not a SignalR endpoint or there is a proxy blocking the connection."), this._logger.log(i.Error, a), Promise.reject(new ke(a));
+      return c instanceof x && c.statusCode === 404 && (a = a + " Either this is not a SignalR endpoint or there is a proxy blocking the connection."), this._logger.log(i.Error, a), Promise.reject(new ke(a));
     }
   }
   _createConnectUrl(e, t) {
@@ -1487,7 +1487,7 @@ class Et {
       case w.ServerSentEvents:
         if (!this._options.EventSource)
           throw new Error("'EventSource' is not supported in your environment.");
-        return new vt(this._httpClient, this._httpClient._accessToken, this._logger, this._options);
+        return new yt(this._httpClient, this._httpClient._accessToken, this._logger, this._options);
       case w.LongPolling:
         return new Te(this._httpClient, this._logger, this._options);
       default:
@@ -1636,7 +1636,7 @@ class Pt {
     if (!e)
       return [];
     t === null && (t = B.instance);
-    const o = v.parse(e), s = [];
+    const o = y.parse(e), s = [];
     for (const r of o) {
       const c = JSON.parse(r);
       if (typeof c.type != "number")
@@ -1675,7 +1675,7 @@ class Pt {
    * @returns {string} A string containing the serialized representation of the message.
    */
   writeMessage(e) {
-    return v.write(JSON.stringify(e));
+    return y.write(JSON.stringify(e));
   }
   _isInvocationMessage(e) {
     this._assertNotEmptyString(e.target, "Invalid payload for Invocation message."), e.invocationId !== void 0 && this._assertNotEmptyString(e.invocationId, "Invalid payload for Invocation message.");
@@ -1702,7 +1702,7 @@ class Pt {
       throw new Error(t);
   }
 }
-const xt = {
+const Rt = {
   trace: i.Trace,
   debug: i.Debug,
   info: i.Information,
@@ -1713,8 +1713,8 @@ const xt = {
   critical: i.Critical,
   none: i.None
 };
-function Rt(n) {
-  const e = xt[n.toLowerCase()];
+function xt(n) {
+  const e = Rt[n.toLowerCase()];
   if (typeof e < "u")
     return e;
   throw new Error(`Unknown log level: ${n}`);
@@ -1724,7 +1724,7 @@ class $t {
     if (b.isRequired(e, "logging"), Dt(e))
       this.logger = e;
     else if (typeof e == "string") {
-      const t = Rt(e);
+      const t = xt(e);
       this.logger = new Z(t);
     } else
       this.logger = new Z(e);
@@ -1787,7 +1787,7 @@ function Dt(n) {
 const je = {
   server: { id: "server", label: "Server", endpointPrefix: "/_elsa/server/diagnostics/console-logs" },
   studio: { id: "studio", label: "Studio", endpointPrefix: "/_elsa/studio/diagnostics/console-logs" }
-}, Nt = "studio", he = 2e3, At = 12e4, jt = 15e3, Mt = "Server timeout elapsed without receiving a message from the server.", Me = "elsa-studio-console-stream-autoscroll", Lt = "x-elsa-module-management-key", G = /\x1b\[([0-9;]*)m/g, xe = {
+}, Nt = "studio", he = 2e3, At = 12e4, jt = 15e3, Mt = "Server timeout elapsed without receiving a message from the server.", Me = "elsa-studio-console-stream-autoscroll", G = /\x1b\[([0-9;]*)m/g, Re = {
   30: "console-stream-ansi-fg-black",
   31: "console-stream-ansi-fg-red",
   32: "console-stream-ansi-fg-green",
@@ -1804,7 +1804,7 @@ const je = {
   95: "console-stream-ansi-fg-bright-magenta",
   96: "console-stream-ansi-fg-bright-cyan",
   97: "console-stream-ansi-fg-bright-white"
-}, Re = {
+}, xe = {
   40: "console-stream-ansi-bg-black",
   41: "console-stream-ansi-bg-red",
   42: "console-stream-ansi-bg-green",
@@ -1823,7 +1823,7 @@ const je = {
   107: "console-stream-ansi-bg-bright-white"
 };
 let ue;
-function gn(n) {
+function dn(n) {
   ue = n, n.navigation.add({
     id: "console",
     label: "Console",
@@ -1836,33 +1836,33 @@ function gn(n) {
     id: "console",
     label: "Console",
     path: "/diagnostics/console",
-    component: Wt
+    component: Ht
   }), n.panels.add({
     id: "console-stream",
     title: "Console",
     order: 1e3,
-    component: Ht
+    component: Lt
   });
 }
-function Ht() {
+function Lt() {
   return /* @__PURE__ */ f.jsx(Le, {});
 }
-function Wt() {
+function Ht() {
   return /* @__PURE__ */ f.jsx(Le, { page: !0 });
 }
 function Le({ page: n = !1 }) {
-  const [e, t] = I(Nt), [o, s] = I([]), [r, c] = I(""), [a, l] = I("loading"), [u, g] = I([]), [k, N] = I(0), [pe, L] = I(!1), [P, _e] = I(!1), [Ue, q] = I(null), [Be, te] = I(0), [A, Oe] = I(en), z = Ce(/* @__PURE__ */ new Set()), me = Ce(null), H = P ? Ue ?? u : u, Fe = P ? Math.max(0, k - Be) : 0, E = ie(() => on(e), [e]), ne = ie(
+  const [e, t] = I(Nt), [o, s] = I([]), [r, c] = I(""), [a, l] = I("loading"), [u, g] = I([]), [k, N] = I(0), [pe, L] = I(!1), [P, _e] = I(!1), [Ue, q] = I(null), [Be, te] = I(0), [A, Oe] = I(Qt), z = Ce(/* @__PURE__ */ new Set()), me = Ce(null), H = P ? Ue ?? u : u, Fe = P ? Math.max(0, k - Be) : 0, E = ie(() => nn(e), [e]), ne = ie(
     () => o.find((h) => h.id === r) ?? null,
     [r, o]
   ), J = r || null, j = ce((h) => {
     const C = [];
     for (const m of h)
       z.current.has(m.id) || (z.current.add(m.id), C.push(m));
-    C.length !== 0 && (N((m) => m + C.length), g((m) => Ot(m, C)));
-  }, []), x = ce((h, C) => {
-    j([Ft(h, C)]);
+    C.length !== 0 && (N((m) => m + C.length), g((m) => Bt(m, C)));
+  }, []), R = ce((h, C) => {
+    j([Ot(h, C)]);
   }, [j]), oe = ce(async () => {
-    const h = await E.context.http.getJson(sn(E, J)), C = h.sources ?? h.Sources;
+    const h = await E.context.http.getJson(on(E, J)), C = h.sources ?? h.Sources;
     C && s(C.map(Y).sort(Q));
     const m = h.items ?? h.Items ?? h.lines ?? h.Lines ?? [];
     j(m.map($e));
@@ -1891,7 +1891,7 @@ function Le({ page: n = !1 }) {
   }, [A, P, H]), V(() => {
     let h = !1, C = null;
     z.current.clear(), g([]), N(0), q(null), te(0);
-    const m = new $t().withUrl(We(E, `${E.endpointPrefix}/hub`), zt(E.context)).withAutomaticReconnect().build();
+    const m = new $t().withUrl(We(E, `${E.endpointPrefix}/hub`), qt(E.context)).withAutomaticReconnect().build();
     m.serverTimeoutInMilliseconds = At, m.keepAliveIntervalInMilliseconds = jt, m.onreconnecting(() => L(!1)), m.onreconnected(() => {
       L(!0), se();
     }), m.onclose(() => L(!1));
@@ -1899,21 +1899,21 @@ function Le({ page: n = !1 }) {
       C?.dispose(), C = null;
     }
     function se() {
-      h || m.state !== p.Connected || (we(), C = m.stream("StreamAsync", qt(J)).subscribe({
-        next: (y) => {
-          const X = y?.line ?? y?.Line, re = y?.droppedLines ?? y?.DroppedLines ?? y?.dropped ?? y?.Dropped, Se = y?.source ?? y?.Source;
-          X ? j([$e(X)]) : re ? x("stderr", `${re.count ?? re.Count ?? 0} console lines were dropped.`) : Se && s((Ve) => cn(Ve, Y(Se)));
+      h || m.state !== p.Connected || (we(), C = m.stream("StreamAsync", Ft(J)).subscribe({
+        next: (v) => {
+          const X = v?.line ?? v?.Line, re = v?.droppedLines ?? v?.DroppedLines ?? v?.dropped ?? v?.Dropped, Se = v?.source ?? v?.Source;
+          X ? j([$e(X)]) : re ? R("stderr", `${re.count ?? re.Count ?? 0} console lines were dropped.`) : Se && s((Ve) => rn(Ve, Y(Se)));
         },
-        error: (y) => {
+        error: (v) => {
           if (!h) {
-            if (tn(y)) {
+            if (en(v)) {
               se();
               return;
             }
-            x("stderr", `Console stream failed: ${U(y)}`);
+            R("stderr", `Console stream failed: ${U(v)}`);
           }
         },
-        complete: () => x("stdout", "Console stream completed.")
+        complete: () => R("stdout", "Console stream completed.")
       }));
     }
     async function Xe() {
@@ -1921,20 +1921,20 @@ function Le({ page: n = !1 }) {
         if (await m.start(), h)
           return;
         L(!0), se(), await oe();
-      } catch (y) {
-        if (L(!1), nn(y)) {
-          x("stderr", rn(E));
+      } catch (v) {
+        if (L(!1), tn(v)) {
+          R("stderr", sn(E));
           return;
         }
-        x("stderr", `Console stream connection failed: ${U(y)}`), await oe().catch((X) => x("stderr", `Recent console lines failed: ${U(X)}`));
+        R("stderr", `Console stream connection failed: ${U(v)}`), await oe().catch((X) => R("stderr", `Recent console lines failed: ${U(X)}`));
       }
     }
     return Xe(), () => {
       h = !0, we(), m.stop();
     };
-  }, [j, x, oe, J, E]);
+  }, [j, R, oe, J, E]);
   const be = ie(
-    () => H.map((h) => ({ ...h, renderedText: Kt(h.text) })),
+    () => H.map((h) => ({ ...h, renderedText: Vt(h.text) })),
     [H]
   );
   function qe() {
@@ -1948,7 +1948,7 @@ function Le({ page: n = !1 }) {
     g([]), N(0), q(P ? [] : null), te(0), z.current.clear();
   }
   function Je() {
-    Gt(H);
+    Kt(H);
   }
   return /* @__PURE__ */ f.jsxs("section", { className: n ? "console-stream-page" : "console-stream-panel", children: [
     /* @__PURE__ */ f.jsxs("header", { className: "console-stream-header", children: [
@@ -1957,7 +1957,7 @@ function Le({ page: n = !1 }) {
           E.label,
           " console"
         ] }),
-        /* @__PURE__ */ f.jsx("p", { children: hn(ne, a, Fe) })
+        /* @__PURE__ */ f.jsx("p", { children: ln(ne, a, Fe) })
       ] }),
       /* @__PURE__ */ f.jsxs("div", { className: "console-stream-tools", children: [
         /* @__PURE__ */ f.jsx("div", { className: "console-stream-hosts", role: "group", "aria-label": "Console host", children: Object.values(je).map((h) => /* @__PURE__ */ f.jsx(
@@ -2007,17 +2007,17 @@ function Le({ page: n = !1 }) {
     ] })
   ] });
 }
-function Ut(n) {
+function Wt(n) {
   return n === 1 || n === "stderr" || n === "Stderr" ? "stderr" : "stdout";
 }
-function Bt(n, e) {
+function Ut(n, e) {
   const t = Date.parse(n.timestamp) - Date.parse(e.timestamp);
   return t !== 0 ? t : (n.sequence ?? 0) - (e.sequence ?? 0);
 }
-function Ot(n, e) {
-  return [...n, ...e].sort(Bt).slice(-2e3);
+function Bt(n, e) {
+  return [...n, ...e].sort(Ut).slice(-2e3);
 }
-function Ft(n, e) {
+function Ot(n, e) {
   return {
     id: `${Date.now()}-${Math.random()}`,
     timestamp: (/* @__PURE__ */ new Date()).toISOString(),
@@ -2029,12 +2029,12 @@ function Ft(n, e) {
   };
 }
 function $e(n) {
-  const e = an(n.source ?? n.Source), t = n.timestamp ?? n.Timestamp ?? n.receivedAt ?? n.ReceivedAt ?? (/* @__PURE__ */ new Date()).toISOString(), o = n.sequence ?? n.Sequence ?? null;
+  const e = cn(n.source ?? n.Source), t = n.timestamp ?? n.Timestamp ?? n.receivedAt ?? n.ReceivedAt ?? (/* @__PURE__ */ new Date()).toISOString(), o = n.sequence ?? n.Sequence ?? null;
   return {
     id: n.id ?? n.Id ?? `${o ?? Date.now()}-${Math.random()}`,
     timestamp: t,
     sequence: o,
-    stream: Ut(n.stream ?? n.Stream),
+    stream: Wt(n.stream ?? n.Stream),
     text: n.text ?? n.Text ?? "",
     sourceId: e?.id ?? null,
     sourceLabel: e ? F(e) : null
@@ -2046,24 +2046,21 @@ function F(n) {
   const e = n.displayName || n.serviceName || n.id;
   return e ? n.machineName && n.processId ? `${e} · ${n.machineName}:${n.processId}` : e : "";
 }
-function qt(n) {
+function Ft(n) {
   return n ? { limit: he, sourceId: n } : { limit: he };
 }
-function zt(n) {
-  const e = ln(n.headers), t = e ? { headers: e } : {};
-  if (n.accessTokenFactory)
-    return { ...t, accessTokenFactory: n.accessTokenFactory };
-  const o = e?.[Lt];
-  return o ? { ...t, accessTokenFactory: () => o } : t;
+function qt(n) {
+  const e = an(n.headers), t = e ? { headers: e } : {};
+  return n.accessTokenFactory ? { ...t, accessTokenFactory: n.accessTokenFactory } : t;
 }
-function Jt(n) {
-  return n.map(Yt).join(`
+function zt(n) {
+  return n.map(Gt).join(`
 `);
 }
-function Xt(n = /* @__PURE__ */ new Date()) {
+function Jt(n = /* @__PURE__ */ new Date()) {
   return `console-log-${n.toISOString().replace(/\.\d{3}Z$/, "Z").replace(/[:.]/g, "-")}.log`;
 }
-function Vt(n) {
+function Xt(n) {
   if (!n.includes("\x1B["))
     return [{ text: n, className: "" }];
   const e = [], t = He();
@@ -2071,24 +2068,24 @@ function Vt(n) {
   for (G.lastIndex = 0; (s = G.exec(n)) !== null; ) {
     s.index > o && e.push({ text: n.slice(o, s.index), className: De(t) });
     const r = s[1] === "" ? [0] : s[1].split(";").map((c) => Number(c || 0));
-    Qt(t, r), o = G.lastIndex;
+    Zt(t, r), o = G.lastIndex;
   }
   return o < n.length && e.push({ text: n.slice(o), className: De(t) }), e;
 }
-function Kt(n) {
-  return Vt(n).map((e, t) => e.className ? /* @__PURE__ */ f.jsx("span", { className: e.className, children: e.text }, t) : e.text);
+function Vt(n) {
+  return Xt(n).map((e, t) => e.className ? /* @__PURE__ */ f.jsx("span", { className: e.className, children: e.text }, t) : e.text);
 }
-function Gt(n) {
+function Kt(n) {
   if (n.length === 0 || typeof document > "u")
     return;
-  const e = new Blob([Jt(n)], { type: "text/plain;charset=utf-8" }), t = URL.createObjectURL(e), o = document.createElement("a");
-  o.href = t, o.download = Xt(), o.rel = "noopener", document.body.appendChild(o), o.click(), o.remove(), window.setTimeout(() => URL.revokeObjectURL(t), 0);
+  const e = new Blob([zt(n)], { type: "text/plain;charset=utf-8" }), t = URL.createObjectURL(e), o = document.createElement("a");
+  o.href = t, o.download = Jt(), o.rel = "noopener", document.body.appendChild(o), o.click(), o.remove(), window.setTimeout(() => URL.revokeObjectURL(t), 0);
+}
+function Gt(n) {
+  const e = n.sourceLabel ?? n.sourceId ?? "local";
+  return `${n.timestamp} ${n.stream} ${e} ${Yt(n.text)}`;
 }
 function Yt(n) {
-  const e = n.sourceLabel ?? n.sourceId ?? "local";
-  return `${n.timestamp} ${n.stream} ${e} ${Zt(n.text)}`;
-}
-function Zt(n) {
   return n.replace(G, "");
 }
 function He() {
@@ -2099,9 +2096,9 @@ function He() {
     background: ""
   };
 }
-function Qt(n, e) {
+function Zt(n, e) {
   for (const t of e)
-    t === 0 ? Object.assign(n, He()) : t === 1 ? (n.bold = !0, n.dim = !1) : t === 2 ? (n.dim = !0, n.bold = !1) : t === 22 ? (n.bold = !1, n.dim = !1) : t === 39 ? n.foreground = "" : t === 49 ? n.background = "" : xe[t] ? n.foreground = xe[t] : Re[t] && (n.background = Re[t]);
+    t === 0 ? Object.assign(n, He()) : t === 1 ? (n.bold = !0, n.dim = !1) : t === 2 ? (n.dim = !0, n.bold = !1) : t === 22 ? (n.bold = !1, n.dim = !1) : t === 39 ? n.foreground = "" : t === 49 ? n.background = "" : Re[t] ? n.foreground = Re[t] : xe[t] && (n.background = xe[t]);
 }
 function De(n) {
   return [
@@ -2111,42 +2108,42 @@ function De(n) {
     n.background
   ].filter(Boolean).join(" ");
 }
-function en() {
+function Qt() {
   return typeof window > "u" ? !0 : window.localStorage.getItem(Me) !== "false";
 }
 function U(n) {
   return n instanceof Error ? n.message : String(n);
 }
-function tn(n) {
+function en(n) {
   return U(n) === Mt;
 }
-function nn(n) {
+function tn(n) {
   return /\b404\b/.test(U(n));
 }
-function on(n) {
+function nn(n) {
   return {
     ...je[n],
     context: n === "server" ? ue.backend : ue.host
   };
 }
-function sn(n, e) {
+function on(n, e) {
   const t = new URLSearchParams({ limit: String(he) });
   return e && t.set("sourceId", e), `${n.endpointPrefix}/recent?${t}`;
 }
 function We(n, e) {
   return new URL(e, n.context.baseUrl).toString();
 }
-function rn(n) {
+function sn(n) {
   return `Console stream endpoint was not found at ${We(n, n.endpointPrefix)}. Make sure ${n.label} maps console streaming or choose another host.`;
 }
-function cn(n, e) {
+function rn(n, e) {
   const t = n.findIndex((s) => s.id === e.id);
   if (t === -1)
     return [...n, e].sort(Q);
   const o = [...n];
   return o[t] = e, o.sort(Q);
 }
-function an(n) {
+function cn(n) {
   return n ? Y(n) : null;
 }
 function Y(n) {
@@ -2164,7 +2161,7 @@ function Y(n) {
     health: n.health ?? n.Health ?? null
   };
 }
-function ln(n) {
+function an(n) {
   if (!n)
     return;
   const e = {};
@@ -2175,24 +2172,24 @@ function ln(n) {
 function Q(n, e) {
   return F(n).localeCompare(F(e));
 }
-function hn(n, e, t) {
+function ln(n, e, t) {
   return t > 0 ? `${t} buffered while paused` : n ? n.podName ? [n.namespace, n.nodeName].filter(Boolean).join(" / ") : n.id : e === "loading" ? "Loading sources" : e === "failed" ? "Sources unavailable" : "Merged source stream";
 }
 export {
-  Wt as ConsoleStreamPage,
-  Ht as ConsoleStreamPanel,
-  Ot as appendConsoleEntries,
-  Bt as compareConsoleEntries,
-  zt as createConsoleConnectionOptions,
-  Ft as createConsoleEntry,
+  Ht as ConsoleStreamPage,
+  Lt as ConsoleStreamPanel,
+  Bt as appendConsoleEntries,
+  Ut as compareConsoleEntries,
+  qt as createConsoleConnectionOptions,
+  Ot as createConsoleEntry,
   $e as createConsoleEntryFromLine,
-  Jt as createConsoleExportContent,
-  Xt as createConsoleExportFilename,
-  qt as createConsoleFilter,
+  zt as createConsoleExportContent,
+  Jt as createConsoleExportFilename,
+  Ft as createConsoleFilter,
   F as formatConsoleSourceLabel,
-  Ut as getConsoleStreamName,
-  nn as isConsoleStreamEndpointNotFoundError,
-  tn as isRecoverableConsoleStreamError,
-  Vt as parseAnsiSegments,
-  gn as register
+  Wt as getConsoleStreamName,
+  tn as isConsoleStreamEndpointNotFoundError,
+  en as isRecoverableConsoleStreamError,
+  Xt as parseAnsiSegments,
+  dn as register
 };

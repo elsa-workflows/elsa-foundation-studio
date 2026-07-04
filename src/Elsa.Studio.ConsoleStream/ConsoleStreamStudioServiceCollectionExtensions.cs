@@ -15,6 +15,13 @@ public static class ConsoleStreamStudioServiceCollectionExtensions
     private const int MaxRecentQuerySize = 2_000;
 
     /// <summary>
+    /// The request path the console-stream SignalR hub is mapped at. Exposed so the management auth gate can
+    /// scope its <c>access_token</c> query-parameter acceptance to this path (browsers cannot attach headers to
+    /// WebSocket/EventSource handshakes) without leaking the key into access logs on other management endpoints.
+    /// </summary>
+    public const string HubPath = $"{EndpointPrefix}/hub";
+
+    /// <summary>
     /// Registers the per-shell Studio integration for the console stream: the UI module manifest
     /// contribution. The console-log-streaming <em>host</em> (capture, SignalR hub, HTTP endpoints) is
     /// hosted at the application root instead — see <see cref="AddConsoleStreamStudioHost"/> — so that
@@ -44,7 +51,7 @@ public static class ConsoleStreamStudioServiceCollectionExtensions
         {
             aspNetCoreOptions.RecentPath = $"{EndpointPrefix}/recent";
             aspNetCoreOptions.SourcesPath = $"{EndpointPrefix}/sources";
-            aspNetCoreOptions.HubPath = $"{EndpointPrefix}/hub";
+            aspNetCoreOptions.HubPath = HubPath;
         });
 
         return services;
