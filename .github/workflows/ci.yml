@@ -1,5 +1,9 @@
 name: CI
 
+# Note: this workflow uses pnpm/action-setup, which must be present in the repo's
+# Actions allowlist (Settings > Actions > Allow specified actions: pnpm/action-setup@*).
+# Without it GitHub rejects the run at load time with startup_failure (no jobs created).
+
 on:
   push:
     branches: [main]
