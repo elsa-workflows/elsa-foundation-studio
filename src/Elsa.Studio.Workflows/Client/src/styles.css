@@ -736,6 +736,115 @@
   font-size: 13px;
 }
 
+.wf-instance-note {
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+.wf-runtime-input-list {
+  display: grid;
+  gap: 8px;
+}
+
+.wf-runtime-input {
+  display: grid;
+  gap: 7px;
+  border: 1px solid var(--wf-border);
+  border-radius: var(--wf-radius);
+  background: var(--wf-panel-muted);
+  padding: 9px;
+}
+
+.wf-runtime-input header {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wf-runtime-input header span:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.wf-runtime-input strong {
+  overflow: hidden;
+  color: var(--wf-text);
+  font-size: 12px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wf-runtime-input small {
+  overflow: hidden;
+  color: var(--wf-muted-text);
+  font-size: 11px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wf-runtime-capture-mode {
+  flex: 0 0 auto;
+  border: 1px solid var(--wf-border);
+  border-radius: var(--wf-radius-sm);
+  background: var(--wf-panel);
+  color: var(--wf-muted-text);
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 6px;
+}
+
+.wf-runtime-input-value {
+  display: block;
+  overflow: hidden;
+  border: 1px solid var(--wf-border);
+  border-radius: var(--wf-radius-sm);
+  background: var(--wf-panel);
+  color: var(--wf-text);
+  font-family: var(--studio-mono-font, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 6px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wf-runtime-input-value-details {
+  border: 1px solid var(--wf-border);
+  border-radius: var(--wf-radius-sm);
+  background: var(--wf-panel);
+}
+
+.wf-runtime-input-value-details summary {
+  overflow: hidden;
+  color: var(--wf-text);
+  cursor: pointer;
+  font-family: var(--studio-mono-font, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 6px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wf-runtime-input-value-details pre {
+  max-height: 220px;
+  margin: 0;
+  overflow: auto;
+  border-top: 1px solid var(--wf-border);
+  color: var(--wf-text);
+  font-family: var(--studio-mono-font, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .wf-instance-activity-list {
   display: grid;
   gap: 8px;
