@@ -72,6 +72,7 @@ export function WorkflowExecutableInspectorWorkbench({ context, ai, artifactId, 
   const [sourceDefinition, setSourceDefinition] = useState<SourceDefinitionState>({ status: "idle" });
   const [runStatus, setRunStatus] = useState("");
   const [runError, setRunError] = useState("");
+  const [running, setRunning] = useState(false);
   const [lastRun, setLastRun] = useState<ExecutableRunState | null>(null);
   const [frames, setFrames] = useState<ScopeFrame[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -149,7 +150,8 @@ export function WorkflowExecutableInspectorWorkbench({ context, ai, artifactId, 
   );
 
   const run = async () => {
-    if (!data) return;
+    if (!data || running) return;
+    setRunning(true);
     setRunStatus("");
     setRunError("");
     setLastRun(null);
@@ -160,6 +162,8 @@ export function WorkflowExecutableInspectorWorkbench({ context, ai, artifactId, 
       setRunStatus(`Started ${data.detail.artifactId}`);
     } catch (e) {
       setRunError(formatExecutableRunError(e));
+    } finally {
+      setRunning(false);
     }
   };
 
@@ -206,7 +210,7 @@ export function WorkflowExecutableInspectorWorkbench({ context, ai, artifactId, 
       <div className="wf-toolbar">
         <button type="button" onClick={goBack}><ChevronLeft size={14} /> Executables</button>
         <button type="button" onClick={() => void load()}><RotateCcw size={14} /> Refresh</button>
-        {data ? <button type="button" onClick={() => void run()}><Play size={14} /> Run</button> : null}
+        {data ? <button type="button" disabled={running} onClick={() => void run()}><Play size={14} /> {running ? "Running..." : "Run"}</button> : null}
         {data && explainAction ? (
           <button type="button" onClick={explain}><Sparkles size={13} /> Explain</button>
         ) : null}

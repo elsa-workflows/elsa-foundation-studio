@@ -3471,6 +3471,13 @@ button.wf-reference-select {
   margin: 0;
 }
 
+/* Scope chips: Published keeps the default accent chip tone; test runs get the warning tint their
+   expiring nature suggests. */
+.wf-reference-scope-testrun {
+  background: color-mix(in srgb, var(--wf-warning) 14%, var(--wf-panel));
+  color: var(--wf-warning-text);
+}
+
 .wf-reference-retired {
   background: var(--wf-danger-soft);
   color: var(--wf-danger);
