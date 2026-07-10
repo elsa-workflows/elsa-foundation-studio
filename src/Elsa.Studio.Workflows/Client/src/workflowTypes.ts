@@ -476,9 +476,27 @@ export interface WorkflowExecutableReference {
   deletedReason?: string | null;
 }
 
+// Compact flowchart wiring projected with an executable node. Endpoints refer to authored node ids;
+// routing vertices preserve the designer path without carrying the authored structure payload.
+export interface WorkflowExecutableConnectionEndpoint {
+  nodeId: string;
+  port?: string | null;
+}
+
+export interface WorkflowExecutableConnectionVertex {
+  x: number;
+  y: number;
+}
+
+export interface WorkflowExecutableConnection {
+  source: WorkflowExecutableConnectionEndpoint;
+  target: WorkflowExecutableConnectionEndpoint;
+  vertices?: WorkflowExecutableConnectionVertex[];
+}
+
 // A node in the Execution Material tree served by GET /executables/{artifactId}. Input bindings are
-// compact summaries (secrets stay references, never literals); the structure payload is not on the
-// wire, only its kind — so flowchart connections are not available to the Inspector canvas.
+// compact summaries (secrets stay references, never literals); only the structure kind and compact
+// flowchart connections are projected, never the authored structure or descriptor payload.
 export interface WorkflowExecutableNode {
   executableNodeId: string;
   authoredActivityId: string;
@@ -487,6 +505,7 @@ export interface WorkflowExecutableNode {
   structureKind?: string | null;
   inputBindings: WorkflowExecutableInputBinding[];
   childSlots: WorkflowExecutableChildSlot[];
+  connections?: WorkflowExecutableConnection[];
 }
 
 export interface WorkflowExecutableChildSlot {

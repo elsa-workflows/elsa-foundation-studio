@@ -3,14 +3,14 @@ import { buildExecutableActivityGraph, ghostNodeLabel, isGhostFact } from "../ex
 import { buildExecutableInspectorCanvas } from "../workflow-editor/WorkflowExecutableInspector";
 import { getChildSlots } from "../workflowAdapter";
 import type { ActivityNode, WorkflowExecutableNode } from "../workflowTypes";
-import { forEachActivity, sequenceActivity, writeLine } from "./fixtures";
+import { flowchartActivity, forEachActivity, sequenceActivity, writeLine } from "./fixtures";
 
 // The Executable Inspector adapts the Execution Material wire tree (executable nodes + named child
 // slots, no structure payload) back into the authored ActivityNode shape so buildCanvas/resolveScope
 // can render it. These tests pin the adaptation: facet-based slot mapping, generic fallback, ghost
 // nodes for catalog misses, and Layout Sidecar geometry with auto-layout fallback.
 
-const catalog = [sequenceActivity, forEachActivity, writeLine];
+const catalog = [flowchartActivity, sequenceActivity, forEachActivity, writeLine];
 
 function executableNode(overrides: Partial<WorkflowExecutableNode> = {}): WorkflowExecutableNode {
   return {
@@ -32,6 +32,16 @@ function sequenceRoot(children: WorkflowExecutableNode[]): WorkflowExecutableNod
     activityType: sequenceActivity.activityTypeKey,
     structureKind: "elsa.sequence.structure",
     childSlots: [{ name: "Sequence.Activities", activities: children }]
+  });
+}
+
+function flowchartRoot(children: WorkflowExecutableNode[]): WorkflowExecutableNode {
+  return executableNode({
+    executableNodeId: "exec-root",
+    authoredActivityId: "root",
+    activityType: flowchartActivity.activityTypeKey,
+    structureKind: "elsa.flowchart.structure",
+    childSlots: [{ name: "Flowchart.Activities", activities: children }]
   });
 }
 
@@ -100,6 +110,18 @@ describe("buildExecutableActivityGraph", () => {
     expect(slots).toHaveLength(1);
     expect(slots[0].activities.map(activity => activity.nodeId)).toEqual(["write-line-1"]);
   });
+
+  it("keeps projected connections out of non-flowchart synthesized payloads", () => {
+    const graph = buildExecutableActivityGraph({
+      ...sequenceRoot([executableNode()]),
+      connections: [{
+        source: { nodeId: "write-line-1" },
+        target: { nodeId: "write-line-2" }
+      }]
+    }, catalog);
+
+    expect(graph.root.structure?.payload).not.toHaveProperty("connections");
+  });
 });
 
 describe("buildExecutableInspectorCanvas", () => {
@@ -149,5 +171,33 @@ describe("buildExecutableInspectorCanvas", () => {
     );
 
     expect(canvas.nodes.map(node => node.id)).toEqual(["write-line-2"]);
+  });
+
+  it("renders projected flowchart connections with ports and routing vertices", () => {
+    const graph = buildExecutableActivityGraph({
+      ...flowchartRoot([
+        executableNode({ authoredActivityId: "write-line-1" }),
+        executableNode({ executableNodeId: "exec-2", authoredActivityId: "write-line-2" })
+      ]),
+      connections: [{
+        source: { nodeId: "write-line-1", port: "True" },
+        target: { nodeId: "write-line-2", port: "Input" },
+        vertices: [{ x: 120, y: 45 }, { x: 180, y: 90 }]
+      }]
+    }, catalog);
+
+    const canvas = buildExecutableInspectorCanvas(graph, catalog, [], [], () => {});
+
+    expect(canvas.edges).toHaveLength(1);
+    expect(canvas.edges[0]).toMatchObject({
+      id: "flow-0-write-line-1-write-line-2",
+      source: "write-line-1",
+      target: "write-line-2",
+      sourceHandle: "True",
+      targetHandle: "Input",
+      label: "True",
+      data: { vertices: [{ x: 120, y: 45 }, { x: 180, y: 90 }] },
+      deletable: false
+    });
   });
 });

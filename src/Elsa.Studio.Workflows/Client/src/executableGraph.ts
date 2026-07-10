@@ -1,4 +1,4 @@
-import { readStructureDesignFacet, type StructureDesignSlotDescriptor } from "./workflowAdapter";
+import { flowchartStructureKind, readStructureDesignFacet, type StructureDesignSlotDescriptor } from "./workflowAdapter";
 import type {
   ActivityCatalogItem,
   ActivityNode,
@@ -15,10 +15,9 @@ import type {
 // Node ids use the authored activity id: the Layout Sidecar is a publish-time copy of the definition
 // layout keyed by authored node ids, so this is what makes the sidecar geometry land on the right nodes.
 //
-// The wire tree carries only the structure KIND (the payload — including flowchart connections — is
-// deliberately not on the wire), so the synthesized structure holds child slots but no connections:
-// a flowchart artifact renders its nodes at their sidecar positions without edges. If the detail
-// contract later projects connections, flowchartEdges() picks them up from the payload automatically.
+// The wire tree carries the structure kind, named child slots, and a compact flowchart-connections
+// projection. Synthesis puts those connections into the authored-shaped flowchart payload so the
+// existing flowchartEdges() adapter produces the same canvas edges as the definition designer.
 
 // Per-node inspection facts the canvas cannot carry through ActivityNode: catalog availability
 // (ghost nodes), the runtime ids, and the input-binding summaries for the node details panel.
@@ -118,6 +117,7 @@ function synthesizeStructure(
       const activities = slot.activities.map(adapt);
       payload[descriptor.property] = descriptor.cardinality === "single" ? activities[0] ?? null : activities;
     }
+    copyFlowchartConnections(facet.kind, node, payload);
     return { kind: facet.kind, schemaVersion: facet.schemaVersion, payload };
   }
 
@@ -126,11 +126,20 @@ function synthesizeStructure(
     payload[uniqueSlotProperty(payload, slotProperty(slot.name))] = slot.activities.map(adapt);
   }
 
+  const kind = node.structureKind ?? `executable:${node.activityType}`;
+  copyFlowchartConnections(kind, node, payload);
+
   return {
-    kind: node.structureKind ?? `executable:${node.activityType}`,
+    kind,
     schemaVersion: "1.0.0",
     payload
   };
+}
+
+function copyFlowchartConnections(kind: string, node: WorkflowExecutableNode, payload: Record<string, unknown>) {
+  if (kind === flowchartStructureKind && node.connections !== undefined) {
+    payload.connections = node.connections;
+  }
 }
 
 // Pairs every wire slot with the facet slot descriptor sharing its contract name. Collection-backed
