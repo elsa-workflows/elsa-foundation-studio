@@ -208,4 +208,41 @@ describe("buildExecutableInspectorCanvas", () => {
     });
     expect(canvas.edges[0].data).toBeUndefined();
   });
+
+  it("treats a null connections projection as no flowchart edges", () => {
+    const rawRoot = {
+      ...flowchartRoot([executableNode()]),
+      connections: null
+    } as unknown as WorkflowExecutableNode;
+
+    const graph = buildExecutableActivityGraph(rawRoot, catalog);
+    const canvas = buildExecutableInspectorCanvas(graph, catalog, [], [], () => {});
+
+    expect(canvas.edges).toEqual([]);
+  });
+
+  it("omits null and non-string endpoint ports", () => {
+    const rawRoot = {
+      ...flowchartRoot([
+        executableNode({ authoredActivityId: "write-line-1" }),
+        executableNode({ executableNodeId: "exec-2", authoredActivityId: "write-line-2" })
+      ]),
+      connections: [{
+        source: { nodeId: "write-line-1", port: null },
+        target: { nodeId: "write-line-2", port: 42 }
+      }]
+    } as unknown as WorkflowExecutableNode;
+
+    const graph = buildExecutableActivityGraph(rawRoot, catalog);
+    const canvas = buildExecutableInspectorCanvas(graph, catalog, [], [], () => {});
+
+    expect(canvas.edges).toHaveLength(1);
+    expect(canvas.edges[0]).toMatchObject({
+      source: "write-line-1",
+      target: "write-line-2",
+      sourceHandle: undefined,
+      targetHandle: undefined,
+      label: undefined
+    });
+  });
 });

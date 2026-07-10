@@ -138,7 +138,7 @@ function synthesizeStructure(
 }
 
 function copyFlowchartConnections(kind: string, node: WorkflowExecutableNode, payload: Record<string, unknown>) {
-  if (kind === flowchartStructureKind && node.connections !== undefined) {
+  if (kind === flowchartStructureKind && Array.isArray(node.connections)) {
     payload.connections = node.connections.map(connection => ({
       source: cloneConnectionEndpoint(connection.source),
       target: cloneConnectionEndpoint(connection.target)
@@ -151,7 +151,7 @@ function copyFlowchartConnections(kind: string, node: WorkflowExecutableNode, pa
 function cloneConnectionEndpoint(endpoint: WorkflowExecutableConnectionEndpoint) {
   return {
     nodeId: endpoint.nodeId,
-    ...(endpoint.port !== undefined ? { port: endpoint.port } : {})
+    ...(typeof endpoint.port === "string" ? { port: endpoint.port } : {})
   };
 }
 
