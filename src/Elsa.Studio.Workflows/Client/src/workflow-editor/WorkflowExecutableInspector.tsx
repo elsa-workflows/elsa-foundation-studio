@@ -393,18 +393,22 @@ function WorkflowExecutableSidePanel({ detail, graph, chosenReference, sourceDef
     { id: "references", title: `References (${detail.references.length})`, order: 1, icon: <ListTree size={14} />, render: () => null }
   ];
   const selectedFact = selectedNodeId ? graph.factsByNodeId.get(selectedNodeId) : null;
-  const currentDraftVersionId = sourceDefinition.status === "ready" && sourceDefinition.draft
-    ? `draft:${createDraftSnapshotId(sourceDefinition.draft)}`
-    : null;
+  const sourceDraft = sourceDefinition.status === "ready" ? sourceDefinition.draft : null;
+  const sourceDefinitionId = sourceDefinition.status === "ready" ? sourceDefinition.definition.id : null;
+  const currentDraftVersionId = useMemo(
+    () => sourceDraft ? `draft:${createDraftSnapshotId(sourceDraft)}` : null,
+    [sourceDraft]
+  );
   // The routed Inspector does not retain the editor's transient test-run view, so it recovers the same
   // exact-current-draft signal from the artifact's TestRun reference. The synthetic version id embeds
   // both the persisted draft id and its state hash; a stale test run therefore cannot claim equivalence.
-  const hasDraftEquivalence = currentDraftVersionId && sourceDefinition.status === "ready"
-    ? detail.references.some(reference =>
+  const hasDraftEquivalence = useMemo(
+    () => !!currentDraftVersionId && !!sourceDefinitionId && detail.references.some(reference =>
       reference.definitionVersionId === currentDraftVersionId
-      && reference.definitionId === sourceDefinition.definition.id
-      && ["testrun", "test-run"].includes(reference.scope.trim().toLowerCase()))
-    : false;
+      && reference.definitionId === sourceDefinitionId
+      && ["testrun", "test-run"].includes(reference.scope.trim().toLowerCase())),
+    [currentDraftVersionId, detail.references, sourceDefinitionId]
+  );
 
   return (
     <aside className="wf-instance-inspector" aria-label="Executable details panel">
