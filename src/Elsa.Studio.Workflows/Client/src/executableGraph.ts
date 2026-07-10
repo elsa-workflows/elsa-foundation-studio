@@ -4,6 +4,7 @@ import type {
   ActivityNode,
   ActivityNodeStructure,
   WorkflowExecutableChildSlot,
+  WorkflowExecutableConnection,
   WorkflowExecutableConnectionEndpoint,
   WorkflowExecutableInputBinding,
   WorkflowExecutableNode
@@ -139,11 +140,25 @@ function synthesizeStructure(
 
 function copyFlowchartConnections(kind: string, node: WorkflowExecutableNode, payload: Record<string, unknown>) {
   if (kind === flowchartStructureKind && Array.isArray(node.connections)) {
-    payload.connections = node.connections.map(connection => ({
-      source: cloneConnectionEndpoint(connection.source),
-      target: cloneConnectionEndpoint(connection.target)
-    }));
+    payload.connections = node.connections
+      .filter(isValidConnection)
+      .map(connection => ({
+        source: cloneConnectionEndpoint(connection.source),
+        target: cloneConnectionEndpoint(connection.target)
+      }));
   }
+}
+
+function isValidConnection(value: unknown): value is WorkflowExecutableConnection {
+  if (!value || typeof value !== "object") return false;
+  const connection = value as { source?: unknown; target?: unknown };
+  return isValidConnectionEndpoint(connection.source) && isValidConnectionEndpoint(connection.target);
+}
+
+function isValidConnectionEndpoint(value: unknown): value is WorkflowExecutableConnectionEndpoint {
+  if (!value || typeof value !== "object") return false;
+  const nodeId = (value as { nodeId?: unknown }).nodeId;
+  return typeof nodeId === "string" && nodeId.length > 0;
 }
 
 // Rebuilds the compact wire projection field by field so undeclared server data (notably authored

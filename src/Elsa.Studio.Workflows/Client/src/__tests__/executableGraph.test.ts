@@ -245,4 +245,31 @@ describe("buildExecutableInspectorCanvas", () => {
       label: undefined
     });
   });
+
+  it("skips malformed connection entries and missing or invalid endpoints", () => {
+    const rawRoot = {
+      ...flowchartRoot([
+        executableNode({ authoredActivityId: "write-line-1" }),
+        executableNode({ executableNodeId: "exec-2", authoredActivityId: "write-line-2" })
+      ]),
+      connections: [
+        null,
+        { target: { nodeId: "write-line-2" } },
+        { source: { nodeId: "write-line-1" } },
+        { source: { nodeId: 42 }, target: { nodeId: "write-line-2" } },
+        { source: { nodeId: "write-line-1", port: "Done" }, target: { nodeId: "write-line-2" } }
+      ]
+    } as unknown as WorkflowExecutableNode;
+
+    const graph = buildExecutableActivityGraph(rawRoot, catalog);
+    const canvas = buildExecutableInspectorCanvas(graph, catalog, [], [], () => {});
+
+    expect(canvas.edges).toHaveLength(1);
+    expect(canvas.edges[0]).toMatchObject({
+      id: "flow-0-write-line-1-write-line-2",
+      source: "write-line-1",
+      target: "write-line-2",
+      sourceHandle: "Done"
+    });
+  });
 });
