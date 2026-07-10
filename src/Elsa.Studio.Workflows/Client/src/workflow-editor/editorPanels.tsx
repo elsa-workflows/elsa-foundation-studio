@@ -80,8 +80,9 @@ export function WorkflowRuntimePanel({ testRun, publishedEquivalent, onOpenRun }
   const rejected = isRejectedTestRun(testRun);
   const workflowExecutionId = testRun.workflowExecutionId;
   // The equivalence signal resolves asynchronously; re-check the artifact id so a match computed for an
-  // earlier test run never captions a newer one.
-  const equivalent = publishedEquivalent && publishedEquivalent.artifactId === testRun.artifactId
+  // earlier test run never captions a newer one. A rejected dispatch can still mint a valid artifact id,
+  // but pairing a green "identical" banner with a rejection reason reads as contradictory — suppress it.
+  const equivalent = !rejected && publishedEquivalent && publishedEquivalent.artifactId === testRun.artifactId
     ? publishedEquivalent
     : null;
   return (

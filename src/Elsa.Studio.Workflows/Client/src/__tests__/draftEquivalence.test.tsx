@@ -102,6 +102,18 @@ describe("WorkflowRuntimePanel equivalence caption", () => {
     expect(container.querySelector(".wf-runtime-equivalence")).toBeNull();
   });
 
+  it("suppresses the caption on a rejected test run even when the artifact id matches", () => {
+    const container = render(
+      <WorkflowRuntimePanel
+        testRun={testRun({ status: "Rejected", reason: "Reference gate closed" })}
+        publishedEquivalent={executable()}
+        onOpenRun={() => {}}
+      />
+    );
+
+    expect(container.querySelector(".wf-runtime-equivalence")).toBeNull();
+  });
+
   it("drops a stale signal computed for an earlier test run", () => {
     const container = render(
       <WorkflowRuntimePanel
