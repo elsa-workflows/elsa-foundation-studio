@@ -7,6 +7,7 @@ import type {
   ActivityCatalogItem,
   DesignMetadataRecord,
   WorkflowDefinitionSummary,
+  WorkflowDraft,
   WorkflowExecutableDetails,
   WorkflowExecutableReference
 } from "../workflowTypes";
@@ -32,6 +33,7 @@ import { CopyValueButton, ExecutableReferenceList, ExecutableRunStatusLine } fro
 import type { ExecutableRunState, WorkflowEditorPanelTab } from "./editorTypes";
 import {
   computeExecutableSourceDrift,
+  createDraftSnapshotId,
   dispatchAiAction,
   findAiAction,
   formatExecutableRunError,
@@ -55,7 +57,7 @@ interface ExecutableInspectionData {
 
 type SourceDefinitionState =
   | { status: "idle" | "loading" }
-  | { status: "ready"; definition: WorkflowDefinitionSummary }
+  | { status: "ready"; definition: WorkflowDefinitionSummary; draft: WorkflowDraft | null }
   | { status: "absent" }
   | { status: "failed"; error: string };
 
@@ -132,7 +134,7 @@ export function WorkflowExecutableInspectorWorkbench({ context, ai, artifactId, 
     let cancelled = false;
     setSourceDefinition({ status: "loading" });
     getDefinition(context, definitionId).then(
-      details => { if (!cancelled) setSourceDefinition({ status: "ready", definition: details.definition }); },
+      details => { if (!cancelled) setSourceDefinition({ status: "ready", definition: details.definition, draft: details.draft ?? null }); },
       error => {
         if (cancelled) return;
         setSourceDefinition(isNotFound(error)
@@ -391,6 +393,18 @@ function WorkflowExecutableSidePanel({ detail, graph, chosenReference, sourceDef
     { id: "references", title: `References (${detail.references.length})`, order: 1, icon: <ListTree size={14} />, render: () => null }
   ];
   const selectedFact = selectedNodeId ? graph.factsByNodeId.get(selectedNodeId) : null;
+  const currentDraftVersionId = sourceDefinition.status === "ready" && sourceDefinition.draft
+    ? `draft:${createDraftSnapshotId(sourceDefinition.draft)}`
+    : null;
+  // The routed Inspector does not retain the editor's transient test-run view, so it recovers the same
+  // exact-current-draft signal from the artifact's TestRun reference. The synthetic version id embeds
+  // both the persisted draft id and its state hash; a stale test run therefore cannot claim equivalence.
+  const currentDraftTestRunArtifactId = currentDraftVersionId && sourceDefinition.status === "ready"
+    ? detail.references.find(reference =>
+      reference.definitionVersionId === currentDraftVersionId
+      && reference.definitionId === sourceDefinition.definition.id
+      && ["testrun", "test-run"].includes(reference.scope.trim().toLowerCase()))?.artifactId ?? null
+    : null;
 
   return (
     <aside className="wf-instance-inspector" aria-label="Executable details panel">
@@ -468,7 +482,11 @@ function WorkflowExecutableSidePanel({ detail, graph, chosenReference, sourceDef
                   ) : (
                     <p className="wf-muted">This artifact carries no source references.</p>
                   )}
-                  <SourceDriftCaption reference={chosenReference} sourceDefinition={sourceDefinition} />
+                  <SourceDriftCaption
+                    reference={chosenReference}
+                    sourceDefinition={sourceDefinition}
+                    currentDraftTestRunArtifactId={currentDraftTestRunArtifactId}
+                  />
                 </section>
                 <WorkflowExecutableNodePanel fact={selectedFact ?? null} />
               </>
@@ -555,9 +573,10 @@ function getSourceDefinitionDisabledReason(reference: WorkflowExecutableReferenc
 // reference and the definition's latest. studio#262's behavioral-equivalence signal (draft test run
 // resolving to this artifact id) upgrades this caption; keep the rendering here so that lands in one
 // place.
-function SourceDriftCaption({ reference, sourceDefinition }: {
+function SourceDriftCaption({ reference, sourceDefinition, currentDraftTestRunArtifactId }: {
   reference: WorkflowExecutableReference | null;
   sourceDefinition: SourceDefinitionState;
+  currentDraftTestRunArtifactId: string | null;
 }) {
   if (!reference) return null;
   if (sourceDefinition.status === "absent") {
@@ -565,7 +584,14 @@ function SourceDriftCaption({ reference, sourceDefinition }: {
   }
   if (sourceDefinition.status !== "ready") return null;
 
-  const drift = computeExecutableSourceDrift(reference, sourceDefinition.definition);
+  const drift = computeExecutableSourceDrift(reference, sourceDefinition.definition, currentDraftTestRunArtifactId);
+  if (drift.kind === "equivalent") {
+    return (
+      <p className="wf-instance-note wf-executable-drift" role="note">
+        Current draft is behaviorally identical to this artifact.
+      </p>
+    );
+  }
   if (drift.kind !== "behind") return null;
 
   return (
