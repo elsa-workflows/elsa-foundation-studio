@@ -222,9 +222,9 @@ export function getExecutableReferenceStatus(reference: WorkflowExecutableRefere
   return "live";
 }
 
-// How the inspected reference's source relates to its definition in THIS environment. "absent" is the
-// promotion case (the artifact traveled without its definition); "behind" drives the drift caption.
-//
+// How the inspected artifact relates to its source definition in this environment: absent when the
+// definition did not travel with it, current/behind by source version, or behaviorally equivalent when
+// the exact current-draft test-run signal resolves to this artifact.
 export type ExecutableSourceDrift =
   | { kind: "absent" }
   | { kind: "current" }
