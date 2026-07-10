@@ -158,7 +158,7 @@ function isValidConnection(value: unknown): value is WorkflowExecutableConnectio
 function isValidConnectionEndpoint(value: unknown): value is WorkflowExecutableConnectionEndpoint {
   if (!value || typeof value !== "object") return false;
   const nodeId = (value as { nodeId?: unknown }).nodeId;
-  return typeof nodeId === "string" && nodeId.length > 0;
+  return typeof nodeId === "string" && nodeId.trim().length > 0;
 }
 
 // Rebuilds the compact wire projection field by field so undeclared server data (notably authored

@@ -257,6 +257,7 @@ describe("buildExecutableInspectorCanvas", () => {
         { target: { nodeId: "write-line-2" } },
         { source: { nodeId: "write-line-1" } },
         { source: { nodeId: 42 }, target: { nodeId: "write-line-2" } },
+        { source: { nodeId: "   " }, target: { nodeId: "write-line-2" } },
         { source: { nodeId: "write-line-1", port: "Done" }, target: { nodeId: "write-line-2" } }
       ]
     } as unknown as WorkflowExecutableNode;
