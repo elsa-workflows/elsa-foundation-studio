@@ -284,9 +284,11 @@ public sealed class StudioExtensionBuilderBridgeTests : IAsyncDisposable
 
         var pending = SendAsync(client, op);
         // The budget timer exists once the backend has received the outbound call; only then can advancing the fake
-        // clock expire it.
-        while (backend.Requests.Count == 0)
+        // clock expire it. Bounded so a relay regression fails the test instead of hanging the runner.
+        var waitDeadline = DateTime.UtcNow.AddSeconds(10);
+        while (backend.Requests.Count == 0 && DateTime.UtcNow < waitDeadline)
             await Task.Delay(10);
+        Assert.NotEmpty(backend.Requests);
         timeProvider.Advance(TimeSpan.FromSeconds(op.TimeoutSeconds + 1));
         var response = await pending;
         var error = await ReadErrorAsync(response);
@@ -310,6 +312,21 @@ public sealed class StudioExtensionBuilderBridgeTests : IAsyncDisposable
         Assert.True(response.IsSuccessStatusCode);
         var recorded = Assert.Single(backend.Requests);
         Assert.Equal("/_elsa/extension-builder/workspaces/ws-1/files/Activities/My%20File%23x.cs", recorded.PathAndQuery);
+    }
+
+    [Fact]
+    public async Task StripsTheHostPathBaseFromTheBackendCall()
+    {
+        // GetEncodedPathAndQuery prepends the PathBase a Studio host is mounted under; the relay must still forward
+        // only the operation suffix to the backend root.
+        var backend = RecordingBackend.RespondingWith(_ => JsonOk("{}"));
+        var client = await StartBridgeHostAsync(backend, pathBase: "/mounted");
+
+        var response = await client.GetAsync("/mounted" + StudioExtensionBuilderBridge.RouteGroup + "/workspaces/ws-1");
+
+        Assert.True(response.IsSuccessStatusCode);
+        var recorded = Assert.Single(backend.Requests);
+        Assert.Equal("/_elsa/extension-builder/workspaces/ws-1", recorded.PathAndQuery);
     }
 
     [Fact]
@@ -398,8 +415,11 @@ public sealed class StudioExtensionBuilderBridgeTests : IAsyncDisposable
         return suffix;
     }
 
-    private static Task<HttpResponseMessage> SendAsync(HttpClient client, StudioExtensionBuilderBridge.BridgeOperation op) =>
-        client.SendAsync(new HttpRequestMessage(new HttpMethod(op.Method), StudioExtensionBuilderBridge.RouteGroup + SampleSuffix(op)));
+    private static async Task<HttpResponseMessage> SendAsync(HttpClient client, StudioExtensionBuilderBridge.BridgeOperation op)
+    {
+        using var request = new HttpRequestMessage(new HttpMethod(op.Method), StudioExtensionBuilderBridge.RouteGroup + SampleSuffix(op));
+        return await client.SendAsync(request);
+    }
 
     // Starts an auth-enabled host whose stub backend recognizes the known bearers, then sends the operation with the
     // given one. Returns the backend too so callers can assert the outbound management-call count.
@@ -409,7 +429,7 @@ public sealed class StudioExtensionBuilderBridgeTests : IAsyncDisposable
     {
         var backend = RecordingBackend.RespondingWith(WithSessionEndpoint(_ => BackendSuccessFor(op)));
         var client = await StartBridgeHostAsync(backend, authEnabled: true);
-        var request = new HttpRequestMessage(new HttpMethod(op.Method), StudioExtensionBuilderBridge.RouteGroup + SampleSuffix(op));
+        using var request = new HttpRequestMessage(new HttpMethod(op.Method), StudioExtensionBuilderBridge.RouteGroup + SampleSuffix(op));
         request.Headers.Authorization = new("Bearer", bearer);
         return (await client.SendAsync(request), backend);
     }
@@ -470,7 +490,8 @@ public sealed class StudioExtensionBuilderBridgeTests : IAsyncDisposable
         string? backendBaseUrl = BackendBaseUrl,
         string? managementKey = ManagementKey,
         bool authEnabled = false,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        string? pathBase = null)
     {
         var settings = new Dictionary<string, string?>
         {
@@ -496,6 +517,8 @@ public sealed class StudioExtensionBuilderBridgeTests : IAsyncDisposable
             .ConfigurePrimaryHttpMessageHandler(() => backend);
 
         var app = builder.Build();
+        if (pathBase is not null)
+            app.UsePathBase(pathBase);
         app.UseAuthentication();
         app.UseAuthorization();
         // Mapping the management bridge maps the Extension Builder relay group with it — Program.cs stays untouched.

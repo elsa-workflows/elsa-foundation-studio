@@ -1,5 +1,6 @@
 using System.Net;
 using Microsoft.AspNetCore.Http.Extensions;
+using Microsoft.AspNetCore.Http.Features;
 
 namespace Elsa.Studio.Web;
 
@@ -107,9 +108,8 @@ internal static class StudioExtensionBuilderBridge
         // every policy allows anonymously (demo shell). The browser carries no Elsa host management key.
         var group = endpoints.MapGroup(RouteGroup);
 
-        foreach (var operation in Operations)
+        foreach (var op in Operations)
         {
-            var op = operation;
             group.MapMethods(op.Route, [op.Method],
                     (HttpContext context, StudioExtensionBuilderRelayClient client) => client.RelayAsync(op, context))
                 .RequireAuthorization(op.Access == BridgeAccess.Manage
@@ -166,10 +166,14 @@ internal sealed class StudioExtensionBuilderRelayClient(
         }
 
         // The incoming Studio path suffix IS the backend path suffix (the table's templates are shape-identical), and
-        // GetEncodedPathAndQuery preserves segment encoding and relays the query string as-is.
+        // GetEncodedPathAndQuery preserves segment encoding and relays the query string as-is. The suffix is located by
+        // searching for the route group rather than slicing at its length because GetEncodedPathAndQuery prepends any
+        // PathBase the Studio host is mounted under.
+        var encodedPathAndQuery = context.Request.GetEncodedPathAndQuery();
+        var routeGroupIndex = encodedPathAndQuery.IndexOf(StudioExtensionBuilderBridge.RouteGroup, StringComparison.Ordinal);
         var backendPathAndQuery = string.Concat(
             StudioExtensionBuilderBridge.BackendRoot,
-            context.Request.GetEncodedPathAndQuery().AsSpan(StudioExtensionBuilderBridge.RouteGroup.Length));
+            encodedPathAndQuery.AsSpan(routeGroupIndex + StudioExtensionBuilderBridge.RouteGroup.Length));
 
         // Per-operation budget over the browser-abort token. The budget covers connect + response headers + buffered
         // (JSON) body reads; Text/Stream body copies run outside it so a long log/artifact download is bounded only by
@@ -216,8 +220,12 @@ internal sealed class StudioExtensionBuilderRelayClient(
         request.Headers.TryAddWithoutValidation(StudioBackendManagementOptions.ManagementApiKeyHeaderName, options.ManagementApiKey);
         request.Headers.TryAddWithoutValidation("Accept", AcceptFor(operation.Payload));
 
-        // Bodied methods stream the browser body through with its Content-Type; nothing else is forwarded.
-        if (context.Request.ContentLength > 0 || !string.IsNullOrEmpty(context.Request.Headers.TransferEncoding))
+        // Bodied methods stream the browser body through with its Content-Type; nothing else is forwarded. Body
+        // presence comes from the server's body-detection feature because HTTP/2+ requests can carry a body with
+        // neither a Content-Length nor a Transfer-Encoding header.
+        var canHaveBody = context.Features.Get<IHttpRequestBodyDetectionFeature>()?.CanHaveBody
+            ?? context.Request.ContentLength > 0;
+        if (canHaveBody)
         {
             request.Content = new StreamContent(context.Request.Body);
             if (!string.IsNullOrEmpty(context.Request.ContentType))
