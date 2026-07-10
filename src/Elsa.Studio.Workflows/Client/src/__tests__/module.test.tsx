@@ -1314,6 +1314,8 @@ describe("workflows module", () => {
 
     await waitForText(container, "Current draft is behaviorally identical to this artifact");
 
+    expect(container.querySelector(".wf-executable-equivalent")?.textContent)
+      .toContain("Current draft is behaviorally identical to this artifact");
     expect(container.textContent).not.toContain("the definition's latest is 9.0.0");
 
     await unmount();

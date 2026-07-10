@@ -399,12 +399,12 @@ function WorkflowExecutableSidePanel({ detail, graph, chosenReference, sourceDef
   // The routed Inspector does not retain the editor's transient test-run view, so it recovers the same
   // exact-current-draft signal from the artifact's TestRun reference. The synthetic version id embeds
   // both the persisted draft id and its state hash; a stale test run therefore cannot claim equivalence.
-  const currentDraftTestRunArtifactId = currentDraftVersionId && sourceDefinition.status === "ready"
-    ? detail.references.find(reference =>
+  const hasDraftEquivalence = currentDraftVersionId && sourceDefinition.status === "ready"
+    ? detail.references.some(reference =>
       reference.definitionVersionId === currentDraftVersionId
       && reference.definitionId === sourceDefinition.definition.id
-      && ["testrun", "test-run"].includes(reference.scope.trim().toLowerCase()))?.artifactId ?? null
-    : null;
+      && ["testrun", "test-run"].includes(reference.scope.trim().toLowerCase()))
+    : false;
 
   return (
     <aside className="wf-instance-inspector" aria-label="Executable details panel">
@@ -485,7 +485,7 @@ function WorkflowExecutableSidePanel({ detail, graph, chosenReference, sourceDef
                   <SourceDriftCaption
                     reference={chosenReference}
                     sourceDefinition={sourceDefinition}
-                    currentDraftTestRunArtifactId={currentDraftTestRunArtifactId}
+                    hasDraftEquivalence={hasDraftEquivalence}
                   />
                 </section>
                 <WorkflowExecutableNodePanel fact={selectedFact ?? null} />
@@ -573,10 +573,10 @@ function getSourceDefinitionDisabledReason(reference: WorkflowExecutableReferenc
 // reference and the definition's latest. studio#262's behavioral-equivalence signal (draft test run
 // resolving to this artifact id) upgrades this caption; keep the rendering here so that lands in one
 // place.
-function SourceDriftCaption({ reference, sourceDefinition, currentDraftTestRunArtifactId }: {
+function SourceDriftCaption({ reference, sourceDefinition, hasDraftEquivalence }: {
   reference: WorkflowExecutableReference | null;
   sourceDefinition: SourceDefinitionState;
-  currentDraftTestRunArtifactId: string | null;
+  hasDraftEquivalence: boolean;
 }) {
   if (!reference) return null;
   if (sourceDefinition.status === "absent") {
@@ -584,10 +584,10 @@ function SourceDriftCaption({ reference, sourceDefinition, currentDraftTestRunAr
   }
   if (sourceDefinition.status !== "ready") return null;
 
-  const drift = computeExecutableSourceDrift(reference, sourceDefinition.definition, currentDraftTestRunArtifactId);
+  const drift = computeExecutableSourceDrift(reference, sourceDefinition.definition, hasDraftEquivalence);
   if (drift.kind === "equivalent") {
     return (
-      <p className="wf-instance-note wf-executable-drift" role="note">
+      <p className="wf-instance-note wf-executable-drift wf-executable-equivalent" role="note">
         Current draft is behaviorally identical to this artifact.
       </p>
     );

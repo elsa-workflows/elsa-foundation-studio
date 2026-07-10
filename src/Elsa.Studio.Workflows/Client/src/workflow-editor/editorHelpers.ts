@@ -234,10 +234,10 @@ export type ExecutableSourceDrift =
 export function computeExecutableSourceDrift(
   reference: WorkflowExecutableReference,
   definition: WorkflowDefinitionSummary | null,
-  currentDraftTestRunArtifactId: string | null = null
+  hasDraftEquivalence = false
 ): ExecutableSourceDrift {
   if (!definition) return { kind: "absent" };
-  if (currentDraftTestRunArtifactId === reference.artifactId) return { kind: "equivalent" };
+  if (hasDraftEquivalence) return { kind: "equivalent" };
   if (!definition.latestVersionId || definition.latestVersionId === reference.definitionVersionId) return { kind: "current" };
   return {
     kind: "behind",
