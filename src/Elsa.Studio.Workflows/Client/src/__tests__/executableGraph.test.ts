@@ -173,8 +173,8 @@ describe("buildExecutableInspectorCanvas", () => {
     expect(canvas.nodes.map(node => node.id)).toEqual(["write-line-2"]);
   });
 
-  it("renders projected flowchart connections with ports and routing vertices", () => {
-    const graph = buildExecutableActivityGraph({
+  it("renders projected flowchart connections with ports while ignoring undeclared routing vertices", () => {
+    const rawRoot = {
       ...flowchartRoot([
         executableNode({ authoredActivityId: "write-line-1" }),
         executableNode({ executableNodeId: "exec-2", authoredActivityId: "write-line-2" })
@@ -184,10 +184,18 @@ describe("buildExecutableInspectorCanvas", () => {
         target: { nodeId: "write-line-2", port: "Input" },
         vertices: [{ x: 120, y: 45 }, { x: 180, y: 90 }]
       }]
-    }, catalog);
+    } as unknown as WorkflowExecutableNode;
+    const graph = buildExecutableActivityGraph(rawRoot, catalog);
 
-    const canvas = buildExecutableInspectorCanvas(graph, catalog, [], [], () => {});
+    const canvas = buildExecutableInspectorCanvas(graph, catalog, [
+      { nodeId: "write-line-1", x: 40, y: 20 },
+      { nodeId: "write-line-2", x: 420, y: 180 }
+    ], [], () => {});
 
+    expect(canvas.nodes.map(node => ({ id: node.id, position: node.position }))).toEqual([
+      { id: "write-line-1", position: { x: 40, y: 20 } },
+      { id: "write-line-2", position: { x: 420, y: 180 } }
+    ]);
     expect(canvas.edges).toHaveLength(1);
     expect(canvas.edges[0]).toMatchObject({
       id: "flow-0-write-line-1-write-line-2",
@@ -196,8 +204,8 @@ describe("buildExecutableInspectorCanvas", () => {
       sourceHandle: "True",
       targetHandle: "Input",
       label: "True",
-      data: { vertices: [{ x: 120, y: 45 }, { x: 180, y: 90 }] },
       deletable: false
     });
+    expect(canvas.edges[0].data).toBeUndefined();
   });
 });

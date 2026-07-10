@@ -4,6 +4,7 @@ import type {
   ActivityNode,
   ActivityNodeStructure,
   WorkflowExecutableChildSlot,
+  WorkflowExecutableConnectionEndpoint,
   WorkflowExecutableInputBinding,
   WorkflowExecutableNode
 } from "./workflowTypes";
@@ -15,9 +16,9 @@ import type {
 // Node ids use the authored activity id: the Layout Sidecar is a publish-time copy of the definition
 // layout keyed by authored node ids, so this is what makes the sidecar geometry land on the right nodes.
 //
-// The wire tree carries the structure kind, named child slots, and a compact flowchart-connections
-// projection. Synthesis puts those connections into the authored-shaped flowchart payload so the
-// existing flowchartEdges() adapter produces the same canvas edges as the definition designer.
+// The wire tree carries the structure kind, named child slots, and compact flowchart endpoints/ports.
+// Synthesis puts only those endpoint semantics into the authored-shaped flowchart payload so the
+// existing flowchartEdges() adapter produces edges while the Layout Sidecar remains geometry authority.
 
 // Per-node inspection facts the canvas cannot carry through ActivityNode: catalog availability
 // (ghost nodes), the runtime ids, and the input-binding summaries for the node details panel.
@@ -138,8 +139,20 @@ function synthesizeStructure(
 
 function copyFlowchartConnections(kind: string, node: WorkflowExecutableNode, payload: Record<string, unknown>) {
   if (kind === flowchartStructureKind && node.connections !== undefined) {
-    payload.connections = node.connections;
+    payload.connections = node.connections.map(connection => ({
+      source: cloneConnectionEndpoint(connection.source),
+      target: cloneConnectionEndpoint(connection.target)
+    }));
   }
+}
+
+// Rebuilds the compact wire projection field by field so undeclared server data (notably authored
+// routing vertices) cannot cross into the canvas payload. Geometry comes only from the Layout Sidecar.
+function cloneConnectionEndpoint(endpoint: WorkflowExecutableConnectionEndpoint) {
+  return {
+    nodeId: endpoint.nodeId,
+    ...(endpoint.port !== undefined ? { port: endpoint.port } : {})
+  };
 }
 
 // Pairs every wire slot with the facet slot descriptor sharing its contract name. Collection-backed

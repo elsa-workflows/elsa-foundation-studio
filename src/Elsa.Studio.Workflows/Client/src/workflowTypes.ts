@@ -477,21 +477,15 @@ export interface WorkflowExecutableReference {
 }
 
 // Compact flowchart wiring projected with an executable node. Endpoints refer to authored node ids;
-// routing vertices preserve the designer path without carrying the authored structure payload.
+// geometry remains owned by the chosen reference's Layout Sidecar.
 export interface WorkflowExecutableConnectionEndpoint {
   nodeId: string;
   port?: string | null;
 }
 
-export interface WorkflowExecutableConnectionVertex {
-  x: number;
-  y: number;
-}
-
 export interface WorkflowExecutableConnection {
   source: WorkflowExecutableConnectionEndpoint;
   target: WorkflowExecutableConnectionEndpoint;
-  vertices?: WorkflowExecutableConnectionVertex[];
 }
 
 // A node in the Execution Material tree served by GET /executables/{artifactId}. Input bindings are
