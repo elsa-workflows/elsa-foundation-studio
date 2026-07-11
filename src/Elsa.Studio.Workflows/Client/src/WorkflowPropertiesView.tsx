@@ -43,9 +43,15 @@ interface PickerOption {
   group?: string;
 }
 
+interface DescriptorOptions {
+  typeOptions: PickerOption[] | null;
+  storageOptions: PickerOption[] | null;
+  editorForAlias: EditorForAlias;
+}
+
 // Loads type descriptors once per editor mount. Storage remains the Foundation compatibility
 // free-text field because Foundation intentionally has no live storage-driver catalog contract.
-export function useDescriptorOptions(context: StudioEndpointContext) {
+export function useDescriptorOptions(context: StudioEndpointContext): DescriptorOptions {
   const [variableTypes, setVariableTypes] = useState<VariableTypeDescriptor[] | null>(null);
 
   useEffect(() => {
@@ -82,6 +88,7 @@ export function useDescriptorOptions(context: StudioEndpointContext) {
     return alias => editors.get(alias) ?? "text";
   }, [variableTypes]);
 
+  // `null` is the PickerOrText contract for a free-text field, not a pending descriptor request.
   return { typeOptions, storageOptions: null, editorForAlias };
 }
 

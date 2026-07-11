@@ -259,13 +259,13 @@ export function useScopedVariableAnalysis(
   }, [context]);
 
   useEffect(() => {
-    if (!state) {
-      setResult(emptyAnalysis("unavailable"));
+    if (supportsAnalysis === null) {
+      setResult(emptyAnalysis("loading"));
       return;
     }
 
-    if (supportsAnalysis === null) {
-      setResult(emptyAnalysis("loading"));
+    if (!state) {
+      setResult(emptyAnalysis("unavailable"));
       return;
     }
 
