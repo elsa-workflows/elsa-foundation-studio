@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, GripVertical, Maximize2, Plus, Trash2, X } from
 import type {
   StudioActivityDescriptor,
   StudioActivityInputDescriptor,
+  StudioActivityPropertyGroupDescriptor,
   StudioActivityPropertyEditorContribution,
   StudioActivityPropertyEditorContext,
   StudioExpressionEditorContribution,
@@ -29,7 +30,11 @@ import {
   writeInputValue
 } from "./activityProperties";
 
-const inlineSyntaxEditorIds = new Set(["studio.property.singleline", "studio.property.text-fallback"]);
+const inlineSyntaxEditorIds = new Set([
+  "studio.property.singleline",
+  "studio.property.text-fallback",
+  "studio.property.checkbox"
+]);
 const variableSyntax = "Variable";
 
 export interface ActivityPropertiesPanelProps {
@@ -65,15 +70,13 @@ export function ActivityPropertiesPanel({
     return <p className="wf-muted">No activity descriptor is available for this activity.</p>;
   }
 
-  const inputs = descriptor.inputs
-    .filter(input => input.isBrowsable !== false)
-    .sort((left, right) => (left.order ?? 0) - (right.order ?? 0) || left.name.localeCompare(right.name));
+  const inputs = descriptor.inputs.filter(input => input.isBrowsable !== false);
 
   if (inputs.length === 0) {
     return <p className="wf-muted">This activity does not expose editable properties.</p>;
   }
 
-  const groups = groupInputs(inputs);
+  const groups = groupInputs(inputs, readPropertyGroupMetadata(descriptor.customProperties));
   const syntaxDescriptors = expressionDescriptors.length > 0 ? expressionDescriptors : defaultExpressionDescriptors;
 
   return (
@@ -81,7 +84,7 @@ export function ActivityPropertiesPanel({
       <span className="wf-section-label">Properties</span>
       {groups.map(group => (
         <section key={group.category} className="wf-property-group">
-          {groups.length > 1 ? <h4>{group.category}</h4> : null}
+          {groups.length > 1 || group.configured || group.category !== "General" ? <h4>{group.label}</h4> : null}
           {group.inputs.map(input => (
             <PropertyRow
               key={input.name}
@@ -160,6 +163,7 @@ function PropertyRow({
   // gating on the collection itself (not the hint) is what keeps the two features from colliding.
   const isCollectionEditor = collectionType != null;
   const useInlineSyntaxPicker = Boolean(wrapped && !isCollectionEditor && isSingleLineTextInput(input, editor?.id));
+  const useToggleLayout = editor?.id === "studio.property.checkbox" && lowerSyntax === "literal";
   const canExpandEditor = Boolean(wrapped && !isCollectionEditor && isExpandableTextInput(input, editor?.id));
   const [expanded, setExpanded] = useState(false);
 
@@ -225,7 +229,7 @@ function PropertyRow({
         />
       ) : null}
       {useInlineSyntaxPicker ? (
-        <div className="wf-expression-field">
+        <div className={useToggleLayout ? "wf-expression-field wf-expression-field--toggle" : "wf-expression-field"}>
           <div className="wf-expression-editor">
             {valueEditor}
             {renderExpressionDiagnostics(inlineDiagnostics)}
@@ -750,19 +754,72 @@ function renderExpressionDiagnostics(diagnostics: StudioExpressionEditorDiagnost
   );
 }
 
-function groupInputs(inputs: StudioActivityInputDescriptor[]) {
+type ResolvedPropertyGroupMetadata = Required<StudioActivityPropertyGroupDescriptor>;
+
+function readPropertyGroupMetadata(customProperties: Record<string, unknown> | undefined): ResolvedPropertyGroupMetadata[] {
+  if (!customProperties) return [];
+
+  const candidates = customProperties.propertyGroups;
+  if (!Array.isArray(candidates)) return [];
+
+  const groups: ResolvedPropertyGroupMetadata[] = [];
+  const seen = new Set<string>();
+  candidates.forEach((candidate, index) => {
+    const record = asRecord(candidate);
+    const category = readNonEmptyString(record?.category ?? record?.name ?? record?.id);
+    if (!category || seen.has(category)) return;
+
+    const label = readNonEmptyString(record?.label ?? record?.displayName) ?? category;
+    const configuredOrder = typeof record?.order === "number" && Number.isFinite(record.order) ? record.order : index;
+    groups.push({ category, label, order: configuredOrder });
+    seen.add(category);
+  });
+  return groups;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value != null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function readNonEmptyString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function groupInputs(inputs: StudioActivityInputDescriptor[], metadata: ResolvedPropertyGroupMetadata[]) {
+  const metadataByCategory = new Map(metadata.map(group => [group.category, group]));
   const groups = new Map<string, StudioActivityInputDescriptor[]>();
-  for (const input of inputs) {
+  const orderedInputs = [...inputs]
+    .sort((left, right) => (left.order ?? 0) - (right.order ?? 0) || left.name.localeCompare(right.name));
+
+  for (const input of orderedInputs) {
     const category = input.category?.trim() || "General";
     groups.set(category, [...(groups.get(category) ?? []), input]);
   }
 
-  return [...groups.entries()].map(([category, groupedInputs]) => ({ category, inputs: groupedInputs }));
+  return [...groups.entries()]
+    .map(([category, groupedInputs]) => {
+      const configured = metadataByCategory.get(category);
+      return {
+        category,
+        label: configured?.label ?? category,
+        order: configured?.order ?? Math.min(...groupedInputs.map(input => input.order ?? 0)),
+        configured: configured != null,
+        inputs: groupedInputs
+      };
+    })
+    .sort((left, right) =>
+      Number(right.configured) - Number(left.configured) ||
+      left.order - right.order ||
+      left.category.localeCompare(right.category)
+    );
 }
 
 function isSingleLineTextInput(input: StudioActivityInputDescriptor, editorId: string | undefined) {
   if (input.uiHint?.toLowerCase() === "multiline") return false;
   if (editorId && !inlineSyntaxEditorIds.has(editorId)) return false;
+  if (editorId === "studio.property.checkbox") return true;
 
   const normalizedType = input.typeName.toLowerCase();
   return ["string", "system.string", "text"].includes(normalizedType) || input.uiHint?.toLowerCase() === "singleline";
