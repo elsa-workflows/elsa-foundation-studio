@@ -795,7 +795,9 @@ function groupInputs(inputs: StudioActivityInputDescriptor[], metadata: Resolved
 
   for (const input of orderedInputs) {
     const category = input.category?.trim() || "General";
-    groups.set(category, [...(groups.get(category) ?? []), input]);
+    const group = groups.get(category);
+    if (group) group.push(input);
+    else groups.set(category, [input]);
   }
 
   return [...groups.entries()]

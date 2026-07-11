@@ -66,7 +66,7 @@ describe("built-in boolean activity property editor", () => {
     const input = renderBooleanEditor({ onChange });
 
     flushSync(() => {
-      input.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      input.click();
     });
 
     expect(onChange).toHaveBeenCalledWith(true);
