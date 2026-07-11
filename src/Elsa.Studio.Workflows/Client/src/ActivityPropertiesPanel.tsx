@@ -2,6 +2,7 @@ import { type DragEvent, useEffect, useId, useState } from "react";
 import { ChevronDown, ChevronUp, GripVertical, Maximize2, Plus, Trash2, X } from "lucide-react";
 import type {
   StudioActivityDescriptor,
+  StudioActivityCustomProperties,
   StudioActivityInputDescriptor,
   StudioActivityPropertyGroupDescriptor,
   StudioActivityPropertyEditorContribution,
@@ -756,7 +757,7 @@ function renderExpressionDiagnostics(diagnostics: StudioExpressionEditorDiagnost
 
 type ResolvedPropertyGroupMetadata = Required<StudioActivityPropertyGroupDescriptor>;
 
-function readPropertyGroupMetadata(customProperties: Record<string, unknown> | undefined): ResolvedPropertyGroupMetadata[] {
+function readPropertyGroupMetadata(customProperties: StudioActivityCustomProperties | undefined): ResolvedPropertyGroupMetadata[] {
   if (!customProperties) return [];
 
   const candidates = customProperties.propertyGroups;
@@ -821,7 +822,6 @@ function groupInputs(inputs: StudioActivityInputDescriptor[], metadata: Resolved
       };
     })
     .sort((left, right) =>
-      Number(right.configured) - Number(left.configured) ||
       left.order - right.order ||
       left.category.localeCompare(right.category)
     );

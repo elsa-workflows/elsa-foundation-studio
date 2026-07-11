@@ -118,18 +118,18 @@ describe("activity property organization", () => {
 
   it("keeps unconfigured and uncategorized properties visible in deterministic fallback groups", () => {
     const container = renderPanel([
-      input("ZebraValue", { category: "Zebra" }),
-      input("GeneralValue", { category: null }),
+      input("ZebraValue", { category: "Zebra", order: 200 }),
+      input("GeneralValue", { category: null, order: 10 }),
       input("AdvancedValue", { category: "Advanced" })
     ], {
       customProperties: {
-        propertyGroups: [{ category: "Advanced", label: "Advanced settings" }]
+        propertyGroups: [{ category: "Advanced", label: "Advanced settings", order: 100 }]
       }
     });
 
     expect([...container.querySelectorAll(".wf-property-group h4")].map(heading => heading.textContent))
-      .toEqual(["Advanced settings", "General", "Zebra"]);
-    expect(propertyLabels(container)).toEqual(["AdvancedValue", "GeneralValue", "ZebraValue"]);
+      .toEqual(["General", "Advanced settings", "Zebra"]);
+    expect(propertyLabels(container)).toEqual(["GeneralValue", "AdvancedValue", "ZebraValue"]);
   });
 
   it("places the syntax picker inline with the checkbox contribution", () => {
