@@ -427,6 +427,17 @@ export interface StudioActivityInputDescriptor extends StudioActivityPropertyDes
   uiSpecifications?: StudioActivityInputUISpecifications | null;
 }
 
+export function readActivityInputOptionsProvider(input: StudioActivityInputDescriptor): StudioActivityInputOptionsProviderDescriptor | null {
+  const value = input.uiSpecifications?.optionsProvider;
+  if (!value || typeof value !== "object") return null;
+  const record = value as unknown as Record<string, unknown>;
+  if (typeof record.key !== "string" || record.key.trim().length === 0) return null;
+  return {
+    key: record.key,
+    dependsOn: Array.isArray(record.dependsOn) ? record.dependsOn.filter((item): item is string => typeof item === "string") : []
+  };
+}
+
 export interface StudioActivityOutputDescriptor extends StudioActivityPropertyDescriptor {
 }
 

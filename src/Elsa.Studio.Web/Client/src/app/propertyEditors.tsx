@@ -1,9 +1,10 @@
-import type {
-  ElsaStudioModuleApi,
-  StudioActivityInputDescriptor,
-  StudioActivityPropertyEditorContext,
-  StudioActivityPropertyEditorContribution,
-  StudioActivityPropertyEditorProps
+import {
+  readActivityInputOptionsProvider,
+  type ElsaStudioModuleApi,
+  type StudioActivityInputDescriptor,
+  type StudioActivityPropertyEditorContext,
+  type StudioActivityPropertyEditorContribution,
+  type StudioActivityPropertyEditorProps
 } from "../sdk";
 
 const textLikeTypes = new Set(["string", "system.string", "text"]);
@@ -76,6 +77,7 @@ function MultiSelectEditor({ descriptor, value, disabled, onChange }: StudioActi
   };
 
   if (renderedOptions.length === 0) {
+    if (readActivityInputOptionsProvider(descriptor)) return null;
     return <p className="studio-property-multiselect-empty">No options available.</p>;
   }
 
@@ -193,14 +195,7 @@ function getOptions(descriptor: StudioActivityInputDescriptor): Array<{ label: s
 }
 
 function hasOptionSource(descriptor: StudioActivityInputDescriptor) {
-  return getOptions(descriptor).length > 0 || !!readOptionsProvider(descriptor);
-}
-
-function readOptionsProvider(descriptor: StudioActivityInputDescriptor) {
-  const provider = descriptor.uiSpecifications?.optionsProvider;
-  if (!provider || typeof provider !== "object") return null;
-  const key = (provider as Record<string, unknown>).key;
-  return typeof key === "string" && key.length > 0 ? provider : null;
+  return getOptions(descriptor).length > 0 || !!readActivityInputOptionsProvider(descriptor);
 }
 
 function withUnavailableOptions(

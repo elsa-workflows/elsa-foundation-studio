@@ -304,6 +304,9 @@ function PropertyRow({
           <button type="button" onClick={dynamicOptions.retry}>Retry</button>
         </div>
       ) : null}
+      {provider && dynamicOptions.status === "ready" && dynamicOptions.options.length === 0 ? (
+        <p className="wf-property-options-status" role="status">No options available.</p>
+      ) : null}
       {expanded ? (
         <ExpandedPropertyEditor
           input={input}

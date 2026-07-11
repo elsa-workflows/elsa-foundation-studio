@@ -139,4 +139,18 @@ describe("built-in option activity property editors", () => {
     flushSync(() => stale.click());
     expect(onChange).toHaveBeenCalledWith([1]);
   });
+
+  it("does not report an empty provider-backed checklist while its options are unresolved", () => {
+    renderEditor("studio.property.multiselect", {
+      descriptor: {
+        name: "Methods",
+        displayName: "Methods",
+        typeName: "System.Collections.Generic.ICollection`1[System.String]",
+        uiSpecifications: { optionsProvider: { key: "catalog.methods", dependsOn: [] } }
+      },
+      value: []
+    });
+
+    expect(container.textContent).not.toContain("No options available.");
+  });
 });

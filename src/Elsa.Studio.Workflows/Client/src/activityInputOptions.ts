@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type {
-  StudioActivityDescriptor,
-  StudioActivityInputDescriptor,
-  StudioActivityInputOption,
-  StudioActivityInputOptionsProviderDescriptor,
-  StudioEndpointContext
+import {
+  readActivityInputOptionsProvider,
+  type StudioActivityDescriptor,
+  type StudioActivityInputDescriptor,
+  type StudioActivityInputOption,
+  type StudioEndpointContext
 } from "@elsa-workflows/studio-sdk";
 import { readInputValue, readWrappedInput } from "./activityProperties";
 import { getActivityInputOptions } from "./api/workflows";
@@ -18,16 +18,7 @@ export interface ActivityInputOptionsState {
   retry(): void;
 }
 
-export function readOptionsProvider(input: StudioActivityInputDescriptor): StudioActivityInputOptionsProviderDescriptor | null {
-  const value = input.uiSpecifications?.optionsProvider;
-  if (!value || typeof value !== "object") return null;
-  const record = value as unknown as Record<string, unknown>;
-  if (typeof record.key !== "string" || record.key.trim().length === 0) return null;
-  return {
-    key: record.key,
-    dependsOn: Array.isArray(record.dependsOn) ? record.dependsOn.filter((item): item is string => typeof item === "string") : []
-  };
-}
+export const readOptionsProvider = readActivityInputOptionsProvider;
 
 export function useActivityInputOptions(
   context: StudioEndpointContext,

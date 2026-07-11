@@ -73,6 +73,21 @@ function renderPanel(context: StudioEndpointContext, node: ActivityNode) {
 }
 
 describe("dynamic activity input options", () => {
+  it("distinguishes unresolved provider options from a resolved empty result", async () => {
+    let resolveRequest!: (value: unknown) => void;
+    const postJson = vi.fn(() => new Promise(resolve => { resolveRequest = resolve; }));
+    const context = { http: { postJson } } as unknown as StudioEndpointContext;
+
+    renderPanel(context, activity("Customer"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(container.textContent).toContain("Loading options...");
+    expect(container.textContent).not.toContain("No options available.");
+
+    resolveRequest({ options: [] });
+    await vi.waitFor(() => expect(container.textContent).toContain("No options available."));
+    expect(container.textContent).not.toContain("Loading options...");
+  });
+
   it("loads on open, debounces dependency refresh, and cancels the superseded request", async () => {
     const requests: Array<{ signal: AbortSignal; resolve(value: unknown): void }> = [];
     const postJson = vi.fn((_url, _body, init) => new Promise(resolve => requests.push({ signal: init.signal, resolve })));
