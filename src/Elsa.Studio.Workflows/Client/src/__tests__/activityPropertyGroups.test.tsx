@@ -93,7 +93,7 @@ describe("activity property organization", () => {
     ], {
       customProperties: {
         propertyGroups: [
-          { category: "Advanced", label: "Advanced settings", order: 20 },
+          { category: " ", name: "Advanced", label: " ", displayName: "Advanced settings", order: 20 },
           { category: "Simple", label: "Essentials", order: 10 }
         ]
       }

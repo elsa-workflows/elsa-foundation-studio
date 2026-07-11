@@ -766,10 +766,10 @@ function readPropertyGroupMetadata(customProperties: Record<string, unknown> | u
   const seen = new Set<string>();
   candidates.forEach((candidate, index) => {
     const record = asRecord(candidate);
-    const category = readNonEmptyString(record?.category ?? record?.name ?? record?.id);
+    const category = readFirstNonEmptyString(record?.category, record?.name, record?.id);
     if (!category || seen.has(category)) return;
 
-    const label = readNonEmptyString(record?.label ?? record?.displayName) ?? category;
+    const label = readFirstNonEmptyString(record?.label, record?.displayName) ?? category;
     const configuredOrder = typeof record?.order === "number" && Number.isFinite(record.order) ? record.order : index;
     groups.push({ category, label, order: configuredOrder });
     seen.add(category);
@@ -785,6 +785,15 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 function readNonEmptyString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function readFirstNonEmptyString(...values: unknown[]): string | null {
+  for (const value of values) {
+    const text = readNonEmptyString(value);
+    if (text) return text;
+  }
+
+  return null;
 }
 
 function groupInputs(inputs: StudioActivityInputDescriptor[], metadata: ResolvedPropertyGroupMetadata[]) {
