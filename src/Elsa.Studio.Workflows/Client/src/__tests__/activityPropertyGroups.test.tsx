@@ -242,7 +242,7 @@ describe("activity property organization", () => {
     });
 
     flushSync(() => container.querySelector<HTMLButtonElement>(".wf-syntax-picker-trigger")?.click());
-    const liquidOption = [...container.querySelectorAll<HTMLButtonElement>("[role='option']")]
+    const liquidOption = [...document.querySelectorAll<HTMLButtonElement>("[role='option']")]
       .find(option => option.textContent === "Liquid");
     flushSync(() => liquidOption?.click());
 
