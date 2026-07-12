@@ -25,13 +25,15 @@ export interface AnchoredPopoverPosition {
   maxHeight: number;
 }
 
+export type AnchoredPopoverDismissReason = "anchor-hidden" | "outside-pointer";
+
 export interface AnchoredPopoverProps extends AnchoredPopoverOptions {
   anchorRef: RefObject<HTMLElement | null>;
   open: boolean;
   children: ReactNode;
   className?: string;
   id?: string;
-  onDismiss?(): void;
+  onDismiss?(reason: AnchoredPopoverDismissReason): void;
 }
 
 const defaultOptions: Required<AnchoredPopoverOptions> = {
@@ -75,9 +77,12 @@ export function AnchoredPopover({
   ...options
 }: AnchoredPopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
+  const animationFrameRef = useRef<number | null>(null);
   const [position, setPosition] = useState<AnchoredPopoverPosition | null>(null);
   const optionsRef = useRef(options);
+  const onDismissRef = useRef(onDismiss);
   optionsRef.current = options;
+  onDismissRef.current = onDismiss;
 
   const updatePosition = useCallback(() => {
     const anchor = anchorRef.current;
@@ -88,7 +93,7 @@ export function AnchoredPopover({
     if (anchorRect.width === 0 && anchorRect.height === 0) return;
     const viewport = { width: window.innerWidth, height: window.innerHeight };
     if (!isVisible(anchorRect, viewport)) {
-      onDismiss?.();
+      onDismissRef.current?.("anchor-hidden");
       return;
     }
 
@@ -98,7 +103,15 @@ export function AnchoredPopover({
       viewport,
       optionsRef.current
     ));
-  }, [anchorRef, onDismiss]);
+  }, [anchorRef]);
+
+  const schedulePositionUpdate = useCallback(() => {
+    if (animationFrameRef.current != null) return;
+    animationFrameRef.current = requestAnimationFrame(() => {
+      animationFrameRef.current = null;
+      updatePosition();
+    });
+  }, [updatePosition]);
 
   useLayoutEffect(() => {
     if (!open) {
@@ -110,7 +123,7 @@ export function AnchoredPopover({
 
   useEffect(() => {
     if (!open) return;
-    const handleViewportChange = () => updatePosition();
+    const handleViewportChange = () => schedulePositionUpdate();
     window.addEventListener("resize", handleViewportChange);
     window.addEventListener("scroll", handleViewportChange, true);
 
@@ -124,18 +137,24 @@ export function AnchoredPopover({
       window.removeEventListener("resize", handleViewportChange);
       window.removeEventListener("scroll", handleViewportChange, true);
       observer?.disconnect();
+      if (animationFrameRef.current != null) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
     };
-  }, [anchorRef, open, updatePosition]);
+  }, [anchorRef, open, schedulePositionUpdate]);
 
   useEffect(() => {
-    if (!open || !onDismiss) return;
+    if (!open) return;
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Node | null;
-      if (target && !anchorRef.current?.contains(target) && !popoverRef.current?.contains(target)) onDismiss();
+      if (target && !anchorRef.current?.contains(target) && !popoverRef.current?.contains(target)) {
+        onDismissRef.current?.("outside-pointer");
+      }
     };
     document.addEventListener("pointerdown", handlePointerDown);
     return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [anchorRef, onDismiss, open]);
+  }, [anchorRef, open]);
 
   if (!open || typeof document === "undefined") return null;
 

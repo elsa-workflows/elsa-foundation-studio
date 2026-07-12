@@ -7,6 +7,9 @@ import "../../src/Elsa.Studio.Web/Client/src/app/ui/tokens.css";
 import "../../src/Elsa.Studio.Workflows/Client/src/styles.css";
 import "./fixture.css";
 
+const searchParams = new URLSearchParams(window.location.search);
+const scrollingFixture = searchParams.get("mode") === "scroll";
+
 const expressionDescriptors: StudioExpressionDescriptor[] = [
   { type: "Input", displayName: "Input" },
   { type: "JavaScript", displayName: "JavaScript" },
@@ -51,7 +54,7 @@ function Fixture() {
         <h1>Workflow designer</h1>
         <p>The inspector intentionally clips its own content to reproduce the original stacking defect.</p>
       </div>
-      <aside className="wf-inspector browser-inspector" aria-label="Activity inspector">
+      <aside className={`wf-inspector browser-inspector${scrollingFixture ? " browser-inspector--scroll" : ""}`} aria-label="Activity inspector">
         <h2>HTTP Endpoint</h2>
         <div className="browser-inspector-spacer" aria-hidden="true" />
         <ActivityPropertiesPanel
@@ -65,12 +68,13 @@ function Fixture() {
           scopeStatus="ready"
           onChange={setActivity}
         />
+        {scrollingFixture ? <div className="browser-inspector-tail" aria-hidden="true" /> : null}
       </aside>
     </main>
   );
 }
 
-const theme = new URLSearchParams(window.location.search).get("theme");
+const theme = searchParams.get("theme");
 document.documentElement.dataset.theme = theme === "black-glass" ? "black-glass" : "harbor";
 document.documentElement.dataset.themeMode = theme === "black-glass" ? "dark" : "light";
 createRoot(document.getElementById("root")!).render(<Fixture />);

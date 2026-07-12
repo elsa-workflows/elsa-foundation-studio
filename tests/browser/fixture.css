@@ -67,3 +67,12 @@ body {
 .browser-inspector-spacer {
   height: 92px;
 }
+
+.browser-inspector--scroll {
+  overflow-y: auto;
+}
+
+.browser-inspector-tail {
+  height: 800px;
+  flex: 0 0 800px;
+}

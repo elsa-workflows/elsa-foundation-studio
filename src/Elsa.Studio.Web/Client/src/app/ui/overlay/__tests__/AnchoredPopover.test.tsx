@@ -48,22 +48,29 @@ describe("calculateAnchoredPopoverPosition", () => {
 });
 
 describe("AnchoredPopover", () => {
-  it("renders through a body portal, repositions on scroll, and dismisses when its anchor leaves the viewport", () => {
+  it("portals, coalesces viewport events, and reports anchor-hidden dismissal", () => {
     vi.stubGlobal("ResizeObserver", class {
       observe() {}
       disconnect() {}
     });
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", vi.fn(callback => {
+      frames.push(callback);
+      return frames.length;
+    }));
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
     const anchorRef = createRef<HTMLButtonElement>();
     const host = document.createElement("div");
     document.body.appendChild(host);
     const root = createRoot(host);
     let anchorTop = 40;
-    let dismissals = 0;
+    let rectReads = 0;
+    const dismissals: string[] = [];
 
     flushSync(() => root.render(
       <>
         <button ref={anchorRef}>Anchor</button>
-        <AnchoredPopover anchorRef={anchorRef} open onDismiss={() => dismissals++}>
+        <AnchoredPopover anchorRef={anchorRef} open onDismiss={reason => dismissals.push(reason)}>
           <div>Portal content</div>
         </AnchoredPopover>
       </>
@@ -71,16 +78,27 @@ describe("AnchoredPopover", () => {
 
     Object.defineProperty(anchorRef.current!, "getBoundingClientRect", {
       configurable: true,
-      value: () => rect({
-        top: anchorTop,
-        right: 140,
-        bottom: anchorTop + 32,
-        left: 40,
-        width: 100,
-        height: 32
-      })
+      value: () => {
+        rectReads++;
+        return rect({
+          top: anchorTop,
+          right: 140,
+          bottom: anchorTop + 32,
+          left: 40,
+          width: 100,
+          height: 32
+        });
+      }
     });
-    flushSync(() => window.dispatchEvent(new Event("resize")));
+    flushSync(() => {
+      window.dispatchEvent(new Event("resize"));
+      window.dispatchEvent(new Event("resize"));
+      window.dispatchEvent(new Event("scroll"));
+    });
+    expect(rectReads).toBe(0);
+    expect(frames).toHaveLength(1);
+    flushSync(() => frames.shift()?.(0));
+    expect(rectReads).toBe(1);
 
     const popover = document.body.querySelector<HTMLElement>(".studio-anchored-popover");
     expect(popover).not.toBeNull();
@@ -88,12 +106,19 @@ describe("AnchoredPopover", () => {
     expect(popover?.style.top).toBe("78px");
 
     anchorTop = 80;
-    flushSync(() => window.dispatchEvent(new Event("scroll")));
+    flushSync(() => {
+      window.dispatchEvent(new Event("scroll"));
+      window.dispatchEvent(new Event("scroll"));
+    });
+    expect(frames).toHaveLength(1);
+    flushSync(() => frames.shift()?.(1));
+    expect(rectReads).toBe(2);
     expect(popover?.style.top).toBe("118px");
 
     anchorTop = -100;
     flushSync(() => window.dispatchEvent(new Event("scroll")));
-    expect(dismissals).toBe(1);
+    flushSync(() => frames.shift()?.(2));
+    expect(dismissals).toEqual(["anchor-hidden"]);
 
     cleanup = () => {
       flushSync(() => root.unmount());

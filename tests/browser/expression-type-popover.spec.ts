@@ -25,11 +25,17 @@ for (const theme of ["light", "black-glass"] as const) {
     expect(box!.y + box!.height).toBeLessThanOrEqual(600);
     expect(await popover.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
 
-    await page.getByRole("option", { name: "Variable" }).click();
+    await popover.evaluate(element => { element.scrollTop = element.scrollHeight; });
+    expect(await popover.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+    await listbox.getByRole("option", { name: "Variable", exact: true }).click();
     await expect(trigger).toHaveText("Variable");
 
+    await trigger.click();
+    await listbox.getByRole("option", { name: "Input", exact: true }).click();
+    await expect(trigger).toHaveText("Input");
+
     await trigger.press("ArrowDown");
-    await expect(listbox.getByRole("option", { name: "Variable", exact: true })).toBeFocused();
+    await expect(listbox.getByRole("option", { name: "Input", exact: true })).toBeFocused();
     await page.keyboard.press("Home");
     await expect(listbox.getByRole("option", { name: "Input", exact: true })).toBeFocused();
     await page.keyboard.press("Escape");
@@ -37,3 +43,23 @@ for (const theme of ["light", "black-glass"] as const) {
     await expect(trigger).toBeFocused();
   });
 }
+
+test("scrolling the anchor out of view closes without fighting inspector scroll or focus", async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 600 });
+  await page.goto("/?theme=light&mode=scroll");
+
+  const inspector = page.getByRole("complementary", { name: "Activity inspector" });
+  const trigger = page.getByRole("button", { name: "Path expression syntax" });
+  const listbox = page.getByRole("listbox", { name: "Path expression syntax" });
+  await trigger.click();
+  await expect(listbox.getByRole("option", { name: "Literal", exact: true })).toBeFocused();
+
+  const maximumScroll = await inspector.evaluate(element => element.scrollHeight - element.clientHeight);
+  expect(maximumScroll).toBeGreaterThan(0);
+  await inspector.evaluate(element => element.scrollTo({ top: element.scrollHeight }));
+
+  await expect(listbox).toBeHidden();
+  await page.waitForTimeout(100);
+  expect(await inspector.evaluate(element => element.scrollTop)).toBeGreaterThanOrEqual(maximumScroll - 1);
+  await expect(trigger).not.toBeFocused();
+});

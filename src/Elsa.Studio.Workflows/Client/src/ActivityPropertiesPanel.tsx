@@ -699,7 +699,7 @@ export function SyntaxPicker({
         className="wf-syntax-picker-menu"
         minWidth={variant === "inline" ? 176 : 0}
         maxHeight={210}
-        onDismiss={() => closePicker(true)}
+        onDismiss={reason => closePicker(reason !== "anchor-hidden")}
       >
         <div id={listboxId} role="listbox" aria-label={label} onKeyDown={handleListboxKeyDown}>
           {descriptors.map((descriptor, index) => {
