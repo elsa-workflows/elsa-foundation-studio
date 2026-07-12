@@ -158,12 +158,12 @@ function mapBackendManagementStatus(status: StudioBackendManagementStatus): Host
 
 function defaultBackendDetail(kind: StudioBackendManagementStatusKind): string {
   switch (kind) {
-    case "available": return "Backend management is reachable.";
-    case "unconfigured": return "Backend management is not configured.";
-    case "unauthorized": return "Backend rejected the Studio management credential.";
-    case "unreachable": return "Backend management could not be reached.";
-    case "degraded": return "Backend management is degraded.";
-    default: return "Backend management status is unknown.";
+    case "available": return "Privileged host management is reachable.";
+    case "unconfigured": return "Privileged host management is not configured.";
+    case "unauthorized": return "The backend rejected the Studio privileged host-management credential.";
+    case "unreachable": return "Privileged host management could not be reached.";
+    case "degraded": return "Privileged host management is degraded.";
+    default: return "Privileged host-management status is unknown.";
   }
 }
 

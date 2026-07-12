@@ -114,6 +114,17 @@ describe("dashboard", () => {
     await unmount();
   });
 
+  it("uses privileged host-management terminology when a configured failure has no detail", async () => {
+    const { container, unmount } = await renderDashboard(stubApi({ backendStatus: bridgeStatus("degraded") }));
+
+    await flushPromises();
+
+    expect(container.textContent).toContain("Privileged host management is degraded.");
+    expect(container.textContent).not.toContain("Backend management is degraded.");
+
+    await unmount();
+  });
+
   it("hides an unknown bridge state because it does not prove the optional integration is configured", async () => {
     const bridgeGetJson = vi.fn(async () => { throw new Error("bridge offline"); });
     const { container, unmount } = await renderDashboard(stubApi({ bridgeGetJson }));
