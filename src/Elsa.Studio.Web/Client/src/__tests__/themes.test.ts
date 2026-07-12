@@ -72,6 +72,7 @@ describe("theme presets", () => {
     expect(walnut).toBeDefined();
     expect(getSupportedThemeModes(walnut!)).toEqual(["light"]);
     expect(walnut?.modes.light.material?.textureAssets?.surface).toBe("/studio/assets/walnut-workshop-tile.png");
+    expect(walnut?.modes.dark.background).not.toBe(walnut?.modes.light.background);
     expect(resolveThemeMode(walnut!, "dark")).toBe("light");
   });
 
