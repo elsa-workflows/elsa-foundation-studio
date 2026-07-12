@@ -206,22 +206,24 @@ describe("activity property organization", () => {
     expect(fields[1]?.querySelector(".wf-variable-picker")).not.toBeNull();
   });
 
-  it("uses a focused generic inline textbox and expansion for text mode regardless of property type", () => {
+  it("does not steal focus for pre-existing text expressions and still expands regardless of property type", () => {
     const container = renderPanel([
-      input("Condition", { typeName: "System.Boolean", isWrapped: true })
+      input("Condition", { typeName: "System.Boolean", isWrapped: true }),
+      input("Template", { isWrapped: true })
     ], {
       expressionDescriptors: [
         { type: "Literal", displayName: "Literal", editingMode: "literal" },
         { type: "Python", displayName: "Python", editingMode: "text" }
       ],
       activity: activity({
-        condition: { typeName: "System.Boolean", expression: { type: "Python", value: "value and" } }
+        condition: { typeName: "System.Boolean", expression: { type: "Python", value: "value and" } },
+        template: { typeName: "System.String", expression: { type: "Python", value: "message" } }
       })
     });
 
-    const inline = container.querySelector<HTMLInputElement>("input[aria-label='Condition expression']");
-    expect(inline?.value).toBe("value and");
-    expect(document.activeElement).toBe(inline);
+    const inlineEditors = [...container.querySelectorAll<HTMLInputElement>("input[aria-label$=' expression']")];
+    expect(inlineEditors.map(editor => editor.value)).toEqual(["value and", "message"]);
+    expect(inlineEditors).not.toContain(document.activeElement);
     expect(container.querySelector("input[type='checkbox']")).toBeNull();
 
     flushSync(() => container.querySelector<HTMLButtonElement>("button[aria-label='Open expanded Condition editor']")?.click());
@@ -284,5 +286,27 @@ describe("activity property organization", () => {
     expect(container.querySelector<HTMLInputElement>("input[aria-label='Items expression']")?.value).toBe("input.items");
     expect(container.querySelector(".wf-collection-editor")).toBeNull();
     expect(container.querySelector("button[aria-label='Open expanded Items editor']")).not.toBeNull();
+  });
+
+  it("requires an owning contribution for arbitrary structured syntaxes while retaining the Object collection bridge", () => {
+    const collectionType = "System.Collections.Generic.ICollection`1[System.String]";
+    const container = renderPanel([
+      input("RecordItems", { typeName: collectionType, isWrapped: true }),
+      input("ObjectItems", { typeName: collectionType, isWrapped: true })
+    ], {
+      expressionDescriptors: [
+        { type: "Literal", displayName: "Literal", editingMode: "literal" },
+        { type: "Object", displayName: "Object", editingMode: "structured" },
+        { type: "Record", displayName: "Record", editingMode: "structured" }
+      ],
+      activity: activity({
+        recordItems: { typeName: collectionType, expression: { type: "Record", value: ["one"] } },
+        objectItems: { typeName: collectionType, expression: { type: "Object", value: ["one"] } }
+      })
+    });
+
+    expect(container.querySelectorAll(".wf-collection-editor")).toHaveLength(1);
+    expect(container.textContent).toContain("No editor is available for Record.");
+    expect(container.textContent).not.toContain("No editor is available for Object.");
   });
 });

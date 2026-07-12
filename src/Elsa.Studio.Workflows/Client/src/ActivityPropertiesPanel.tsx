@@ -163,7 +163,9 @@ function PropertyRow({
   // The repeater authors collection literals under both the "Literal" syntax (freshly added inputs) and
   // the "Object" syntax — how they come back from the backend, which needs Object to JSON-deserialize the
   // list into ICollection<T> (see toWireArgument in activityInputWire).
-  const usesStructuredPropertyEditor = editingMode === "literal" || editingMode === "structured";
+  // Object is the one pre-contribution structured bridge retained for collection values. Other
+  // structured syntaxes remain owned by their expression module and require an inline contribution.
+  const usesStructuredPropertyEditor = editingMode === "literal" || (editingMode === "structured" && syntax === "Object");
   const collectionType = wrapped && usesStructuredPropertyEditor && !isRepeaterOptOut(input)
     ? describeCollectionType(input.typeName)
     : null;
@@ -200,6 +202,11 @@ function PropertyRow({
     editingMode === "text" || (!isCollectionEditor && editingMode === "literal" && isExpandableTextInput(input, editor?.id))
   ));
   const [expanded, setExpanded] = useState(false);
+  const [focusRequested, setFocusRequested] = useState(false);
+
+  useEffect(() => {
+    if (focusRequested) setFocusRequested(false);
+  }, [focusRequested]);
 
   const setRaw = (nextValue: unknown) => {
     const next = wrapped ? withLiteralValue(wrapped, nextValue) : nextValue;
@@ -208,6 +215,8 @@ function PropertyRow({
 
   const setSyntax = (nextSyntax: string) => {
     if (!wrapped) return;
+    const nextMode = expressionDescriptors.find(descriptor => descriptor.type === nextSyntax)?.editingMode;
+    setFocusRequested(nextMode === "text");
     onChange(writeInputValue(activity, input, withSyntax(wrapped, nextSyntax)));
   };
   // The whole collection concept resolves to a single node: a collection-scoped editor when one claims
@@ -233,7 +242,7 @@ function PropertyRow({
       syntax={syntax}
       value={value}
       disabled={readOnly}
-      initialFocus={editingMode === "text"}
+      initialFocus={focusRequested && editingMode === "text" && !expanded}
       context={inlineExpressionContext}
       onChange={setRaw}
     />
@@ -245,7 +254,7 @@ function PropertyRow({
         syntax={syntax}
         value={value}
         disabled={readOnly}
-        initialFocus
+        initialFocus={focusRequested && !expanded}
         context={inlineExpressionContext}
         onChange={setRaw}
       />
