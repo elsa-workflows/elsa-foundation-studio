@@ -89,6 +89,8 @@ public sealed class StudioExtensionBuilderBridgeTests : IAsyncDisposable
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal(StudioBackendManagementStatus.Unconfigured, error.Management?.Status);
+        Assert.Contains(StudioBackendManagementOptions.BackendBaseUrlConfigurationKey, error.Management?.Detail);
+        Assert.Contains(StudioBackendManagementOptions.ManagementApiKeyConfigurationKey, error.Management?.Detail);
         // Fail closed: no outbound backend request may be issued, and the (absent) key never appears in the body.
         Assert.Empty(backend.Requests);
         Assert.DoesNotContain(ManagementKey, body);
