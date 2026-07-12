@@ -145,8 +145,8 @@ function mapBackendManagementStatus(status: StudioBackendManagementStatus): Host
     case "available":
       return { kind: status.status, status: "ok", attention: 0, detail };
     case "unconfigured":
-      // Fail-closed-by-design, not an outage: no attention weight and no backoff.
-      return { kind: status.status, status: "attention", attention: 0, detail };
+      // Fail-closed-by-design and optional: no warning state, attention weight, or backoff.
+      return { kind: status.status, status: "ok", attention: 0, detail };
     case "degraded":
       return { kind: status.status, status: "attention", attention: 1, detail };
     case "unauthorized":
