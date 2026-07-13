@@ -473,6 +473,10 @@ export type WorkflowExecutableListScope = "published" | "test-runs" | "all";
 export interface WorkflowExecutableReference {
   sourceReferenceId: string;
   artifactId: string;
+  /**
+   * Canonical executable-source discriminator. Runtime API v1 may also emit the deprecated `sourceType`
+   * compatibility alias, but Studio deliberately does not model or consume it; the alias is removed in v2.
+   */
   sourceKind?: string | null;
   sourceId?: string | null;
   sourceVersion?: string | null;
