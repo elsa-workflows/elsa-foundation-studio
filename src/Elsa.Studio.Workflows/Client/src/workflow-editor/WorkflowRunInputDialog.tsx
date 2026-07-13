@@ -31,7 +31,7 @@ export function WorkflowRunInputDialog({ inputs, editors = [], busy = false, onS
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    const parsed = parseWorkflowRunInputs(inputs, drafts, editors);
+    const parsed = parseWorkflowRunInputs(inputs, drafts, editors, failedEditorKeys);
     setErrors(parsed.errors);
     if (Object.keys(parsed.errors).length === 0) onSubmit(parsed.values);
   };

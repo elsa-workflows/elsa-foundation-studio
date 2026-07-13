@@ -1130,7 +1130,8 @@ export interface ElsaStudioModuleApi {
   readonly activityEditors: StudioContributionRegistry<unknown>;
   readonly propertyEditors: StudioContributionRegistry<StudioActivityPropertyEditorContribution>;
   readonly expressionEditors: StudioContributionRegistry<StudioExpressionEditorContribution>;
-  readonly workflowRunInputEditors: StudioContributionRegistry<StudioWorkflowRunInputEditorContribution>;
+  /** Available on hosts that support the workflow run-input editor Slot. */
+  readonly workflowRunInputEditors?: StudioContributionRegistry<StudioWorkflowRunInputEditorContribution>;
   readonly settingEditors: StudioContributionRegistry<StudioSettingEditorContribution>;
   readonly agent: StudioAgentRegistry;
   readonly workflowDesigner: {

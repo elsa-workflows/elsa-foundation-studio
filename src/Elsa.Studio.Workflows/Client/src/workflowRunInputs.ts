@@ -41,7 +41,8 @@ export function getWorkflowRunInputControlKind(input: WorkflowInput): WorkflowRu
 export function parseWorkflowRunInputs(
   inputs: WorkflowInput[],
   drafts: WorkflowRunInputDrafts,
-  editors: StudioWorkflowRunInputEditorContribution[] = []
+  editors: StudioWorkflowRunInputEditorContribution[] = [],
+  fallbackInputKeys: ReadonlySet<string> = new Set()
 ): WorkflowRunInputParseResult {
   const valueEntries: [string, unknown][] = [];
   const errorEntries: [string, string][] = [];
@@ -55,7 +56,7 @@ export function parseWorkflowRunInputs(
       continue;
     }
 
-    const editor = resolveWorkflowRunInputEditor(editors, input);
+    const editor = fallbackInputKeys.has(input.referenceKey) ? undefined : resolveWorkflowRunInputEditor(editors, input);
     const context = { input, draft };
     const parsed = editor
       ? parseContributionDraft(editor, context)

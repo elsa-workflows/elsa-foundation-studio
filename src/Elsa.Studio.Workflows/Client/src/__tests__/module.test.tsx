@@ -151,7 +151,7 @@ describe("workflows module", () => {
       supports: input => input.type.alias === "Contoso.OrderStatus",
       options: [{ value: "pending", label: "Pending" }]
     });
-    api.workflowRunInputEditors.add(editor);
+    api.workflowRunInputEditors!.add(editor);
 
     for (const routeId of ["workflows-definitions", "workflows-executables", "workflows-executable-inspector"]) {
       const route = api.routes.list().find(candidate => candidate.id === routeId);
@@ -163,8 +163,7 @@ describe("workflows module", () => {
   });
 
   it("keeps the JSON fallback when hosted by a pre-slot SDK registry", () => {
-    const api = testApi();
-    Reflect.deleteProperty(api, "workflowRunInputEditors");
+    const { workflowRunInputEditors: _unsupportedSlot, ...api } = testApi();
 
     expect(() => register(api)).not.toThrow();
     const route = api.routes.list().find(candidate => candidate.id === "workflows-definitions")!;

@@ -77,15 +77,20 @@ describe("workflow run inputs", () => {
     const input = workflowInput("payload", "Payload", "Contoso.Order", true);
     const editor = editorContribution("broken-component", 100, candidate => candidate.type.alias === "Contoso.Order");
     editor.component = () => { throw new Error("render failed"); };
+    const onSubmit = vi.fn();
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     try {
       const container = render(
-        <WorkflowRunInputDialog inputs={[input]} editors={[editor]} onSubmit={vi.fn()} onCancel={vi.fn()} />
+        <WorkflowRunInputDialog inputs={[input]} editors={[editor]} onSubmit={onSubmit} onCancel={vi.fn()} />
       );
 
-      expect(container.querySelector<HTMLTextAreaElement>("textarea[aria-label='Payload']")?.placeholder).toBe("Enter JSON");
+      const fallback = container.querySelector<HTMLTextAreaElement>("textarea[aria-label='Payload']")!;
+      expect(fallback.placeholder).toBe("Enter JSON");
       expect(container.textContent).toContain("The Payload editor failed. Enter a JSON value instead.");
+      fill(fallback, '{"id":42}');
+      submit(container);
+      expect(onSubmit).toHaveBeenCalledWith({ Payload: { id: 42 } });
     } finally {
       consoleError.mockRestore();
     }
