@@ -10,6 +10,14 @@ export const capabilityIds = {
 
 export type ApiCapabilityId = typeof capabilityIds[keyof typeof capabilityIds];
 
+const supportedContractVersions: Record<ApiCapabilityId, string> = {
+  [capabilityIds.workflowDesign]: "1",
+  [capabilityIds.activityDesign]: "1",
+  [capabilityIds.expressions]: "1",
+  [capabilityIds.publishing]: "1",
+  [capabilityIds.runtime]: "1"
+};
+
 export interface ApiCapabilityLink {
   rel: string;
   href: string;
@@ -35,6 +43,17 @@ export class ApiCapabilityUnavailableError extends Error {
       ? `API capability '${capabilityId}' does not advertise '${relation}'.`
       : `API capability '${capabilityId}' is not available.`);
     this.name = "ApiCapabilityUnavailableError";
+  }
+}
+
+export class ApiCapabilityVersionMismatchError extends Error {
+  constructor(
+    public readonly capabilityId: ApiCapabilityId,
+    public readonly expectedVersion: string,
+    public readonly actualVersion: string
+  ) {
+    super(`API capability '${capabilityId}' advertises contract major '${actualVersion}', but Studio supports '${expectedVersion}'.`);
+    this.name = "ApiCapabilityVersionMismatchError";
   }
 }
 
@@ -69,7 +88,8 @@ export async function getApiCapability(
 }
 
 export async function hasApiCapability(context: StudioEndpointContext, capabilityId: ApiCapabilityId) {
-  return (await getApiCapability(context, capabilityId)) !== null;
+  const capability = await getApiCapability(context, capabilityId);
+  return capability?.contractVersion === supportedContractVersions[capabilityId];
 }
 
 export async function resolveCapabilityLink(
@@ -80,6 +100,11 @@ export async function resolveCapabilityLink(
 ) {
   const capability = await getApiCapability(context, capabilityId);
   if (!capability) throw new ApiCapabilityUnavailableError(capabilityId);
+
+  const expectedVersion = supportedContractVersions[capabilityId];
+  if (capability.contractVersion !== expectedVersion) {
+    throw new ApiCapabilityVersionMismatchError(capabilityId, expectedVersion, capability.contractVersion);
+  }
 
   const link = capability.links.find(candidate => candidate.rel === relation);
   if (!link) throw new ApiCapabilityUnavailableError(capabilityId, relation);

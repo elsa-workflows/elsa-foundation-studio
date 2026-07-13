@@ -4,6 +4,7 @@ import {
   capabilityIds,
   clearApiCapabilityCache,
   getApiCapabilities,
+  hasApiCapability,
   resolveCapabilityLink
 } from "../api/capabilities";
 import { getActivityInputOptions } from "../api/workflowDesign";
@@ -54,6 +55,26 @@ describe("API capability bootstrap", () => {
     }));
 
     expect(postJson).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unsupported capability contract major instead of calling it blindly", async () => {
+    const value = context(vi.fn().mockResolvedValue({ capabilities: [{
+      id: capabilityIds.workflowDesign,
+      contractVersion: "2",
+      links: [{ rel: "workflow-definitions", href: "design/workflows/definitions" }]
+    }] }));
+
+    await expect(hasApiCapability(value, capabilityIds.workflowDesign)).resolves.toBe(false);
+    await expect(resolveCapabilityLink(
+      value,
+      capabilityIds.workflowDesign,
+      "workflow-definitions"
+    )).rejects.toMatchObject({
+      name: "ApiCapabilityVersionMismatchError",
+      capabilityId: capabilityIds.workflowDesign,
+      expectedVersion: "1",
+      actualVersion: "2"
+    });
   });
 
   it("fails explicitly and emits no domain request when an optional link is absent", async () => {
