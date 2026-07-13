@@ -7,6 +7,12 @@ export type WorkflowRunInputValues = WorkflowExecutionInputs;
 export interface WorkflowRunInputParseResult {
   values: WorkflowRunInputValues;
   errors: Record<string, string>;
+  contributionFailures?: Record<string, WorkflowRunInputContributionFailure>;
+}
+
+export interface WorkflowRunInputContributionFailure {
+  phase: "validate" | "serialize";
+  reason: "callback-error" | "invalid-wire-value";
 }
 
 export type WorkflowRunInputControlKind = "boolean" | "integer" | "number" | "datetime" | "text" | "json";
@@ -46,6 +52,7 @@ export function parseWorkflowRunInputs(
 ): WorkflowRunInputParseResult {
   const valueEntries: [string, unknown][] = [];
   const errorEntries: [string, string][] = [];
+  const contributionFailureEntries: [string, WorkflowRunInputContributionFailure][] = [];
 
   for (const input of inputs) {
     const draft = Object.prototype.hasOwnProperty.call(drafts, input.referenceKey)
@@ -58,13 +65,17 @@ export function parseWorkflowRunInputs(
 
     const editor = fallbackInputKeys.has(input.referenceKey) ? undefined : resolveWorkflowRunInputEditor(editors, input);
     const context = { input, draft };
-    const parsed = editor
+    const parsed: WorkflowRunInputDraftParseResult = editor
       ? parseContributionDraft(editor, context)
       : input.type.collectionKind === "Single"
         ? parseScalarDraft(draft, input.type.alias)
         : parseCollectionDraft(draft, input.type.alias);
-    if (parsed.error) errorEntries.push([input.referenceKey, parsed.error]);
-    else if (input.isRequired && parsed.value === null) {
+    if (parsed.error) {
+      errorEntries.push([input.referenceKey, parsed.error]);
+      if (parsed.contributionFailure) contributionFailureEntries.push([input.referenceKey, parsed.contributionFailure]);
+      continue;
+    }
+    if (input.isRequired && parsed.value === null) {
       errorEntries.push([input.referenceKey, `${input.displayName || input.name} is required.`]);
     }
     else valueEntries.push([input.name, parsed.value]);
@@ -72,28 +83,54 @@ export function parseWorkflowRunInputs(
 
   return {
     values: Object.fromEntries(valueEntries),
-    errors: Object.fromEntries(errorEntries)
+    errors: Object.fromEntries(errorEntries),
+    ...(contributionFailureEntries.length > 0
+      ? { contributionFailures: Object.fromEntries(contributionFailureEntries) }
+      : {})
   };
+}
+
+interface WorkflowRunInputDraftParseResult {
+  value?: unknown;
+  error?: string;
+  contributionFailure?: WorkflowRunInputContributionFailure;
 }
 
 function parseContributionDraft(
   editor: StudioWorkflowRunInputEditorContribution,
   context: { input: WorkflowInput; draft: string }
-): { value?: unknown; error?: string } {
+): WorkflowRunInputDraftParseResult {
   const label = context.input.displayName || context.input.name;
+  let validationError: string | undefined;
   try {
-    const error = editor.validate(context);
-    if (error) return { error };
-    const value = editor.serialize(context);
-    if (!isWireSerializable(value)) {
-      reportContributionFailure(editor, context.input, "serialize", new TypeError("The contribution returned a non-serializable value."));
-      return { error: `The ${label} editor returned a value that cannot be sent.` };
-    }
-    return { value };
+    validationError = editor.validate(context);
   } catch (error) {
-    reportContributionFailure(editor, context.input, "process", error);
-    return { error: `The ${label} editor could not process this value.` };
+    reportContributionFailure(editor, context.input, "validate", error);
+    return {
+      error: `The ${label} editor failed while validating.`,
+      contributionFailure: { phase: "validate", reason: "callback-error" }
+    };
   }
+  if (validationError) return { error: validationError };
+
+  let value: unknown;
+  try {
+    value = editor.serialize(context);
+  } catch (error) {
+    reportContributionFailure(editor, context.input, "serialize", error);
+    return {
+      error: `The ${label} editor failed while serializing.`,
+      contributionFailure: { phase: "serialize", reason: "callback-error" }
+    };
+  }
+  if (!isWireSerializable(value)) {
+    reportContributionFailure(editor, context.input, "serialize", new TypeError("The contribution returned a non-serializable value."));
+    return {
+      error: `The ${label} editor returned a value that cannot be sent.`,
+      contributionFailure: { phase: "serialize", reason: "invalid-wire-value" }
+    };
+  }
+  return { value };
 }
 
 function isWireSerializable(value: unknown): boolean {

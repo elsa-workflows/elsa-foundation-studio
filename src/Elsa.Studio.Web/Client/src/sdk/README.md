@@ -78,8 +78,10 @@ A Contribution owns its visible control, draft validation, and conversion to
 the JSON value sent on the execution wire. Lower `order` values win when more
 than one Contribution supports an input. Keep `supports`, `validate`, and
 `serialize` deterministic and free of side effects. Studio contains callback
-and render failures, reports a field error, and retains the built-in primitive
-or honest JSON fallback instead of taking down the run dialog.
+and render failures, reports an accessible field error, preserves the current
+draft, and switches that field to the built-in primitive or honest JSON
+fallback instead of taking down or permanently blocking the run dialog. After
+a callback failure, the user can review the fallback value and submit again.
 
 The Workflows module exports `createEnumWorkflowRunInputEditorContribution`
 for scalar enums. The registering module supplies the stable type match and

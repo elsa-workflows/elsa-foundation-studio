@@ -32,6 +32,15 @@ export function WorkflowRunInputDialog({ inputs, editors = [], busy = false, onS
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const parsed = parseWorkflowRunInputs(inputs, drafts, editors, failedEditorKeys);
+    const contributionFailureKeys = Object.keys(parsed.contributionFailures ?? {});
+    if (contributionFailureKeys.length > 0) {
+      setFailedEditorKeys(current => new Set([...current, ...contributionFailureKeys]));
+      setErrors({
+        ...parsed.errors,
+        ...Object.fromEntries(contributionFailureKeys.map(key => [key, describeEditorFallback(inputs, key, parsed.errors[key])]))
+      });
+      return;
+    }
     setErrors(parsed.errors);
     if (Object.keys(parsed.errors).length === 0) onSubmit(parsed.values);
   };
@@ -90,6 +99,14 @@ export function WorkflowRunInputDialog({ inputs, editors = [], busy = false, onS
       </section>
     </div>
   );
+}
+
+function describeEditorFallback(inputs: WorkflowInput[], inputKey: string, error: string) {
+  const input = inputs.find(candidate => candidate.referenceKey === inputKey);
+  const guidance = input && getWorkflowRunInputControlKind(input) === "json"
+    ? "Enter a JSON value instead."
+    : "Use the standard input instead.";
+  return `${error} ${guidance}`;
 }
 
 function WorkflowRunInputField({ input, editors, value, error, disabled, onEditorFailure, onChange }: {

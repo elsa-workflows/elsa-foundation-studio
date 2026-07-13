@@ -48,7 +48,7 @@ describe("workflow run inputs", () => {
     expect(serializeWorkflowExecutionPayload({ inputs: parsed.values })).toBe('{"inputs":{"__proto__":{"id":42}}}');
   });
 
-  it("contains failing contribution callbacks and rejects values that disappear from the wire payload", () => {
+  it("reports the failed contribution phase when callbacks fail or values disappear from the wire payload", () => {
     const input = workflowInput("order", "Order", "Contoso.OrderId", true);
     const throwingSupports = editorContribution("throwing-supports", 50, () => { throw new Error("supports failed"); });
     const throwingValidation = editorContribution("throwing-validation", 100, candidate => candidate.type.alias === "Contoso.OrderId");
@@ -61,13 +61,113 @@ describe("workflow run inputs", () => {
       expect(resolveWorkflowRunInputEditor([throwingSupports], input)).toBeUndefined();
       expect(parseWorkflowRunInputs([input], { order: "order-42" }, [throwingValidation])).toEqual({
         values: {},
-        errors: { order: "The Order editor could not process this value." }
+        errors: { order: "The Order editor failed while validating." },
+        contributionFailures: { order: { phase: "validate", reason: "callback-error" } }
       });
       expect(parseWorkflowRunInputs([input], { order: "order-42" }, [invalidSerialization])).toEqual({
         values: {},
-        errors: { order: "The Order editor returned a value that cannot be sent." }
+        errors: { order: "The Order editor returned a value that cannot be sent." },
+        contributionFailures: { order: { phase: "serialize", reason: "invalid-wire-value" } }
       });
       expect(consoleError).toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it.each([
+    {
+      failure: "validation callback exception",
+      configure: (editor: StudioWorkflowRunInputEditorContribution) => {
+        editor.validate = () => { throw new Error("validation failed"); };
+      },
+      message: "The Payload editor failed while validating. Enter a JSON value instead."
+    },
+    {
+      failure: "serialization callback exception",
+      configure: (editor: StudioWorkflowRunInputEditorContribution) => {
+        editor.serialize = () => { throw new Error("serialization failed"); };
+      },
+      message: "The Payload editor failed while serializing. Enter a JSON value instead."
+    },
+    {
+      failure: "invalid serialized value",
+      configure: (editor: StudioWorkflowRunInputEditorContribution) => {
+        editor.serialize = () => undefined;
+      },
+      message: "The Payload editor returned a value that cannot be sent. Enter a JSON value instead."
+    }
+  ])("switches to the accessible fallback after a $failure and lets the next submit succeed", ({ configure, message }) => {
+    const input = workflowInput("payload", "Payload", "Contoso.Order", true);
+    const editor = editorContribution("unreliable-editor", 100, candidate => candidate.type.alias === "Contoso.Order");
+    editor.component = ({ draft, disabled, controlProps, onChange }) => (
+      <textarea
+        {...controlProps}
+        disabled={disabled}
+        value={draft}
+        data-contributed-editor="true"
+        onChange={event => onChange(event.currentTarget.value)}
+      />
+    );
+    configure(editor);
+    const onSubmit = vi.fn();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    try {
+      const container = render(
+        <WorkflowRunInputDialog inputs={[input]} editors={[editor]} onSubmit={onSubmit} onCancel={vi.fn()} />
+      );
+      const contributedControl = container.querySelector<HTMLTextAreaElement>("[data-contributed-editor='true']")!;
+      fill(contributedControl, '{"id":42}');
+
+      submit(container);
+
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(container.querySelector("[data-contributed-editor='true']")).toBeNull();
+      const fallback = container.querySelector<HTMLTextAreaElement>("textarea[aria-label='Payload']")!;
+      expect(fallback.value).toBe('{"id":42}');
+      expect(fallback.placeholder).toBe("Enter JSON");
+      expect(container.querySelector("[role='alert']")?.textContent).toBe(message);
+
+      submit(container);
+      expect(onSubmit).toHaveBeenCalledWith({ Payload: { id: 42 } });
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("switches a failed primitive contribution to its standard typed input", () => {
+    const input = workflowInput("count", "Count", "Int32", true);
+    const editor = editorContribution("unreliable-counter", 100, candidate => candidate.type.alias === "Int32");
+    editor.component = ({ draft, disabled, controlProps, onChange }) => (
+      <input
+        {...controlProps}
+        disabled={disabled}
+        value={draft}
+        data-contributed-editor="true"
+        onChange={event => onChange(event.currentTarget.value)}
+      />
+    );
+    editor.validate = () => { throw new Error("validation failed"); };
+    const onSubmit = vi.fn();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    try {
+      const container = render(
+        <WorkflowRunInputDialog inputs={[input]} editors={[editor]} onSubmit={onSubmit} onCancel={vi.fn()} />
+      );
+      fill(container.querySelector<HTMLInputElement>("[data-contributed-editor='true']"), "42");
+
+      submit(container);
+
+      const fallback = container.querySelector<HTMLInputElement>("input[aria-label='Count']")!;
+      expect(fallback.type).toBe("number");
+      expect(fallback.value).toBe("42");
+      expect(container.querySelector("[role='alert']")?.textContent)
+        .toBe("The Count editor failed while validating. Use the standard input instead.");
+
+      submit(container);
+      expect(onSubmit).toHaveBeenCalledWith({ Count: 42 });
     } finally {
       consoleError.mockRestore();
     }
