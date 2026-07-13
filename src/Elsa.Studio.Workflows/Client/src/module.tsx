@@ -1,19 +1,20 @@
 import "@xyflow/react/dist/style.css";
+import { lazy } from "react";
 import type { ElsaStudioModuleApi } from "@elsa-workflows/studio-sdk";
 import { setDialogs } from "./workflow-editor/dialogs";
-import { ActivityAvailabilityPage } from "./ActivityAvailabilityPage";
-import { RuntimeDiagnosticsSettingsPage } from "./RuntimeDiagnosticsSettingsPage";
 import { createObjectExpressionEditorContribution } from "./objectExpressionEditor";
-import {
-  WorkflowExecutableInspectorPage,
-  WorkflowExecutablesPage,
-  WorkflowInstanceDetailsPage,
-  WorkflowInstancesPage,
-  WorkflowManagementPage
-} from "./workflow-editor/pages";
 import "./styles.css";
 import { registerVariableReferenceContribution } from "./variableReferenceContribution";
 import { registerInputReferenceContribution } from "./inputReferenceContribution";
+import { WorkflowLazyBoundary } from "./WorkflowLazyBoundary";
+
+const WorkflowManagementPage = lazy(() => import("./workflow-editor/pages").then(module => ({ default: module.WorkflowManagementPage })));
+const WorkflowExecutablesPage = lazy(() => import("./workflow-editor/pages").then(module => ({ default: module.WorkflowExecutablesPage })));
+const WorkflowExecutableInspectorPage = lazy(() => import("./workflow-editor/pages").then(module => ({ default: module.WorkflowExecutableInspectorPage })));
+const WorkflowInstancesPage = lazy(() => import("./workflow-editor/pages").then(module => ({ default: module.WorkflowInstancesPage })));
+const WorkflowInstanceDetailsPage = lazy(() => import("./workflow-editor/pages").then(module => ({ default: module.WorkflowInstanceDetailsPage })));
+const ActivityAvailabilityPage = lazy(() => import("./ActivityAvailabilityPage").then(module => ({ default: module.ActivityAvailabilityPage })));
+const RuntimeDiagnosticsSettingsPage = lazy(() => import("./RuntimeDiagnosticsSettingsPage").then(module => ({ default: module.RuntimeDiagnosticsSettingsPage })));
 
 // Re-exported for the test suite (src/__tests__/module.test.tsx), which imports these connect-end
 // helpers directly alongside register().
@@ -54,43 +55,47 @@ export function register(api: ElsaStudioModuleApi) {
         id: "workflows-definitions",
         path: "/workflows/definitions",
         label: "Workflow definitions",
-        component: () => <WorkflowManagementPage context={api.backend} ai={api.ai} propertyEditors={api.propertyEditors.list()} expressionEditors={api.expressionEditors?.list() ?? []} workflowDesignerPanels={api.workflowDesigner.panels.list()} autosaveEnabledByDefault={api.runtime.workflows?.autosaveEnabledByDefault ?? true} />
+        component: () => (
+          <WorkflowLazyBoundary label="workflow definitions">
+            <WorkflowManagementPage context={api.backend} ai={api.ai} propertyEditors={api.propertyEditors.list()} expressionEditors={api.expressionEditors?.list() ?? []} workflowDesignerPanels={api.workflowDesigner.panels.list()} autosaveEnabledByDefault={api.runtime.workflows?.autosaveEnabledByDefault ?? true} />
+          </WorkflowLazyBoundary>
+        )
       },
       {
         id: "workflows-executables",
         path: "/workflows/executables",
         label: "Workflow executables",
-        component: () => <WorkflowExecutablesPage context={api.backend} ai={api.ai} />
+        component: () => <WorkflowLazyBoundary label="workflow executables"><WorkflowExecutablesPage context={api.backend} ai={api.ai} /></WorkflowLazyBoundary>
       },
       {
         id: "workflows-executable-inspector",
         path: "/workflows/executables/:artifactId",
         label: "Executable Inspector",
-        component: () => <WorkflowExecutableInspectorPage context={api.backend} ai={api.ai} />
+        component: () => <WorkflowLazyBoundary label="executable inspector"><WorkflowExecutableInspectorPage context={api.backend} ai={api.ai} /></WorkflowLazyBoundary>
       },
       {
         id: "workflows-instances",
         path: "/workflows/instances",
         label: "Workflow runs",
-        component: ({ navigate }) => <WorkflowInstancesPage context={api.backend} navigate={navigate} />
+        component: ({ navigate }) => <WorkflowLazyBoundary label="workflow runs"><WorkflowInstancesPage context={api.backend} navigate={navigate} /></WorkflowLazyBoundary>
       },
       {
         id: "workflows-instance-detail",
         path: "/workflows/instances/:workflowExecutionId",
         label: "Workflow run",
-        component: ({ navigate }) => <WorkflowInstanceDetailsPage context={api.backend} ai={api.ai} navigate={navigate} />
+        component: ({ navigate }) => <WorkflowLazyBoundary label="workflow run"><WorkflowInstanceDetailsPage context={api.backend} ai={api.ai} navigate={navigate} /></WorkflowLazyBoundary>
       },
       {
         id: "workflows-activity-availability",
         path: "/workflows/activity-availability",
         label: "Activity availability",
-        component: () => <ActivityAvailabilityPage context={api.backend} />
+        component: () => <WorkflowLazyBoundary label="activity availability"><ActivityAvailabilityPage context={api.backend} /></WorkflowLazyBoundary>
       },
       {
         id: "workflows-runtime-diagnostics",
         path: "/workflows/runtime-diagnostics",
         label: "Runtime diagnostics",
-        component: () => <RuntimeDiagnosticsSettingsPage context={api.backend} />
+        component: () => <WorkflowLazyBoundary label="runtime diagnostics"><RuntimeDiagnosticsSettingsPage context={api.backend} /></WorkflowLazyBoundary>
       }
     ]
   });
