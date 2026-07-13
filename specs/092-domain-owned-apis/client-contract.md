@@ -28,4 +28,4 @@ provenance, dispatch, and workflow execution state. Definition creation sends ca
 `initialState` and optional layout, never a root-kind shortcut.
 
 The authoritative wire contract is the Foundation specification at
-`specs/091-domain-owned-apis/contracts/management-api.openapi.yaml` in `elsa-foundation`.
+`specs/092-domain-owned-apis/contracts/management-api.openapi.yaml` in `elsa-foundation`.
