@@ -1,3 +1,4 @@
+import type { StudioWorkflowRunInputEditorContribution } from "@elsa-workflows/studio-sdk";
 import type { WorkflowExecutionInputs, WorkflowInput } from "./workflowTypes";
 
 export type WorkflowRunInputDrafts = Record<string, string>;
@@ -12,6 +13,15 @@ export type WorkflowRunInputControlKind = "boolean" | "integer" | "number" | "da
 
 const exactJsonNumbers = new WeakMap<object, string>();
 
+export function resolveWorkflowRunInputEditor(
+  editors: StudioWorkflowRunInputEditorContribution[],
+  input: WorkflowInput
+) {
+  return [...editors]
+    .sort((left, right) => (left.order ?? 500) - (right.order ?? 500))
+    .find(editor => editor.supports(input));
+}
+
 export function getWorkflowRunInputControlKind(input: WorkflowInput): WorkflowRunInputControlKind {
   if (input.type.collectionKind !== "Single") return "json";
   const alias = canonicalAlias(input.type.alias);
@@ -25,7 +35,8 @@ export function getWorkflowRunInputControlKind(input: WorkflowInput): WorkflowRu
 
 export function parseWorkflowRunInputs(
   inputs: WorkflowInput[],
-  drafts: WorkflowRunInputDrafts
+  drafts: WorkflowRunInputDrafts,
+  editors: StudioWorkflowRunInputEditorContribution[] = []
 ): WorkflowRunInputParseResult {
   const valueEntries: [string, unknown][] = [];
   const errorEntries: [string, string][] = [];
@@ -39,9 +50,16 @@ export function parseWorkflowRunInputs(
       continue;
     }
 
-    const parsed = input.type.collectionKind === "Single"
-      ? parseScalarDraft(draft, input.type.alias)
-      : parseCollectionDraft(draft, input.type.alias);
+    const editor = resolveWorkflowRunInputEditor(editors, input);
+    const context = { input, draft };
+    const contributionError = editor?.validate(context);
+    const parsed = editor
+      ? contributionError
+        ? { error: contributionError }
+        : { value: editor.serialize(context) }
+      : input.type.collectionKind === "Single"
+        ? parseScalarDraft(draft, input.type.alias)
+        : parseCollectionDraft(draft, input.type.alias);
     if (parsed.error) errorEntries.push([input.referenceKey, parsed.error]);
     else if (input.isRequired && parsed.value === null) {
       errorEntries.push([input.referenceKey, `${input.displayName || input.name} is required.`]);

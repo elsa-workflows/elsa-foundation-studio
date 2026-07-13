@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ElsaStudioModuleApi, StudioContributionRegistry, StudioSlotDefinition } from "@elsa-workflows/studio-sdk";
-import { clearApiCapabilityCache, isConnectEndOverExistingWorkflowNode, register, resolveConnectEndSource, type WorkflowDesignerPanelContext } from "../module";
+import { clearApiCapabilityCache, createEnumWorkflowRunInputEditorContribution, isConnectEndOverExistingWorkflowNode, register, resolveConnectEndSource, type WorkflowDesignerPanelContext } from "../module";
 import { workflowInspectorCollapsedStorageKey, workflowInspectorWidthStorageKey, workflowSidePanelMaximizedStorageKey } from "../workflow-editor/constants";
 import { createDraftSnapshotId, insertSequenceNodeAfter } from "../workflow-editor/editorHelpers";
 import { ValidationPanel } from "../workflow-editor/editorPanels";
@@ -138,6 +138,25 @@ describe("workflows module", () => {
     } finally {
       flushSync(() => root.unmount());
       consoleError.mockRestore();
+    }
+  });
+
+  it("passes late module run-input contributions through every routed run surface", () => {
+    const api = testApi();
+    register(api);
+    const editor = createEnumWorkflowRunInputEditorContribution({
+      id: "contoso.order-status",
+      supports: input => input.type.alias === "Contoso.OrderStatus",
+      options: [{ value: "pending", label: "Pending" }]
+    });
+    api.workflowRunInputEditors.add(editor);
+
+    for (const routeId of ["workflows-definitions", "workflows-executables", "workflows-executable-inspector"]) {
+      const route = api.routes.list().find(candidate => candidate.id === routeId);
+      const renderRoute = route?.component as (props: { navigate(path: string): void }) => React.ReactElement<{ children: React.ReactNode }>;
+      const boundary = renderRoute({ navigate: vi.fn() });
+      const surface = React.Children.only(boundary.props.children) as React.ReactElement<{ runInputEditors: unknown[] }>;
+      expect(surface.props.runInputEditors).toEqual([editor]);
     }
   });
 
@@ -2691,6 +2710,7 @@ function testApi(): ElsaStudioModuleApi {
     routes,
     propertyEditors: registry(),
     expressionEditors: registry(),
+    workflowRunInputEditors: registry(),
     workflowDesigner: {
       panels: registry()
     },

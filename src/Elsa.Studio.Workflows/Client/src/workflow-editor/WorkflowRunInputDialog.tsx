@@ -1,15 +1,18 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import type { StudioWorkflowRunInputEditorContribution } from "@elsa-workflows/studio-sdk";
 import type { WorkflowInput } from "../workflowTypes";
 import { formatArgumentType } from "../workflowReferenceAuthoring";
 import {
   getWorkflowRunInputControlKind,
   parseWorkflowRunInputs,
+  resolveWorkflowRunInputEditor,
   type WorkflowRunInputDrafts,
   type WorkflowRunInputValues
 } from "../workflowRunInputs";
 
-export function WorkflowRunInputDialog({ inputs, busy = false, onSubmit, onCancel }: {
+export function WorkflowRunInputDialog({ inputs, editors = [], busy = false, onSubmit, onCancel }: {
   inputs: WorkflowInput[];
+  editors?: StudioWorkflowRunInputEditorContribution[];
   busy?: boolean;
   onSubmit(values: WorkflowRunInputValues): void;
   onCancel(): void;
@@ -27,7 +30,7 @@ export function WorkflowRunInputDialog({ inputs, busy = false, onSubmit, onCance
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    const parsed = parseWorkflowRunInputs(inputs, drafts);
+    const parsed = parseWorkflowRunInputs(inputs, drafts, editors);
     setErrors(parsed.errors);
     if (Object.keys(parsed.errors).length === 0) onSubmit(parsed.values);
   };
@@ -57,6 +60,7 @@ export function WorkflowRunInputDialog({ inputs, busy = false, onSubmit, onCance
               <WorkflowRunInputField
                 key={input.referenceKey}
                 input={input}
+                editors={editors}
                 value={ownValue(drafts, input.referenceKey) ?? ""}
                 error={ownValue(errors, input.referenceKey)}
                 disabled={busy}
@@ -82,8 +86,9 @@ export function WorkflowRunInputDialog({ inputs, busy = false, onSubmit, onCance
   );
 }
 
-function WorkflowRunInputField({ input, value, error, disabled, onChange }: {
+function WorkflowRunInputField({ input, editors, value, error, disabled, onChange }: {
   input: WorkflowInput;
+  editors: StudioWorkflowRunInputEditorContribution[];
   value: string;
   error?: string;
   disabled: boolean;
@@ -94,21 +99,34 @@ function WorkflowRunInputField({ input, value, error, disabled, onChange }: {
   const errorId = `${fieldId}-error`;
   const label = input.displayName || input.name;
   const describedBy = [input.description ? descriptionId : null, error ? errorId : null].filter(Boolean).join(" ") || undefined;
-  const common = {
+  const controlProps = {
     id: fieldId,
     "aria-label": label,
     "aria-describedby": describedBy,
     "aria-invalid": Boolean(error),
-    "aria-required": Boolean(input.isRequired),
+    "aria-required": Boolean(input.isRequired)
+  };
+  const common = {
+    ...controlProps,
     disabled,
     value
   };
+  const editor = resolveWorkflowRunInputEditor(editors, input);
+  const EditorComponent = editor?.component;
 
   return (
     <label className="wf-form-field" htmlFor={fieldId}>
       <span>{label}{input.isRequired ? " *" : ""}</span>
       <small className="wf-run-input-type">{formatArgumentType(input.type)}</small>
-      {renderInputControl(input, common, onChange)}
+      {EditorComponent ? (
+        <EditorComponent
+          input={input}
+          draft={value}
+          disabled={disabled}
+          controlProps={controlProps}
+          onChange={onChange}
+        />
+      ) : renderInputControl(input, common, onChange)}
       {input.description ? <small id={descriptionId}>{input.description}</small> : null}
       {error ? <small id={errorId} role="alert">{error}</small> : null}
     </label>

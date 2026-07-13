@@ -1,4 +1,10 @@
-import type { StudioActivityDescriptor, StudioActivityInputOption, StudioExpressionDescriptor } from "@elsa-workflows/studio-sdk";
+import type {
+  StudioActivityDescriptor,
+  StudioActivityInputOption,
+  StudioExpressionDescriptor,
+  StudioWorkflowRunInputDescriptor,
+  StudioWorkflowRunInputTypeMetadata
+} from "@elsa-workflows/studio-sdk";
 
 export interface WorkflowDefinitionsResponse {
   definitions: WorkflowDefinitionSummary[];
@@ -287,7 +293,7 @@ export const collectionKinds: CollectionKind[] = ["Single", "Array", "List", "Ha
 // The type of an authored Variable/Input/Output. `alias` is a stable element-type identifier
 // (bare for framework primitives like "String"/"Int32"; dotted for module types like
 // "Elsa.Http.HttpRequest") — never a namespace/assembly/version. Unknown aliases round-trip unchanged.
-export interface ArgumentType {
+export interface ArgumentType extends StudioWorkflowRunInputTypeMetadata {
   alias: string;
   collectionKind: CollectionKind;
 }
@@ -345,7 +351,7 @@ export interface WorkflowManagementCapabilities {
 // on `type.collectionKind` (the legacy `isArray` boolean is gone). `referenceKey` is the stable identity
 // (a required positional on the backend InputDefinition). The backend InputDefinition has no default
 // value member, so no `defaultValue`/`defaultSyntax` is carried; `isRequired` is a first-class flag.
-export interface WorkflowInput {
+export interface WorkflowInput extends StudioWorkflowRunInputDescriptor {
   referenceKey: string;
   name: string;
   type: ArgumentType;

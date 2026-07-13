@@ -1,5 +1,5 @@
 import React, { lazy, useCallback, useEffect, useState } from "react";
-import type { StudioActivityPropertyEditorContribution, StudioAiContributionApi, StudioEndpointContext, StudioExpressionEditorContribution, StudioWorkflowDesignerPanelContribution } from "@elsa-workflows/studio-sdk";
+import type { StudioActivityPropertyEditorContribution, StudioAiContributionApi, StudioEndpointContext, StudioExpressionEditorContribution, StudioWorkflowDesignerPanelContribution, StudioWorkflowRunInputEditorContribution } from "@elsa-workflows/studio-sdk";
 import { WorkflowLazyBoundary } from "../WorkflowLazyBoundary";
 
 const WorkflowEditor = lazy(() => import("./WorkflowEditor").then(module => ({ default: module.WorkflowEditor })));
@@ -14,6 +14,7 @@ export function WorkflowManagementPage({
   ai,
   propertyEditors,
   expressionEditors,
+  runInputEditors,
   workflowDesignerPanels,
   autosaveEnabledByDefault
 }: {
@@ -21,6 +22,7 @@ export function WorkflowManagementPage({
   ai: StudioAiContributionApi;
   propertyEditors: StudioActivityPropertyEditorContribution[];
   expressionEditors: StudioExpressionEditorContribution[];
+  runInputEditors: StudioWorkflowRunInputEditorContribution[];
   workflowDesignerPanels: StudioWorkflowDesignerPanelContribution[];
   autosaveEnabledByDefault?: boolean;
 }) {
@@ -41,7 +43,7 @@ export function WorkflowManagementPage({
   return definitionId
     ? (
       <WorkflowLazyBoundary label="workflow designer">
-        <WorkflowEditor context={context} definitionId={definitionId} ai={ai} propertyEditors={propertyEditors} expressionEditors={expressionEditors} workflowDesignerPanels={workflowDesignerPanels} autosaveEnabledByDefault={autosaveEnabledByDefault} onBack={() => openDefinition(null)} />
+        <WorkflowEditor context={context} definitionId={definitionId} ai={ai} propertyEditors={propertyEditors} expressionEditors={expressionEditors} runInputEditors={runInputEditors} workflowDesignerPanels={workflowDesignerPanels} autosaveEnabledByDefault={autosaveEnabledByDefault} onBack={() => openDefinition(null)} />
       </WorkflowLazyBoundary>
     )
     : (
@@ -53,7 +55,7 @@ export function WorkflowManagementPage({
     );
 }
 
-export function WorkflowExecutablesPage({ context, ai }: { context: StudioEndpointContext; ai: StudioAiContributionApi }) {
+export function WorkflowExecutablesPage({ context, ai, runInputEditors }: { context: StudioEndpointContext; ai: StudioAiContributionApi; runInputEditors: StudioWorkflowRunInputEditorContribution[] }) {
   const [definitionFilter, setDefinitionFilter] = useState(readExecutableDefinitionFilterFromUrl);
 
   useEffect(() => {
@@ -79,13 +81,13 @@ export function WorkflowExecutablesPage({ context, ai }: { context: StudioEndpoi
   return (
     <WorkflowsPageFrame title="Executables">
       <WorkflowLazyBoundary label="workflow executables">
-        <WorkflowExecutables context={context} ai={ai} definitionFilter={definitionFilter} onDefinitionFilterChange={updateDefinitionFilter} />
+        <WorkflowExecutables context={context} ai={ai} runInputEditors={runInputEditors} definitionFilter={definitionFilter} onDefinitionFilterChange={updateDefinitionFilter} />
       </WorkflowLazyBoundary>
     </WorkflowsPageFrame>
   );
 }
 
-export function WorkflowExecutableInspectorPage({ context, ai }: { context: StudioEndpointContext; ai: StudioAiContributionApi }) {
+export function WorkflowExecutableInspectorPage({ context, ai, runInputEditors }: { context: StudioEndpointContext; ai: StudioAiContributionApi; runInputEditors: StudioWorkflowRunInputEditorContribution[] }) {
   const [location, setLocation] = useState(readExecutableInspectorLocation);
 
   useEffect(() => {
@@ -115,6 +117,7 @@ export function WorkflowExecutableInspectorPage({ context, ai }: { context: Stud
         <WorkflowExecutableInspectorWorkbench
           context={context}
           ai={ai}
+          runInputEditors={runInputEditors}
           artifactId={location.artifactId}
           sourceReferenceId={location.sourceReferenceId}
           onSelectReference={selectReference}
