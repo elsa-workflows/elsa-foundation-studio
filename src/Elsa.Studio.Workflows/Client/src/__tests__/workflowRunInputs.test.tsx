@@ -2,9 +2,15 @@ import React from "react";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { StudioWorkflowRunInputEditorContribution } from "@elsa-workflows/studio-sdk";
 import type { WorkflowInput } from "../workflowTypes";
-import { parseWorkflowRunInputs, serializeWorkflowExecutionPayload } from "../workflowRunInputs";
+import {
+  parseWorkflowRunInputs,
+  resolveWorkflowRunInputEditor,
+  serializeWorkflowExecutionPayload
+} from "../workflowRunInputs";
 import { WorkflowRunInputDialog } from "../workflow-editor/WorkflowRunInputDialog";
+import { createEnumWorkflowRunInputEditorContribution } from "../workflowRunInputEditorContributions";
 
 let active: { root: Root; container: HTMLElement } | null = null;
 
@@ -16,6 +22,100 @@ afterEach(() => {
 });
 
 describe("workflow run inputs", () => {
+  it("resolves the highest-priority contribution supported by declared type metadata", () => {
+    const input = workflowInput("status", "Status", "Contoso.OrderStatus", true);
+    const fallback = editorContribution("fallback", 500, () => true);
+    const enumEditor = editorContribution("enum", 100, candidate => candidate.type.alias === "Contoso.OrderStatus");
+
+    expect(resolveWorkflowRunInputEditor([fallback, enumEditor], input)).toBe(enumEditor);
+    expect(resolveWorkflowRunInputEditor([enumEditor], workflowInput("name", "Name", "String", true))).toBeUndefined();
+  });
+
+  it("delegates custom validation and wire serialization to the resolved contribution", () => {
+    const input = workflowInput("order", "__proto__", "Contoso.OrderId", true);
+    const editor = editorContribution("order-id", 100, candidate => candidate.type.alias === "Contoso.OrderId");
+    editor.validate = ({ draft }) => /^order-\d+$/.test(draft) ? undefined : "Enter an order ID such as order-42.";
+    editor.serialize = ({ draft }) => ({ id: Number(draft.slice("order-".length)) });
+
+    expect(parseWorkflowRunInputs([input], { order: "wrong" }, [editor])).toEqual({
+      values: {},
+      errors: { order: "Enter an order ID such as order-42." }
+    });
+
+    const parsed = parseWorkflowRunInputs([input], { order: "order-42" }, [editor]);
+    expect(parsed.errors).toEqual({});
+    expect(Object.prototype.hasOwnProperty.call(parsed.values, "__proto__")).toBe(true);
+    expect(serializeWorkflowExecutionPayload({ inputs: parsed.values })).toBe('{"inputs":{"__proto__":{"id":42}}}');
+  });
+
+  it("renders declared enum values as a keyboard-focusable picker and serializes the selected wire value", () => {
+    const input = workflowInput("status", "Status", "Contoso.OrderStatus", true);
+    const enumEditor = createEnumWorkflowRunInputEditorContribution({
+      id: "contoso.order-status",
+      supports: candidate => candidate.type.alias === "Contoso.OrderStatus",
+      options: [
+        { value: "pending", label: "Pending", wireValue: 1 },
+        { value: "approved", label: "Approved", wireValue: 2 }
+      ]
+    });
+    const onSubmit = vi.fn();
+    const container = render(
+      <WorkflowRunInputDialog
+        inputs={[input]}
+        editors={[enumEditor]}
+        onSubmit={onSubmit}
+        onCancel={vi.fn()}
+      />
+    );
+
+    const picker = container.querySelector<HTMLSelectElement>("select[aria-label='Status']")!;
+    expect(picker).not.toBeNull();
+    expect([...picker.options].map(option => [option.value, option.textContent])).toEqual([
+      ["", "Not set"],
+      ["pending", "Pending"],
+      ["approved", "Approved"]
+    ]);
+    picker.focus();
+    expect(document.activeElement).toBe(picker);
+
+    fill(picker, "approved");
+    submit(container);
+    expect(onSubmit).toHaveBeenCalledWith({ Status: 2 });
+
+    expect(parseWorkflowRunInputs([input], { status: "retired" }, [enumEditor])).toEqual({
+      values: {},
+      errors: { status: "Choose an available Status value." }
+    });
+  });
+
+  it("keeps an honest JSON fallback when no contribution supports a custom declared type", () => {
+    const input = workflowInput("payload", "Payload", "Contoso.Order", true);
+    const enumEditor = createEnumWorkflowRunInputEditorContribution({
+      id: "contoso.order-status",
+      supports: candidate => candidate.type.alias === "Contoso.OrderStatus",
+      options: [{ value: "pending", label: "Pending" }]
+    });
+    const onSubmit = vi.fn();
+    const container = render(
+      <WorkflowRunInputDialog
+        inputs={[input]}
+        editors={[enumEditor]}
+        onSubmit={onSubmit}
+        onCancel={vi.fn()}
+      />
+    );
+
+    const fallback = container.querySelector<HTMLTextAreaElement>("textarea[aria-label='Payload']")!;
+    expect(fallback.placeholder).toBe("Enter JSON");
+    fill(fallback, "not-json");
+    submit(container);
+    expect(container.textContent).toContain("Enter valid JSON.");
+
+    fill(fallback, '{"id":42}');
+    submit(container);
+    expect(onSubmit).toHaveBeenCalledWith({ Payload: { id: 42 } });
+  });
+
   it("blocks a missing required value and serializes valid scalar values by input name", () => {
     const inputs = [
       workflowInput("greeting", "Greeting", "String", true),
@@ -425,5 +525,20 @@ function workflowInput(
     storageDriverType: null,
     type: { alias, collectionKind },
     isRequired
+  };
+}
+
+function editorContribution(
+  id: string,
+  order: number,
+  supports: StudioWorkflowRunInputEditorContribution["supports"]
+): StudioWorkflowRunInputEditorContribution {
+  return {
+    id,
+    order,
+    supports,
+    component: () => null,
+    validate: () => undefined,
+    serialize: ({ draft }) => draft
   };
 }

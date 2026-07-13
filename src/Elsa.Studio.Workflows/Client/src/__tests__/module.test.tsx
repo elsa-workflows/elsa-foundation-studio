@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ElsaStudioModuleApi, StudioContributionRegistry, StudioSlotDefinition } from "@elsa-workflows/studio-sdk";
-import { clearApiCapabilityCache, isConnectEndOverExistingWorkflowNode, register, resolveConnectEndSource, type WorkflowDesignerPanelContext } from "../module";
+import { clearApiCapabilityCache, createEnumWorkflowRunInputEditorContribution, isConnectEndOverExistingWorkflowNode, register, resolveConnectEndSource, type WorkflowDesignerPanelContext } from "../module";
 import { workflowInspectorCollapsedStorageKey, workflowInspectorWidthStorageKey, workflowSidePanelMaximizedStorageKey } from "../workflow-editor/constants";
 import { createDraftSnapshotId, insertSequenceNodeAfter } from "../workflow-editor/editorHelpers";
 import { ValidationPanel } from "../workflow-editor/editorPanels";
@@ -106,6 +106,24 @@ describe("workflows module", () => {
       expect.objectContaining({ id: "elsa.object-expression-editor", createDefaultValue: expect.any(Function) }),
       expect.objectContaining({ id: "studio.workflows.input-reference", createDefaultValue: expect.any(Function) })
     ]);
+  });
+
+  it("passes late module run-input contributions through every routed run surface", () => {
+    const api = testApi();
+    register(api);
+    const editor = createEnumWorkflowRunInputEditorContribution({
+      id: "contoso.order-status",
+      supports: input => input.type.alias === "Contoso.OrderStatus",
+      options: [{ value: "pending", label: "Pending" }]
+    });
+    api.workflowRunInputEditors.add(editor);
+
+    for (const routeId of ["workflows-definitions", "workflows-executables", "workflows-executable-inspector"]) {
+      const route = api.routes.list().find(candidate => candidate.id === routeId);
+      const renderRoute = route?.component as (props: { navigate(path: string): void }) => React.ReactElement<{ runInputEditors: unknown[] }>;
+      const element = renderRoute({ navigate: vi.fn() });
+      expect(element.props.runInputEditors).toEqual([editor]);
+    }
   });
 
   it("renders active definition actions and soft-deletes with confirmation", async () => {
@@ -2662,6 +2680,7 @@ function testApi(): ElsaStudioModuleApi {
     routes,
     propertyEditors: registry(),
     expressionEditors: registry(),
+    workflowRunInputEditors: registry(),
     workflowDesigner: {
       panels: registry()
     },

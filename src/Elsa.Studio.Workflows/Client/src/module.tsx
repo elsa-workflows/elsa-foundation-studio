@@ -22,6 +22,8 @@ export { capabilityIds, clearApiCapabilityCache, resolveCapabilityLink } from ".
 // WorkflowDesignerPanelContext is the TContext behind the workflow.designer.panels slot — exported so
 // contributed-panel authors can type their `context` prop instead of hand-copying the shape.
 export type { WorkflowConnectSource, WorkflowDesignerPanelContext } from "./workflow-editor/editorTypes";
+export { createEnumWorkflowRunInputEditorContribution } from "./workflowRunInputEditorContributions";
+export type { EnumWorkflowRunInputEditorOptions } from "./workflowRunInputEditorContributions";
 
 export function register(api: ElsaStudioModuleApi) {
   setDialogs(api.dialogs);
@@ -54,19 +56,19 @@ export function register(api: ElsaStudioModuleApi) {
         id: "workflows-definitions",
         path: "/workflows/definitions",
         label: "Workflow definitions",
-        component: () => <WorkflowManagementPage context={api.backend} ai={api.ai} propertyEditors={api.propertyEditors.list()} expressionEditors={api.expressionEditors?.list() ?? []} workflowDesignerPanels={api.workflowDesigner.panels.list()} autosaveEnabledByDefault={api.runtime.workflows?.autosaveEnabledByDefault ?? true} />
+        component: () => <WorkflowManagementPage context={api.backend} ai={api.ai} propertyEditors={api.propertyEditors.list()} expressionEditors={api.expressionEditors?.list() ?? []} runInputEditors={api.workflowRunInputEditors.list()} workflowDesignerPanels={api.workflowDesigner.panels.list()} autosaveEnabledByDefault={api.runtime.workflows?.autosaveEnabledByDefault ?? true} />
       },
       {
         id: "workflows-executables",
         path: "/workflows/executables",
         label: "Workflow executables",
-        component: () => <WorkflowExecutablesPage context={api.backend} ai={api.ai} />
+        component: () => <WorkflowExecutablesPage context={api.backend} ai={api.ai} runInputEditors={api.workflowRunInputEditors.list()} />
       },
       {
         id: "workflows-executable-inspector",
         path: "/workflows/executables/:artifactId",
         label: "Executable Inspector",
-        component: () => <WorkflowExecutableInspectorPage context={api.backend} ai={api.ai} />
+        component: () => <WorkflowExecutableInspectorPage context={api.backend} ai={api.ai} runInputEditors={api.workflowRunInputEditors.list()} />
       },
       {
         id: "workflows-instances",
