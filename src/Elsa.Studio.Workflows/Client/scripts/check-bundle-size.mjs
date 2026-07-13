@@ -7,13 +7,13 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const outputRoot = resolve(packageRoot, "../wwwroot/studio/modules/workflows");
 const manifest = JSON.parse(await readFile(resolve(outputRoot, ".vite/manifest.json"), "utf8"));
 
-// Budgets deliberately cover the files the browser must parse for the authenticated Definitions
-// landing path, not just whichever filename Rollup happens to call the entry chunk. The former
-// 677.67 kB monolith is the independent baseline. These limits retain roughly 25–30% headroom over
-// the first split build while staying well below Vite's 500 kB warning threshold.
+// Budgets cover every Workflows asset the browser loads for the authenticated Definitions landing
+// path. The former 677.67 kB JavaScript monolith is the independent split baseline; CSS is reported
+// and enforced separately because Vite emits the module stylesheet as its own manifest entry.
 const budgets = {
-  entry: 125_000,
-  definitionsLanding: 180_000,
+  entryJavaScript: 125_000,
+  stylesheet: 180_000,
+  definitionsLandingTotal: 350_000,
   individualChunk: 500_000
 };
 
@@ -73,6 +73,10 @@ const entryFiles = collectStaticFiles("src/module.tsx");
 const definitionsLandingFiles = new Set(entryFiles);
 collectStaticFiles("src/workflow-editor/pages.tsx", definitionsLandingFiles);
 collectStaticFiles("src/workflow-editor/WorkflowDefinitions.tsx", definitionsLandingFiles);
+const stylesheet = manifest["style.css"];
+if (!stylesheet?.file?.endsWith(".css")) throw new Error("Bundle manifest is missing the Workflows stylesheet entry.");
+const stylesheetFiles = new Set([stylesheet.file]);
+const definitionsLandingTotalFiles = new Set([...definitionsLandingFiles, ...stylesheetFiles]);
 
 for (const chunkName of excludedFromDefinitionsLanding) {
   const chunk = findChunk(chunkName);
@@ -81,21 +85,26 @@ for (const chunkName of excludedFromDefinitionsLanding) {
   }
 }
 
-const [entrySize, definitionsLandingSize] = await Promise.all([
+const [entrySize, stylesheetSize, definitionsLandingSize, definitionsLandingTotalSize] = await Promise.all([
   measure(entryFiles),
-  measure(definitionsLandingFiles)
+  measure(stylesheetFiles),
+  measure(definitionsLandingFiles),
+  measure(definitionsLandingTotalFiles)
 ]);
 
 const jsFiles = [...new Set(Object.values(manifest).map(entry => entry.file).filter(file => file.endsWith(".js")))];
 const jsSizes = await Promise.all(jsFiles.map(async file => ({ file, bytes: (await stat(resolve(outputRoot, file))).size })));
 const largestChunk = jsSizes.reduce((largest, candidate) => candidate.bytes > largest.bytes ? candidate : largest);
 
-assertBudget("Primary Workflows entry", entrySize.bytes, budgets.entry);
-assertBudget("Authenticated Definitions landing path", definitionsLandingSize.bytes, budgets.definitionsLanding);
+assertBudget("Primary Workflows JavaScript entry", entrySize.bytes, budgets.entryJavaScript);
+assertBudget("Workflows stylesheet", stylesheetSize.bytes, budgets.stylesheet);
+assertBudget("Authenticated Definitions landing path", definitionsLandingTotalSize.bytes, budgets.definitionsLandingTotal);
 assertBudget(`Largest JavaScript chunk (${largestChunk.file})`, largestChunk.bytes, budgets.individualChunk);
 
 console.log("Workflows bundle budget");
-console.log(`  Primary entry:                    ${formatBytes(entrySize.bytes)} raw / ${formatBytes(entrySize.gzipBytes)} gzip (budget ${formatBytes(budgets.entry)})`);
-console.log(`  Authenticated Definitions landing: ${formatBytes(definitionsLandingSize.bytes)} raw / ${formatBytes(definitionsLandingSize.gzipBytes)} gzip (budget ${formatBytes(budgets.definitionsLanding)})`);
+console.log(`  Primary JavaScript entry:          ${formatBytes(entrySize.bytes)} raw / ${formatBytes(entrySize.gzipBytes)} gzip (budget ${formatBytes(budgets.entryJavaScript)})`);
+console.log(`  Workflows stylesheet:              ${formatBytes(stylesheetSize.bytes)} raw / ${formatBytes(stylesheetSize.gzipBytes)} gzip (budget ${formatBytes(budgets.stylesheet)})`);
+console.log(`  Definitions JavaScript closure:    ${formatBytes(definitionsLandingSize.bytes)} raw / ${formatBytes(definitionsLandingSize.gzipBytes)} gzip`);
+console.log(`  Authenticated Definitions total:   ${formatBytes(definitionsLandingTotalSize.bytes)} raw / ${formatBytes(definitionsLandingTotalSize.gzipBytes)} gzip (budget ${formatBytes(budgets.definitionsLandingTotal)})`);
 console.log(`  Largest JavaScript chunk:          ${formatBytes(largestChunk.bytes)} (${largestChunk.file}; limit ${formatBytes(budgets.individualChunk)})`);
 console.log(`  Deferred heavy surfaces:           ${deferredHeavySurfaces.length}`);

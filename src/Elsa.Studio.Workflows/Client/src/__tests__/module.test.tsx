@@ -134,6 +134,8 @@ describe("workflows module", () => {
 
       const alert = container.querySelector("[role='alert']");
       expect(alert?.textContent).toContain("Unable to load workflow designer");
+      expect(alert?.textContent).toContain("unexpected error");
+      expect(alert?.textContent).not.toContain("updated while this page was open");
       expect(buttonByText(container, "Reload page")).toBeTruthy();
     } finally {
       flushSync(() => root.unmount());
@@ -158,6 +160,19 @@ describe("workflows module", () => {
       const surface = React.Children.only(boundary.props.children) as React.ReactElement<{ runInputEditors: unknown[] }>;
       expect(surface.props.runInputEditors).toEqual([editor]);
     }
+  });
+
+  it("keeps the JSON fallback when hosted by a pre-slot SDK registry", () => {
+    const api = testApi();
+    Reflect.deleteProperty(api, "workflowRunInputEditors");
+
+    expect(() => register(api)).not.toThrow();
+    const route = api.routes.list().find(candidate => candidate.id === "workflows-definitions")!;
+    const renderRoute = route.component as (props: { navigate(path: string): void }) => React.ReactElement<{ children: React.ReactNode }>;
+    const boundary = renderRoute({ navigate: vi.fn() });
+    const surface = React.Children.only(boundary.props.children) as React.ReactElement<{ runInputEditors: unknown[] }>;
+
+    expect(surface.props.runInputEditors).toEqual([]);
   });
 
   it("renders active definition actions and soft-deletes with confirmation", async () => {

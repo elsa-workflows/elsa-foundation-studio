@@ -48,6 +48,49 @@ describe("workflow run inputs", () => {
     expect(serializeWorkflowExecutionPayload({ inputs: parsed.values })).toBe('{"inputs":{"__proto__":{"id":42}}}');
   });
 
+  it("contains failing contribution callbacks and rejects values that disappear from the wire payload", () => {
+    const input = workflowInput("order", "Order", "Contoso.OrderId", true);
+    const throwingSupports = editorContribution("throwing-supports", 50, () => { throw new Error("supports failed"); });
+    const throwingValidation = editorContribution("throwing-validation", 100, candidate => candidate.type.alias === "Contoso.OrderId");
+    throwingValidation.validate = () => { throw new Error("validation failed"); };
+    const invalidSerialization = editorContribution("invalid-serialization", 100, candidate => candidate.type.alias === "Contoso.OrderId");
+    invalidSerialization.serialize = () => undefined;
+
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      expect(resolveWorkflowRunInputEditor([throwingSupports], input)).toBeUndefined();
+      expect(parseWorkflowRunInputs([input], { order: "order-42" }, [throwingValidation])).toEqual({
+        values: {},
+        errors: { order: "The Order editor could not process this value." }
+      });
+      expect(parseWorkflowRunInputs([input], { order: "order-42" }, [invalidSerialization])).toEqual({
+        values: {},
+        errors: { order: "The Order editor returned a value that cannot be sent." }
+      });
+      expect(consoleError).toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("falls back to honest JSON entry when a contributed editor component fails", () => {
+    const input = workflowInput("payload", "Payload", "Contoso.Order", true);
+    const editor = editorContribution("broken-component", 100, candidate => candidate.type.alias === "Contoso.Order");
+    editor.component = () => { throw new Error("render failed"); };
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    try {
+      const container = render(
+        <WorkflowRunInputDialog inputs={[input]} editors={[editor]} onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
+
+      expect(container.querySelector<HTMLTextAreaElement>("textarea[aria-label='Payload']")?.placeholder).toBe("Enter JSON");
+      expect(container.textContent).toContain("The Payload editor failed. Enter a JSON value instead.");
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it("renders declared enum values as a keyboard-focusable picker and serializes the selected wire value", () => {
     const input = workflowInput("status", "Status", "Contoso.OrderStatus", true);
     const enumEditor = createEnumWorkflowRunInputEditorContribution({

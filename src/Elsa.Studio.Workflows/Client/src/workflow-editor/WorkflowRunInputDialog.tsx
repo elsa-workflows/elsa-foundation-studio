@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { Component, useEffect, useId, useRef, useState, type ErrorInfo, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import type { StudioWorkflowRunInputEditorContribution } from "@elsa-workflows/studio-sdk";
 import type { WorkflowInput } from "../workflowTypes";
 import { formatArgumentType } from "../workflowReferenceAuthoring";
@@ -21,6 +21,7 @@ export function WorkflowRunInputDialog({ inputs, editors = [], busy = false, onS
   const dialogRef = useRef<HTMLElement>(null);
   const [drafts, setDrafts] = useState<WorkflowRunInputDrafts>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [failedEditorKeys, setFailedEditorKeys] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -60,10 +61,15 @@ export function WorkflowRunInputDialog({ inputs, editors = [], busy = false, onS
               <WorkflowRunInputField
                 key={input.referenceKey}
                 input={input}
-                editors={editors}
+                editors={failedEditorKeys.has(input.referenceKey) ? [] : editors}
                 value={ownValue(drafts, input.referenceKey) ?? ""}
                 error={ownValue(errors, input.referenceKey)}
                 disabled={busy}
+                onEditorFailure={() => {
+                  const label = input.displayName || input.name;
+                  setFailedEditorKeys(current => new Set(current).add(input.referenceKey));
+                  setErrors(current => ({ ...current, [input.referenceKey]: `The ${label} editor failed. Enter a JSON value instead.` }));
+                }}
                 onChange={value => {
                   setDrafts(current => ({ ...current, [input.referenceKey]: value }));
                   setErrors(current => {
@@ -86,12 +92,13 @@ export function WorkflowRunInputDialog({ inputs, editors = [], busy = false, onS
   );
 }
 
-function WorkflowRunInputField({ input, editors, value, error, disabled, onChange }: {
+function WorkflowRunInputField({ input, editors, value, error, disabled, onEditorFailure, onChange }: {
   input: WorkflowInput;
   editors: StudioWorkflowRunInputEditorContribution[];
   value: string;
   error?: string;
   disabled: boolean;
+  onEditorFailure(): void;
   onChange(value: string): void;
 }) {
   const fieldId = useId();
@@ -113,24 +120,55 @@ function WorkflowRunInputField({ input, editors, value, error, disabled, onChang
   };
   const editor = resolveWorkflowRunInputEditor(editors, input);
   const EditorComponent = editor?.component;
+  const fallback = renderInputControl(input, common, onChange);
 
   return (
     <label className="wf-form-field" htmlFor={fieldId}>
       <span>{label}{input.isRequired ? " *" : ""}</span>
       <small className="wf-run-input-type">{formatArgumentType(input.type)}</small>
       {EditorComponent ? (
-        <EditorComponent
-          input={input}
-          draft={value}
-          disabled={disabled}
-          controlProps={controlProps}
-          onChange={onChange}
-        />
-      ) : renderInputControl(input, common, onChange)}
+        <WorkflowRunInputEditorBoundary
+          editorId={editor.id}
+          inputKey={input.referenceKey}
+          fallback={fallback}
+          onError={onEditorFailure}
+        >
+          <EditorComponent
+            input={input}
+            draft={value}
+            disabled={disabled}
+            controlProps={controlProps}
+            onChange={onChange}
+          />
+        </WorkflowRunInputEditorBoundary>
+      ) : fallback}
       {input.description ? <small id={descriptionId}>{input.description}</small> : null}
       {error ? <small id={errorId} role="alert">{error}</small> : null}
     </label>
   );
+}
+
+class WorkflowRunInputEditorBoundary extends Component<{
+  editorId: string;
+  inputKey: string;
+  fallback: ReactNode;
+  onError(): void;
+  children: ReactNode;
+}, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error(`[workflow.run-input.editors] ${this.props.editorId} failed while rendering ${this.props.inputKey}.`, error, info);
+    this.props.onError();
+  }
+
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
 }
 
 function renderInputControl(

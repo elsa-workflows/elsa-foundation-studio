@@ -17,9 +17,14 @@ export function resolveWorkflowRunInputEditor(
   editors: StudioWorkflowRunInputEditorContribution[],
   input: WorkflowInput
 ) {
-  return [...editors]
-    .sort((left, right) => (left.order ?? 500) - (right.order ?? 500))
-    .find(editor => editor.supports(input));
+  for (const editor of [...editors].sort((left, right) => (left.order ?? 500) - (right.order ?? 500))) {
+    try {
+      if (editor.supports(input)) return editor;
+    } catch (error) {
+      reportContributionFailure(editor, input, "supports", error);
+    }
+  }
+  return undefined;
 }
 
 export function getWorkflowRunInputControlKind(input: WorkflowInput): WorkflowRunInputControlKind {
@@ -52,11 +57,8 @@ export function parseWorkflowRunInputs(
 
     const editor = resolveWorkflowRunInputEditor(editors, input);
     const context = { input, draft };
-    const contributionError = editor?.validate(context);
     const parsed = editor
-      ? contributionError
-        ? { error: contributionError }
-        : { value: editor.serialize(context) }
+      ? parseContributionDraft(editor, context)
       : input.type.collectionKind === "Single"
         ? parseScalarDraft(draft, input.type.alias)
         : parseCollectionDraft(draft, input.type.alias);
@@ -71,6 +73,47 @@ export function parseWorkflowRunInputs(
     values: Object.fromEntries(valueEntries),
     errors: Object.fromEntries(errorEntries)
   };
+}
+
+function parseContributionDraft(
+  editor: StudioWorkflowRunInputEditorContribution,
+  context: { input: WorkflowInput; draft: string }
+): { value?: unknown; error?: string } {
+  const label = context.input.displayName || context.input.name;
+  try {
+    const error = editor.validate(context);
+    if (error) return { error };
+    const value = editor.serialize(context);
+    if (!isWireSerializable(value)) {
+      reportContributionFailure(editor, context.input, "serialize", new TypeError("The contribution returned a non-serializable value."));
+      return { error: `The ${label} editor returned a value that cannot be sent.` };
+    }
+    return { value };
+  } catch (error) {
+    reportContributionFailure(editor, context.input, "process", error);
+    return { error: `The ${label} editor could not process this value.` };
+  }
+}
+
+function isWireSerializable(value: unknown): boolean {
+  if (value === undefined || typeof value === "bigint" || typeof value === "function" || typeof value === "symbol") return false;
+  if (typeof value === "number" && !Number.isFinite(value)) return false;
+  try {
+    const serialized = serializeWorkflowExecutionPayload({ value });
+    const roundTrip = JSON.parse(serialized) as Record<string, unknown>;
+    return Object.prototype.hasOwnProperty.call(roundTrip, "value");
+  } catch {
+    return false;
+  }
+}
+
+function reportContributionFailure(
+  editor: StudioWorkflowRunInputEditorContribution,
+  input: WorkflowInput,
+  phase: string,
+  error: unknown
+) {
+  console.error(`[workflow.run-input.editors] ${editor.id} failed during ${phase} for ${input.referenceKey}.`, error);
 }
 
 function parseScalarDraft(draft: string, alias: string): { value?: unknown; error?: string } {

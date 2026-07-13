@@ -6,7 +6,7 @@ type WorkflowLazyBoundaryProps = {
 };
 
 type WorkflowLazyBoundaryState = {
-  failed: boolean;
+  error: Error | null;
 };
 
 /**
@@ -14,18 +14,25 @@ type WorkflowLazyBoundaryState = {
  * and turns a failed chunk request into an actionable error instead of a blank route.
  */
 export class WorkflowLazyBoundary extends Component<WorkflowLazyBoundaryProps, WorkflowLazyBoundaryState> {
-  state: WorkflowLazyBoundaryState = { failed: false };
+  state: WorkflowLazyBoundaryState = { error: null };
 
-  static getDerivedStateFromError(): WorkflowLazyBoundaryState {
-    return { failed: true };
+  static getDerivedStateFromError(error: unknown): WorkflowLazyBoundaryState {
+    return { error: error instanceof Error ? error : new Error(String(error)) };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error(`[workflow.lazy-boundary] ${this.props.label} failed.`, error, info);
   }
 
   render() {
-    if (this.state.failed) {
+    if (this.state.error) {
+      const chunkFailure = isChunkLoadFailure(this.state.error);
       return (
         <div className="wf-lazy-state error" role="alert">
           <strong>Unable to load {this.props.label}</strong>
-          <span>The Studio module may have been updated while this page was open.</span>
+          <span>{chunkFailure
+            ? "The Studio module may have been updated while this page was open."
+            : "This workflow surface encountered an unexpected error."}</span>
           <button type="button" className="wf-lazy-reload" onClick={() => window.location.reload()}>
             Reload page
           </button>
@@ -43,4 +50,8 @@ export class WorkflowLazyBoundary extends Component<WorkflowLazyBoundaryProps, W
       </Suspense>
     );
   }
+}
+
+function isChunkLoadFailure(error: Error) {
+  return error.name === "ChunkLoadError" || /dynamically imported module|loading chunk|importing a module script/i.test(error.message);
 }

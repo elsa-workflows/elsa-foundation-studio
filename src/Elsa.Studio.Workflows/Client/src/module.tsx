@@ -31,6 +31,7 @@ export function register(api: ElsaStudioModuleApi) {
   registerVariableReferenceContribution(api.expressionEditors);
   api.expressionEditors.add(createObjectExpressionEditorContribution(() => api.propertyEditors.list()));
   registerInputReferenceContribution(api.expressionEditors);
+  const runInputEditors = () => api.workflowRunInputEditors?.list() ?? [];
   api.featureAreas.add({
     id: "workflows",
     title: "Workflows",
@@ -59,7 +60,7 @@ export function register(api: ElsaStudioModuleApi) {
         label: "Workflow definitions",
         component: () => (
           <WorkflowLazyBoundary label="workflow definitions">
-            <WorkflowManagementPage context={api.backend} ai={api.ai} propertyEditors={api.propertyEditors.list()} expressionEditors={api.expressionEditors?.list() ?? []} runInputEditors={api.workflowRunInputEditors.list()} workflowDesignerPanels={api.workflowDesigner.panels.list()} autosaveEnabledByDefault={api.runtime.workflows?.autosaveEnabledByDefault ?? true} />
+            <WorkflowManagementPage context={api.backend} ai={api.ai} propertyEditors={api.propertyEditors.list()} expressionEditors={api.expressionEditors?.list() ?? []} runInputEditors={runInputEditors()} workflowDesignerPanels={api.workflowDesigner.panels.list()} autosaveEnabledByDefault={api.runtime.workflows?.autosaveEnabledByDefault ?? true} />
           </WorkflowLazyBoundary>
         )
       },
@@ -67,13 +68,13 @@ export function register(api: ElsaStudioModuleApi) {
         id: "workflows-executables",
         path: "/workflows/executables",
         label: "Workflow executables",
-        component: () => <WorkflowLazyBoundary label="workflow executables"><WorkflowExecutablesPage context={api.backend} ai={api.ai} runInputEditors={api.workflowRunInputEditors.list()} /></WorkflowLazyBoundary>
+        component: () => <WorkflowLazyBoundary label="workflow executables"><WorkflowExecutablesPage context={api.backend} ai={api.ai} runInputEditors={runInputEditors()} /></WorkflowLazyBoundary>
       },
       {
         id: "workflows-executable-inspector",
         path: "/workflows/executables/:artifactId",
         label: "Executable Inspector",
-        component: () => <WorkflowLazyBoundary label="executable inspector"><WorkflowExecutableInspectorPage context={api.backend} ai={api.ai} runInputEditors={api.workflowRunInputEditors.list()} /></WorkflowLazyBoundary>
+        component: () => <WorkflowLazyBoundary label="executable inspector"><WorkflowExecutableInspectorPage context={api.backend} ai={api.ai} runInputEditors={runInputEditors()} /></WorkflowLazyBoundary>
       },
       {
         id: "workflows-instances",
