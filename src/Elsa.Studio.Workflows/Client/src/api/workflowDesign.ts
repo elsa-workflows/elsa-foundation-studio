@@ -8,6 +8,8 @@ import type {
   ActivityInputOptionsResponse,
   CreateDefinitionRequest,
   DefinitionListState,
+  DefinitionListSortBy,
+  DefinitionListSortDirection,
   PromoteDraftResponse,
   ScopedVariableAnalysisResponse,
   WorkflowDefinitionDetails,
@@ -24,10 +26,12 @@ import {
 } from "./capabilities";
 
 export interface DefinitionListRequest {
-  search: string;
+  searchTerm: string;
   state?: DefinitionListState;
   page: number;
   pageSize: number;
+  sortBy?: DefinitionListSortBy;
+  sortDirection?: DefinitionListSortDirection;
 }
 
 type WorkflowDraftResponse = Omit<WorkflowDraft, "validationErrors"> & {
@@ -86,16 +90,24 @@ export async function listDefinitions(context: StudioEndpointContext, request: D
   const parameters = new URLSearchParams({
     state: request.state ?? "active"
   });
-  const search = request.search.trim();
-  if (search) parameters.set("search", search);
-  const response = await context.http.getJson<{ items: WorkflowDefinitionsResponse["definitions"] }>(
+  const searchTerm = request.searchTerm.trim();
+  if (searchTerm) parameters.set("searchTerm", searchTerm);
+  parameters.set("page", String(request.page));
+  parameters.set("pageSize", String(request.pageSize));
+  parameters.set("sortBy", request.sortBy ?? "name");
+  parameters.set("sortDirection", request.sortDirection ?? "asc");
+  const response = await context.http.getJson<{
+    items: WorkflowDefinitionsResponse["definitions"];
+    page: number;
+    pageSize: number;
+    totalCount: number;
+  }>(
     `${await definitionsPath(context)}?${parameters.toString()}`);
-  const offset = Math.max(0, request.page - 1) * request.pageSize;
   return {
-    definitions: (response.items ?? []).slice(offset, offset + request.pageSize),
-    page: request.page,
-    pageSize: request.pageSize,
-    totalCount: response.items?.length ?? 0
+    definitions: response.items ?? [],
+    page: response.page,
+    pageSize: response.pageSize,
+    totalCount: response.totalCount
   } satisfies WorkflowDefinitionsResponse;
 }
 

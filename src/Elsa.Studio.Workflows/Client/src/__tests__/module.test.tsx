@@ -239,10 +239,14 @@ describe("workflows module", () => {
     await unmount();
   });
 
-  it("pages the canonical definition collection without extra requests", async () => {
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL) => response({
-      items: [definition(), ...Array.from({ length: 9 }, (_, index) => definition({ id: `definition-${index + 2}`, name: `Workflow ${index + 2}` })), definition({ id: "definition-11", name: "Second page" })]
-    }));
+  it("requests each workflow-definition page from the server", async () => {
+    const firstPage = [definition(), ...Array.from({ length: 9 }, (_, index) => definition({ id: `definition-${index + 2}`, name: `Workflow ${index + 2}` }))];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const page = String(input).includes("page=2")
+        ? { items: [definition({ id: "definition-11", name: "Second page" })], page: 2, pageSize: 10, totalCount: 11 }
+        : { items: firstPage, page: 1, pageSize: 10, totalCount: 11 };
+      return response(page);
+    });
     vi.stubGlobal("fetch", fetchMock);
     const { container, unmount } = await renderRegisteredRoute();
 
@@ -252,9 +256,47 @@ describe("workflows module", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
-      "https://server.example/design/workflows/definitions?state=active",
-      "https://server.example/design/workflows/definitions?state=active"
+      "https://server.example/design/workflows/definitions?state=active&page=1&pageSize=10&sortBy=name&sortDirection=asc",
+      "https://server.example/design/workflows/definitions?state=active&page=2&pageSize=10&sortBy=name&sortDirection=asc"
     ]);
+
+    await unmount();
+  });
+
+  it("keeps the newest workflow-definition query when an older response resolves last", async () => {
+    let resolveInitialRequest!: (value: Response) => void;
+    const initialRequest = new Promise<Response>(resolve => {
+      resolveInitialRequest = resolve;
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("searchTerm=Newest")) {
+        return response({
+          items: [definition({ id: "definition-newest", name: "Newest workflow" })],
+          page: 1,
+          pageSize: 10,
+          totalCount: 1
+        });
+      }
+      return initialRequest;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { container, unmount } = await renderRegisteredRoute();
+
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await fill(container.querySelector<HTMLInputElement>("input[placeholder='Search definitions']"), "Newest");
+    await waitForText(container, "Newest workflow");
+
+    resolveInitialRequest(response({
+      items: [definition({ id: "definition-stale", name: "Stale workflow" })],
+      page: 1,
+      pageSize: 10,
+      totalCount: 1
+    }));
+    await flushPromises();
+
+    expect(container.textContent).toContain("Newest workflow");
+    expect(container.textContent).not.toContain("Stale workflow");
 
     await unmount();
   });

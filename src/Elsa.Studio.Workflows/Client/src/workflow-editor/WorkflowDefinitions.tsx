@@ -3,19 +3,30 @@ import { AlertCircle, Check, Package, Plus, RotateCcw, Search, Sparkles, Trash2 
 import type { StudioAiContributionApi, StudioEndpointContext } from "@elsa-workflows/studio-sdk";
 import { createDefinition, deleteDefinition, deleteDefinitionPermanently, listDefinitions, restoreDefinition } from "../api/workflowDesign";
 import { listActivities } from "../api/activityDesign";
-import type { ActivityCatalogItem, DefinitionListState, WorkflowDefinitionDetails } from "../workflowTypes";
+import type { ActivityCatalogItem, DefinitionListSortBy, DefinitionListSortDirection, DefinitionListState, WorkflowDefinitionDetails } from "../workflowTypes";
 import { formatDate } from "../workflowFormatting";
 import { getDialogs } from "./dialogs";
 import { defaultDefinitionPageSize } from "./constants";
 import type { CreateWorkflowDraft } from "./editorTypes";
-import { dispatchAiAction, findAiAction, getCreateInitialState, getTotalPages, pageItems } from "./editorHelpers";
+import { dispatchAiAction, findAiAction, getCreateInitialState, getTotalPages } from "./editorHelpers";
 import { WfEmptyState, WfErrorCard, WfListSkeleton } from "./StatusViews";
 import { DefinitionPager } from "./DefinitionPager";
 import { CreateWorkflowDialog } from "./CreateWorkflowDialog";
 
+const definitionSortOptions: { value: string; label: string; sortBy: DefinitionListSortBy; sortDirection: DefinitionListSortDirection }[] = [
+  { value: "name:asc", label: "Name A–Z", sortBy: "name", sortDirection: "asc" },
+  { value: "name:desc", label: "Name Z–A", sortBy: "name", sortDirection: "desc" },
+  { value: "lastModifiedAt:desc", label: "Modified newest", sortBy: "lastModifiedAt", sortDirection: "desc" },
+  { value: "lastModifiedAt:asc", label: "Modified oldest", sortBy: "lastModifiedAt", sortDirection: "asc" },
+  { value: "createdAt:desc", label: "Created newest", sortBy: "createdAt", sortDirection: "desc" },
+  { value: "createdAt:asc", label: "Created oldest", sortBy: "createdAt", sortDirection: "asc" }
+];
+
 export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEndpointContext; ai: StudioAiContributionApi; onOpen(id: string): void }) {
   const [search, setSearch] = useState("");
   const [listState, setListState] = useState<DefinitionListState>("active");
+  const [sortBy, setSortBy] = useState<DefinitionListSortBy>("name");
+  const [sortDirection, setSortDirection] = useState<DefinitionListSortDirection>("asc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(defaultDefinitionPageSize);
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
@@ -29,6 +40,7 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
   const [catalog, setCatalog] = useState<ActivityCatalogItem[]>([]);
   const [catalogState, setCatalogState] = useState<"idle" | "loading" | "ready" | "failed">("idle");
   const selectVisibleRef = useRef<HTMLInputElement | null>(null);
+  const requestSequenceRef = useRef(0);
   const visibleDefinitionIds = useMemo(() => definitions.map(definition => definition.id), [definitions]);
   const suggestMetadataAction = findAiAction(ai, "weaver.workflows.suggest-create-metadata");
   const explainDefinitionAction = findAiAction(ai, "weaver.workflows.explain-definition");
@@ -36,30 +48,34 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
   const allVisibleSelected = visibleDefinitionIds.length > 0 && selectedVisibleCount === visibleDefinitionIds.length;
 
   const load = useCallback(async () => {
+    const requestSequence = ++requestSequenceRef.current;
     setState("loading");
     setError("");
     try {
-      const response = await listDefinitions(context, { search, state: listState, page, pageSize });
-      const backendPaged = typeof response.totalCount === "number";
-      const effectiveTotalCount = response.totalCount ?? response.definitions.length;
-      const effectiveTotalPages = getTotalPages(effectiveTotalCount, pageSize);
+      const response = await listDefinitions(context, { searchTerm: search, state: listState, page, pageSize, sortBy, sortDirection });
+      if (requestSequence !== requestSequenceRef.current) return;
+      const effectiveTotalPages = getTotalPages(response.totalCount, response.pageSize);
 
-      if (effectiveTotalCount > 0 && page > effectiveTotalPages) {
+      if (response.totalCount > 0 && page > effectiveTotalPages) {
         setPage(effectiveTotalPages);
         return;
       }
 
-      setDefinitions(backendPaged ? response.definitions : pageItems(response.definitions, page, pageSize));
-      setTotalCount(effectiveTotalCount);
+      setDefinitions(response.definitions);
+      setTotalCount(response.totalCount);
       setState("ready");
     } catch (e) {
+      if (requestSequence !== requestSequenceRef.current) return;
       setError(e instanceof Error ? e.message : String(e));
       setState("failed");
     }
-  }, [context, search, listState, page, pageSize]);
+  }, [context, search, listState, page, pageSize, sortBy, sortDirection]);
 
   useEffect(() => {
     void load();
+    return () => {
+      requestSequenceRef.current += 1;
+    };
   }, [load]);
 
   useEffect(() => {
@@ -156,6 +172,14 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
     clearSelection();
   };
 
+  const changeSort = (value: string) => {
+    const option = definitionSortOptions.find(candidate => candidate.value === value);
+    if (!option) return;
+    setSortBy(option.sortBy);
+    setSortDirection(option.sortDirection);
+    setPage(1);
+  };
+
   const softDelete = async (definition: WorkflowDefinitionDetails["definition"]) => {
     if (!(await getDialogs().confirm({ message: `Delete workflow definition "${definition.name}"? You can restore it from the Deleted view.`, confirmLabel: "Delete", tone: "danger" }))) return;
     setStatus("");
@@ -207,6 +231,12 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
         <label className="wf-search">
           <Search size={15} />
           <input value={search} onChange={event => changeSearch(event.target.value)} placeholder="Search definitions" />
+        </label>
+        <label className="wf-page-size">
+          Sort
+          <select aria-label="Sort workflow definitions" value={`${sortBy}:${sortDirection}`} onChange={event => changeSort(event.target.value)}>
+            {definitionSortOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
         </label>
         <button type="button" onClick={() => void load()}>Refresh</button>
         <div className="wf-actions">
