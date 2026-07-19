@@ -15,6 +15,7 @@ const WorkflowInstancesPage = lazy(() => import("./workflow-editor/pages").then(
 const WorkflowInstanceDetailsPage = lazy(() => import("./workflow-editor/pages").then(module => ({ default: module.WorkflowInstanceDetailsPage })));
 const ActivityAvailabilityPage = lazy(() => import("./ActivityAvailabilityPage").then(module => ({ default: module.ActivityAvailabilityPage })));
 const RuntimeDiagnosticsSettingsPage = lazy(() => import("./RuntimeDiagnosticsSettingsPage").then(module => ({ default: module.RuntimeDiagnosticsSettingsPage })));
+const TagCatalogPage = lazy(() => import("./TagCatalogPage").then(module => ({ default: module.TagCatalogPage })));
 
 // Re-exported for the test suite (src/__tests__/module.test.tsx), which imports these connect-end
 // helpers directly alongside register().
@@ -47,6 +48,7 @@ export function register(api: ElsaStudioModuleApi) {
       iconColor: "#0ea5e9",
       items: [
         { title: "Definitions", path: "/workflows/definitions", iconColor: "#0ea5e9" },
+        { title: "Marker Tags", path: "/workflows/tags", iconColor: "#0ea5e9" },
         { title: "Executables", path: "/workflows/executables", iconColor: "#0ea5e9" },
         { title: "Runs", path: "/workflows/instances", iconColor: "#0ea5e9" },
         { title: "Runtime Diagnostics", path: "/workflows/runtime-diagnostics", iconColor: "#0ea5e9" },
@@ -63,6 +65,12 @@ export function register(api: ElsaStudioModuleApi) {
             <WorkflowManagementPage context={api.backend} ai={api.ai} propertyEditors={api.propertyEditors.list()} expressionEditors={api.expressionEditors?.list() ?? []} runInputEditors={runInputEditors()} workflowDesignerPanels={api.workflowDesigner.panels.list()} autosaveEnabledByDefault={api.runtime.workflows?.autosaveEnabledByDefault ?? true} />
           </WorkflowLazyBoundary>
         )
+      },
+      {
+        id: "workflows-tags",
+        path: "/workflows/tags",
+        label: "Marker tags",
+        component: () => <WorkflowLazyBoundary label="marker tags"><TagCatalogPage context={api.backend} /></WorkflowLazyBoundary>
       },
       {
         id: "workflows-executables",

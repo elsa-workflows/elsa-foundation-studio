@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ReactFlow, Background, Controls, MiniMap } from "@xyflow/react";
-import { AlertCircle, Boxes, Check, ChevronLeft, ChevronRight, Code2, Download, GitBranch, ListTree, Maximize2, Minimize2, Network, Package, Play, Plus, Redo2, Save, SlidersHorizontal, Sparkles, Undo2, Workflow as WorkflowIcon } from "lucide-react";
+import { AlertCircle, Boxes, Check, ChevronLeft, ChevronRight, Code2, Download, GitBranch, ListTree, Maximize2, Minimize2, Network, Package, Play, Plus, Redo2, Save, SlidersHorizontal, Sparkles, Tag, Undo2, Workflow as WorkflowIcon } from "lucide-react";
 import type { StudioActivityPropertyEditorContribution, StudioAiContributionApi, StudioEndpointContext, StudioExpressionEditorContribution, StudioWorkflowDesignerPanelContribution, StudioWorkflowRunInputEditorContribution } from "@elsa-workflows/studio-sdk";
 import type { ActivityCatalogItem, ActivityNode, WorkflowDraft } from "../workflowTypes";
 import {
@@ -52,6 +52,8 @@ import { SlotEmptyState } from "./SlotEmptyState";
 import type { PublicationIntent } from "../api/publishing";
 import { publicationChangesFor, publicationIntentFor, publicationPreflightMatchesIntent, type PublicationChangeCount, type PublicationReviewState } from "./publicationReview";
 import { useDialogFocus } from "./useDialogFocus";
+import { WorkflowDefinitionTagsPanel } from "./WorkflowDefinitionTagsPanel";
+import { capabilityIds, resolveCapabilityLink } from "../api/capabilities";
 
 export function WorkflowEditor({
   context,
@@ -98,6 +100,7 @@ export function WorkflowEditor({
   const [activeLeftPanelId, setActiveLeftPanelId] = useState("activities");
   const [activeRightPanelId, setActiveRightPanelId] = useState("inspector");
   const [canvasView, setCanvasView] = useState<CanvasView>("designer");
+  const [taggingAvailable, setTaggingAvailable] = useState(false);
 
   const {
     paletteWidth,
@@ -135,6 +138,17 @@ export function WorkflowEditor({
   } = useWorkflowEditorData({ context, definitionId, resetHistory, loadDraft, markSaved, setError });
   // Debounced name/description save; edits are optimistic and flushed on unmount.
   const { updateDefinitionMeta } = useDefinitionMetadata({ context, details, setDetails, setStatus });
+
+  useEffect(() => {
+    let active = true;
+    void Promise.all([
+      resolveCapabilityLink(context, capabilityIds.tagging, "tag-definitions"),
+      resolveCapabilityLink(context, capabilityIds.workflowDesign, "workflow-definition-tags", { definitionId })
+    ]).then(() => {
+      if (active) setTaggingAvailable(true);
+    }).catch(() => { if (active) setTaggingAvailable(false); });
+    return () => { active = false; };
+  }, [context]);
 
   // Resolve the current scope + selection (designer mode, selected activity, descriptor/availability,
   // scoped-variable analysis) from the raw draft/frames/selection and the loaded catalog + descriptors.
@@ -554,6 +568,13 @@ export function WorkflowEditor({
       )
     },
     {
+      id: "tags",
+      title: "Tags",
+      order: 3,
+      icon: <Tag size={15} />,
+      render: () => <WorkflowDefinitionTagsPanel context={context} definitionId={details.definition.id} />
+    },
+    {
       id: "runtime",
       title: "Runtime",
       order: 5,
@@ -576,7 +597,7 @@ export function WorkflowEditor({
       )
     },
     ...contributedPanelTabs.filter(tab => tab.side === "right")
-  ].sort(compareWorkflowPanelTabs);
+  ].filter(tab => tab.id !== "tags" || taggingAvailable).sort(compareWorkflowPanelTabs);
   const activeLeftPanel = leftPanelTabs.find(tab => tab.id === activeLeftPanelId) ?? leftPanelTabs[0];
   const activeRightPanel = rightPanelTabs.find(tab => tab.id === activeRightPanelId) ?? rightPanelTabs[0];
   const canvasViewTabs: WorkflowEditorPanelTab[] = [

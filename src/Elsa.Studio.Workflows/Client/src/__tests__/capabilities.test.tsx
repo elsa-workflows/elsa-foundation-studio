@@ -109,4 +109,15 @@ describe("API capability bootstrap", () => {
     await expect(getApiCapabilities(value)).resolves.toEqual(document);
     expect(getJson).toHaveBeenCalledTimes(2);
   });
+
+  it("fails closed when a capability advertisement has malformed links", async () => {
+    const value = context(vi.fn().mockResolvedValue({ capabilities: [{
+      id: capabilityIds.workflowDesign,
+      contractVersion: "1",
+      links: [{ rel: "workflow-definitions" }]
+    }] }));
+
+    await expect(resolveCapabilityLink(value, capabilityIds.workflowDesign, "workflow-definitions"))
+      .rejects.toMatchObject({ name: "ApiCapabilityUnavailableError", capabilityId: capabilityIds.workflowDesign });
+  });
 });

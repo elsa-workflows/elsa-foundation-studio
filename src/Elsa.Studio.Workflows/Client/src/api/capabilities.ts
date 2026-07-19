@@ -1,6 +1,7 @@
 import type { StudioEndpointContext } from "@elsa-workflows/studio-sdk";
 
 export const capabilityIds = {
+  tagging: "elsa.api.tagging",
   workflowDesign: "elsa.api.workflow-design",
   activityDesign: "elsa.api.activity-design",
   expressions: "elsa.api.expressions",
@@ -11,6 +12,7 @@ export const capabilityIds = {
 export type ApiCapabilityId = typeof capabilityIds[keyof typeof capabilityIds];
 
 const supportedContractVersions: Record<ApiCapabilityId, string> = {
+  [capabilityIds.tagging]: "1",
   [capabilityIds.workflowDesign]: "1",
   [capabilityIds.activityDesign]: "1",
   [capabilityIds.expressions]: "1",
@@ -70,13 +72,29 @@ export function getApiCapabilities(context: StudioEndpointContext): Promise<ApiC
   if (cached) return cached;
 
   const request = context.http.getJson<ApiCapabilityDocument>("/capabilities")
-    .then(document => ({ capabilities: Array.isArray(document?.capabilities) ? document.capabilities : [] }))
+    // A malformed advertisement is not a usable API contract. Drop malformed capability/link rows
+    // rather than guessing a route, so optional Studio surfaces fail closed.
+    .then(document => ({ capabilities: Array.isArray(document?.capabilities) ? document.capabilities.map(normalizeCapability).filter((capability): capability is ApiCapability => capability !== null) : [] }))
     .catch(error => {
       documentsByShell.delete(key);
       throw error;
     });
   documentsByShell.set(key, request);
   return request;
+}
+
+function normalizeCapability(value: unknown): ApiCapability | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const candidate = value as Record<string, unknown>;
+  if (typeof candidate.id !== "string" || !candidate.id.trim() || typeof candidate.contractVersion !== "string" || !candidate.contractVersion.trim() || !Array.isArray(candidate.links)) return null;
+  const links = candidate.links.flatMap(link => {
+    if (!link || typeof link !== "object" || Array.isArray(link)) return [];
+    const item = link as Record<string, unknown>;
+    return typeof item.rel === "string" && item.rel.trim() && typeof item.href === "string" && item.href.trim()
+      ? [{ rel: item.rel, href: item.href, ...(item.templated === true ? { templated: true } : {}) }]
+      : [];
+  });
+  return { id: candidate.id, contractVersion: candidate.contractVersion, links };
 }
 
 export async function getApiCapability(

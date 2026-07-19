@@ -28,6 +28,13 @@ export interface WorkflowDefinitionSummary {
   latestVersionId?: string | null;
   latestVersion?: string | null;
   versionCount: number;
+  markerTags?: MarkerTagSummary[];
+}
+
+export interface MarkerTagSummary {
+  tagDefinitionId: string;
+  key: string;
+  displayName: string;
 }
 
 export type DefinitionListState = "active" | "deleted" | "all";
