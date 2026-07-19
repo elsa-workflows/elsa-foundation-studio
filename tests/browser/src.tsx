@@ -197,7 +197,14 @@ function WorkflowDefinitionListFixture() {
             capabilities: [{
               id: "elsa.api.workflow-design",
               contractVersion: "1",
-              links: [{ rel: "workflow-definitions", href: "design/workflows/definitions" }]
+              links: [
+                { rel: "workflow-definitions", href: "design/workflows/definitions" },
+                {
+                  rel: "workflow-definition-tags",
+                  href: "design/workflows/definitions/{definitionId}/tags",
+                  templated: true
+                }
+              ]
             }, {
               id: "elsa.api.tagging",
               contractVersion: "1",
