@@ -58,7 +58,7 @@ export async function register(api: ElsaStudioModuleApi) {
       items: [
         { title: "Definitions", path: "/workflows/definitions", iconColor: "#0ea5e9" },
         ...(markerTagsAvailable
-          ? [{ title: "Marker Tags", path: "/workflows/tags", iconColor: "#0ea5e9" }]
+          ? [{ title: "Tags", path: "/workflows/tags", iconColor: "#0ea5e9" }]
           : []),
         { title: "Executables", path: "/workflows/executables", iconColor: "#0ea5e9" },
         { title: "Runs", path: "/workflows/instances", iconColor: "#0ea5e9" },
@@ -81,8 +81,8 @@ export async function register(api: ElsaStudioModuleApi) {
         ? [{
             id: "workflows-tags",
             path: "/workflows/tags",
-            label: "Marker tags",
-            component: () => <WorkflowLazyBoundary label="marker tags"><TagCatalogPage context={api.backend} /></WorkflowLazyBoundary>
+            label: "Tags",
+            component: () => <WorkflowLazyBoundary label="tags"><TagCatalogPage context={api.backend} /></WorkflowLazyBoundary>
           }]
         : []),
       {

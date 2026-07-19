@@ -50,4 +50,48 @@ describe("marker tag catalog", () => {
       body: "{\"status\":\"Retired\"}"
     }));
   });
+
+  it("manages controlled values through the advertised nested catalog relation", async () => {
+    const postJson = vi.fn().mockResolvedValue({
+      id: "value-production", tagDefinitionId: "tag-environment", canonicalKey: "production", displayName: "Production",
+      sortOrder: 10, status: "Active", revision: "\"value-v1\""
+    });
+    const getJson = vi.fn(async (url: string) => url === "/capabilities" ? {
+      capabilities: [{ id: "elsa.api.tagging", contractVersion: "1", links: [
+        { rel: "tag-definitions", href: "tagging/definitions" },
+        { rel: "tag-definition-values", href: "tagging/definitions/{tagDefinitionId}/values", templated: true }
+      ] }]
+    } : url === "/tagging/definitions" ? {
+      canManage: true,
+      items: [{
+        id: "tag-environment", canonicalKey: "environment", displayName: "Environment", valueMode: "Controlled", cardinality: "Single",
+        status: "Active", revision: "\"tag-v1\""
+      }]
+    } : { canManage: true, items: [] });
+    const context = { baseUrl: "https://studio.example", http: { getJson, postJson, requestJson: vi.fn() } } as unknown as StudioEndpointContext;
+    const container = document.createElement("div");
+    active = createRoot(container);
+    flushSync(() => active?.render(<TagCatalogPage context={context} />));
+
+    await vi.waitFor(() => expect(container.textContent).toContain("Controlled values"));
+    const forms = [...container.querySelectorAll("form")];
+    const valueForm = forms.find(form => form.textContent?.includes("Create value"));
+    const inputs = valueForm?.querySelectorAll<HTMLInputElement>("input");
+    if (!inputs) throw new Error("Expected controlled value form inputs.");
+    setInputValue(inputs[0], "production");
+    setInputValue(inputs[1], "Production");
+    flushSync(() => valueForm?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+
+    await vi.waitFor(() => expect(postJson).toHaveBeenCalledWith("/tagging/definitions/tag-environment/values", expect.objectContaining({
+      canonicalKey: "production", displayName: "Production", sortOrder: 0
+    })));
+  });
 });
+
+function setInputValue(input: HTMLInputElement, value: string) {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+  flushSync(() => {
+    setter.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}

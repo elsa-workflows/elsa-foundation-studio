@@ -2,7 +2,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { StudioEndpointContext } from "@elsa-workflows/studio-sdk";
 import { StudioHttpError } from "@elsa-workflows/studio-sdk";
 import { clearApiCapabilityCache } from "../api/capabilities";
-import { getWorkflowDefinitionTags, listTagDefinitions, replaceWorkflowDefinitionTags, updateTagDefinition } from "../api/tagging";
+import {
+  createControlledTagValue,
+  getWorkflowDefinitionTags,
+  listControlledTagValues,
+  listTagDefinitions,
+  replaceWorkflowDefinitionTags,
+  updateControlledTagValue,
+  updateTagDefinition
+} from "../api/tagging";
 
 afterEach(clearApiCapabilityCache);
 
@@ -75,7 +83,7 @@ describe("workflow definition marker tags", () => {
       workflowDefinitionId: "definition-1",
       revision: "\"tags-v3\"",
       canAssign: true,
-      assertions: [{ tagDefinitionId: "tag-rule", origin: "rule" }]
+      assertions: [{ tagDefinitionId: "tag-rule", origin: "" }]
     }
   ])("fails closed for an invalid tag-set response", async response => {
     const value = context(vi.fn(async (url: string) => url === "/capabilities" ? {
@@ -95,5 +103,66 @@ describe("workflow definition marker tags", () => {
 
     await expect(createTagDefinition(value, { canonicalKey: "risk", displayName: "Risk" })).resolves.toMatchObject({ key: "risk", status: "Active" });
     expect(postJson).toHaveBeenCalledWith("/tagging/definitions", { canonicalKey: "risk", displayName: "Risk" });
+  });
+
+  it("discovers controlled values through the templated catalog relation and preserves stable identity", async () => {
+    const postJson = vi.fn().mockResolvedValue({
+      id: "value-production", tagDefinitionId: "tag-environment", canonicalKey: "production", displayName: "Production",
+      color: "#22c55e", sortOrder: 20, status: "Active", revision: "\"value-v2\""
+    });
+    const requestJson = vi.fn().mockResolvedValue({
+      id: "value-production", tagDefinitionId: "tag-environment", canonicalKey: "production", displayName: "Prod",
+      color: "#16a34a", sortOrder: 10, status: "Active", revision: "\"value-v3\""
+    });
+    const getJson = vi.fn(async (url: string) => url === "/capabilities" ? {
+      capabilities: [{
+        id: "elsa.api.tagging", contractVersion: "1", links: [
+          { rel: "tag-definition-values", href: "tagging/definitions/{tagDefinitionId}/values", templated: true }
+        ]
+      }]
+    } : {
+      canManage: true,
+      items: [{
+        id: "value-production", tagDefinitionId: "tag-environment", canonicalKey: "production", displayName: "Production",
+        color: "#22c55e", sortOrder: 20, status: "Active", revision: "\"value-v1\""
+      }]
+    });
+    const value = { baseUrl: "https://server.example/shell", http: { getJson, postJson, requestJson } } as unknown as StudioEndpointContext;
+
+    await expect(listControlledTagValues(value, "tag-environment")).resolves.toMatchObject({
+      canManage: true,
+      items: [{ id: "value-production", tagDefinitionId: "tag-environment", key: "production", sortOrder: 20 }]
+    });
+    await expect(createControlledTagValue(value, "tag-environment", { canonicalKey: "production", displayName: "Production", sortOrder: 20 }))
+      .resolves.toMatchObject({ id: "value-production", revision: "\"value-v2\"" });
+    await expect(updateControlledTagValue(value, "tag-environment", "value-production", "\"value-v2\"", { displayName: "Prod", sortOrder: 10 }))
+      .resolves.toMatchObject({ displayName: "Prod", sortOrder: 10, revision: "\"value-v3\"" });
+
+    expect(getJson).toHaveBeenCalledWith("/tagging/definitions/tag-environment/values");
+    expect(postJson).toHaveBeenCalledWith("/tagging/definitions/tag-environment/values", { canonicalKey: "production", displayName: "Production", sortOrder: 20 });
+    expect(requestJson).toHaveBeenCalledWith("/tagging/definitions/tag-environment/values/value-production", expect.objectContaining({
+      method: "PATCH",
+      headers: expect.objectContaining({ "If-Match": "\"value-v2\"" })
+    }));
+  });
+
+  it("sends controlled-value assignments alongside marker assignment identities", async () => {
+    const requestJson = vi.fn().mockResolvedValue({
+      workflowDefinitionId: "definition-1", revision: "\"tags-v4\"", canAssign: true,
+      assertions: [
+        { tagDefinitionId: "tag-critical", controlledValueId: null, origin: "manual" },
+        { tagDefinitionId: "tag-environment", controlledValueId: "value-production", origin: "manual" }
+      ]
+    });
+    const value = context(vi.fn().mockResolvedValue({ capabilities: [{
+      id: "elsa.api.workflow-design", contractVersion: "1", links: [{ rel: "workflow-definition-tags", href: "design/workflows/definitions/{definitionId}/tags", templated: true }]
+    }] }), requestJson);
+
+    const saved = await replaceWorkflowDefinitionTags(value, "definition-1", "\"tags-v3\"", ["tag-critical"], [{ tagDefinitionId: "tag-environment", controlledValueId: "value-production" }]);
+    expect(saved.assertions).toContainEqual(expect.objectContaining({ controlledValueId: "value-production" }));
+
+    expect(requestJson).toHaveBeenCalledWith("/design/workflows/definitions/definition-1/tags", expect.objectContaining({
+      body: "{\"tagDefinitionIds\":[\"tag-critical\"],\"controlledValues\":[{\"tagDefinitionId\":\"tag-environment\",\"controlledValueId\":\"value-production\"}]}"
+    }));
   });
 });

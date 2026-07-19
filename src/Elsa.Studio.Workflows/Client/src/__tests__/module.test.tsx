@@ -89,7 +89,7 @@ describe("workflows module", () => {
     expect(api.navigation.list()).toEqual([
       expect.objectContaining({ id: "workflows", path: "/workflows/definitions", activePathPrefix: "/workflows" }),
       expect.objectContaining({ id: "workflows-definitions", path: "/workflows/definitions", parentId: "workflows" }),
-      expect.objectContaining({ id: "workflows-marker tags", label: "Marker Tags", path: "/workflows/tags", parentId: "workflows" }),
+      expect.objectContaining({ id: "workflows-tags", label: "Tags", path: "/workflows/tags", parentId: "workflows" }),
       expect.objectContaining({ id: "workflows-executables", path: "/workflows/executables", parentId: "workflows" }),
       expect.objectContaining({ id: "workflows-runs", label: "Runs", path: "/workflows/instances", parentId: "workflows" }),
       expect.objectContaining({ id: "workflows-runtime diagnostics", label: "Runtime Diagnostics", path: "/workflows/runtime-diagnostics", parentId: "workflows" }),
@@ -97,7 +97,7 @@ describe("workflows module", () => {
     ]);
     expect(api.routes.list()).toEqual([
       expect.objectContaining({ id: "workflows-definitions", path: "/workflows/definitions" }),
-      expect.objectContaining({ id: "workflows-tags", label: "Marker tags", path: "/workflows/tags" }),
+      expect.objectContaining({ id: "workflows-tags", label: "Tags", path: "/workflows/tags" }),
       expect.objectContaining({ id: "workflows-executables", path: "/workflows/executables" }),
       expect.objectContaining({ id: "workflows-executable-inspector", label: "Executable Inspector", path: "/workflows/executables/:artifactId" }),
       expect.objectContaining({ id: "workflows-instances", label: "Workflow runs", path: "/workflows/instances" }),
