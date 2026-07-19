@@ -31,4 +31,23 @@ describe("marker tag chips", () => {
     expect(button?.getAttribute("aria-expanded")).toBe("true");
     expect(container.querySelector("[role='list']")?.textContent).toContain("Three");
   });
+
+  it("prefers a controlled-value color over the definition fallback without changing its text identity", () => {
+    const container = document.createElement("div");
+    const root = createRoot(container);
+
+    flushSync(() => root.render(<MarkerTagChips definition={{ tagChips: [{
+      tagDefinitionId: "tag-environment",
+      canonicalKey: "environment",
+      displayName: "Environment",
+      color: "#0ea5e9",
+      controlledValueId: "value-production",
+      controlledValueDisplayName: "Production",
+      controlledValueColor: "#22c55e"
+    }] }} />));
+
+    expect(container.textContent).toContain("Environment: Production");
+    expect(container.querySelector<HTMLElement>(".wf-tag-chip-color")?.style.backgroundColor).toBe("rgb(34, 197, 94)");
+    flushSync(() => root.unmount());
+  });
 });

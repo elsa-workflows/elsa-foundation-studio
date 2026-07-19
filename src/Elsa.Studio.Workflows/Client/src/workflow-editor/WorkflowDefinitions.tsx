@@ -3,9 +3,9 @@ import { AlertCircle, Check, Package, Plus, RotateCcw, Search, Sparkles, Trash2 
 import type { StudioAiContributionApi, StudioEndpointContext } from "@elsa-workflows/studio-sdk";
 import { createDefinition, deleteDefinition, deleteDefinitionPermanently, listDefinitions, restoreDefinition } from "../api/workflowDesign";
 import { listActivities } from "../api/activityDesign";
-import { listTagDefinitions, type TagDefinition } from "../api/tagging";
+import { listControlledTagValues, listTagDefinitions, type ControlledTagValue, type TagDefinition } from "../api/tagging";
 import { capabilityIds, resolveCapabilityLink } from "../api/capabilities";
-import type { ActivityCatalogItem, DefinitionListSortBy, DefinitionListSortDirection, DefinitionListState, WorkflowDefinitionDetails } from "../workflowTypes";
+import type { ActivityCatalogItem, ControlledTagFacet, ControlledTagGroup, DefinitionListSortBy, DefinitionListSortDirection, DefinitionListState, WorkflowDefinitionDetails } from "../workflowTypes";
 import { formatDate } from "../workflowFormatting";
 import { getDialogs } from "./dialogs";
 import { defaultDefinitionPageSize } from "./constants";
@@ -15,6 +15,14 @@ import { WfEmptyState, WfErrorCard, WfListSkeleton } from "./StatusViews";
 import { DefinitionPager } from "./DefinitionPager";
 import { CreateWorkflowDialog } from "./CreateWorkflowDialog";
 import { markerTagClausesFromSearch, writeMarkerTagClausesToLocation } from "./markerTagFilters";
+import {
+  controlledTagClauseToWire,
+  controlledTagClausesFromSearch,
+  controlledTagGroupingFromSearch,
+  writeControlledTagStateToLocation,
+  type ControlledTagClause,
+  type ControlledTagFilterOperator
+} from "./controlledTagFilters";
 
 const definitionSortOptions: { value: string; label: string; sortBy: DefinitionListSortBy; sortDirection: DefinitionListSortDirection }[] = [
   { value: "name:asc", label: "Name A–Z", sortBy: "name", sortDirection: "asc" },
@@ -25,6 +33,7 @@ const definitionSortOptions: { value: string; label: string; sortBy: DefinitionL
   { value: "createdAt:asc", label: "Created oldest", sortBy: "createdAt", sortDirection: "asc" }
 ];
 const noMarkerTagClauses: string[] = [];
+const noControlledTagClauses: ControlledTagClause[] = [];
 
 export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEndpointContext; ai: StudioAiContributionApi; onOpen(id: string): void }) {
   const [search, setSearch] = useState("");
@@ -44,16 +53,28 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
   const [catalog, setCatalog] = useState<ActivityCatalogItem[]>([]);
   const [catalogState, setCatalogState] = useState<"idle" | "loading" | "ready" | "failed">("idle");
   const [tagDefinitions, setTagDefinitions] = useState<TagDefinition[]>([]);
+  const [controlledValues, setControlledValues] = useState<Record<string, ControlledTagValue[]>>({});
+  const [controlledValuesAvailable, setControlledValuesAvailable] = useState(false);
   const [taggingState, setTaggingState] = useState<"loading" | "ready" | "unavailable" | "forbidden">("loading");
   const [markerTagClauses, setMarkerTagClauses] = useState<string[]>(() => markerTagClausesFromSearch(window.location.search));
+  const [controlledTagClauses, setControlledTagClauses] = useState<ControlledTagClause[]>(() => controlledTagClausesFromSearch(window.location.search));
+  const [groupByControlledTagDefinitionId, setGroupByControlledTagDefinitionId] = useState<string | null>(() => controlledTagGroupingFromSearch(window.location.search));
+  const [controlledTagFacets, setControlledTagFacets] = useState<ControlledTagFacet[]>([]);
+  const [controlledTagGroups, setControlledTagGroups] = useState<ControlledTagGroup[]>([]);
   const filterableTagDefinitions = useMemo(
     () => tagDefinitions.filter(tag =>
-      tag.status === "Active"
-      || markerTagClauses.some(clause => clause.startsWith(`${tag.id}:`))),
+      tag.valueMode === "Marker"
+      && (tag.status === "Active"
+          || markerTagClauses.some(clause => clause.startsWith(`${tag.id}:`)))),
     [markerTagClauses, tagDefinitions]);
   const applicableMarkerTagClauses = useMemo(
     () => taggingState === "ready" ? markerTagClauses : noMarkerTagClauses,
     [markerTagClauses, taggingState]);
+  const applicableControlledTagClauses = useMemo(
+    () => taggingState === "ready" && controlledValuesAvailable ? controlledTagClauses : noControlledTagClauses,
+    [controlledTagClauses, controlledValuesAvailable, taggingState]);
+  const visibleControlledDefinitions = useMemo(() => controlledValuesAvailable ? tagDefinitions.filter(tag => tag.valueMode === "Controlled" && tag.cardinality === "Single" && (
+    tag.status === "Active" || controlledTagClauses.some(clause => clause.definitionId === tag.id))) : [], [controlledTagClauses, controlledValuesAvailable, tagDefinitions]);
   const selectVisibleRef = useRef<HTMLInputElement | null>(null);
   const requestSequenceRef = useRef(0);
   const visibleDefinitionIds = useMemo(() => definitions.map(definition => definition.id), [definitions]);
@@ -74,7 +95,12 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
         pageSize,
         sortBy,
         sortDirection,
-        markerTagClauses: applicableMarkerTagClauses
+        markerTagClauses: applicableMarkerTagClauses,
+        controlledTagClauses: applicableControlledTagClauses.map(controlledTagClauseToWire).filter(Boolean),
+        controlledTagFacetDefinitionIds: visibleControlledDefinitions.slice(0, 4).map(definition => definition.id),
+        groupByControlledTagDefinitionId: controlledValuesAvailable
+          ? groupByControlledTagDefinitionId
+          : null
       });
       if (requestSequence !== requestSequenceRef.current) return;
       const effectiveTotalPages = getTotalPages(response.totalCount, response.pageSize);
@@ -86,13 +112,15 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
 
       setDefinitions(response.definitions);
       setTotalCount(response.totalCount);
+      setControlledTagFacets(response.controlledTagFacets ?? []);
+      setControlledTagGroups(response.controlledTagGroups ?? []);
       setState("ready");
     } catch (e) {
       if (requestSequence !== requestSequenceRef.current) return;
       setError(e instanceof Error ? e.message : String(e));
       setState("failed");
     }
-  }, [context, search, listState, page, pageSize, sortBy, sortDirection, applicableMarkerTagClauses]);
+  }, [context, search, listState, page, pageSize, sortBy, sortDirection, applicableMarkerTagClauses, applicableControlledTagClauses, visibleControlledDefinitions, groupByControlledTagDefinitionId]);
 
   useEffect(() => {
     void load();
@@ -111,15 +139,25 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
         "workflow-definition-tags",
         { definitionId: "capability-check" })
     ])
-      .then(([response]) => {
+      .then(async ([response]) => {
         if (!active) return;
+        const valuesAvailable = await resolveCapabilityLink(context, capabilityIds.tagging, "tag-definition-values", { tagDefinitionId: "capability-check" }).then(() => true, () => false);
+        const valueEntries = valuesAvailable ? await Promise.all(response.items
+          .filter(tag => tag.valueMode === "Controlled" && tag.cardinality === "Single")
+          .map(async tag => [tag.id, await listControlledTagValues(context, tag.id, false).then(value => value.items, () => [])] as const)) : [];
         setTagDefinitions(response.items);
+        setControlledValues(Object.fromEntries(valueEntries));
+        setControlledValuesAvailable(valuesAvailable);
         setTaggingState("ready");
       })
       .catch((reason: unknown) => {
         if (!active) return;
-        setTagDefinitions([]);
-        setMarkerTagClauses([]);
+        setTagDefinitions(current => current.length === 0 ? current : []);
+        setControlledValues(current => Object.keys(current).length === 0 ? current : {});
+        setControlledValuesAvailable(false);
+        setMarkerTagClauses(current => current.length === 0 ? current : []);
+        setControlledTagClauses(current => current.length === 0 ? current : []);
+        setGroupByControlledTagDefinitionId(null);
         const status = typeof reason === "object" && reason && "status" in reason ? (reason as { status?: unknown }).status : undefined;
         setTaggingState(status === 403 ? "forbidden" : "unavailable");
       });
@@ -132,6 +170,14 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
         taggingState === "unavailable" || taggingState === "forbidden"
           ? []
           : markerTagClausesFromSearch(window.location.search));
+      setControlledTagClauses(
+        taggingState === "unavailable" || taggingState === "forbidden"
+          ? []
+          : controlledTagClausesFromSearch(window.location.search));
+      setGroupByControlledTagDefinitionId(
+        taggingState === "unavailable" || taggingState === "forbidden"
+          ? null
+          : controlledTagGroupingFromSearch(window.location.search));
       setPage(1);
       setSelectedDefinitionIds(new Set());
     };
@@ -142,6 +188,17 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
   useEffect(() => {
     writeMarkerTagClausesToLocation(markerTagClauses);
   }, [markerTagClauses]);
+
+  useEffect(() => {
+    writeControlledTagStateToLocation(controlledTagClauses, groupByControlledTagDefinitionId);
+  }, [controlledTagClauses, groupByControlledTagDefinitionId]);
+
+  useEffect(() => {
+    if (taggingState === "ready" && !controlledValuesAvailable) {
+      setControlledTagClauses(current => current.length === 0 ? current : []);
+      setGroupByControlledTagDefinitionId(null);
+    }
+  }, [controlledValuesAvailable, taggingState]);
 
   useEffect(() => {
     if (selectVisibleRef.current) {
@@ -255,6 +312,41 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
     clearSelection();
   };
 
+  const changeControlledTagExistence = (definitionId: string, operator: "" | "exists" | "missing") => {
+    setControlledTagClauses(current => {
+      const next = current.filter(clause => clause.definitionId !== definitionId || (clause.operator !== "exists" && clause.operator !== "missing"));
+      return operator ? [...next, { definitionId, operator, controlledValueIds: [] }] : next;
+    });
+    setPage(1);
+    clearSelection();
+  };
+
+  const changeControlledTagValueOperator = (definitionId: string, operator: "" | "anyOf" | "noneOf") => {
+    setControlledTagClauses(current => {
+      const existing = current.find(clause => clause.definitionId === definitionId && (clause.operator === "anyOf" || clause.operator === "noneOf"));
+      const next = current.filter(clause => clause !== existing);
+      return operator ? [...next, existing ? { ...existing, operator } : { definitionId, operator, controlledValueIds: [] }] : next;
+    });
+    setPage(1);
+    clearSelection();
+  };
+
+  const changeControlledTagValues = (definitionId: string, values: string[]) => {
+    setControlledTagClauses(current => {
+      const existing = current.find(clause => clause.definitionId === definitionId && (clause.operator === "anyOf" || clause.operator === "noneOf"));
+      const next = current.filter(clause => clause !== existing);
+      return existing && values.length ? [...next, { ...existing, controlledValueIds: values }] : next;
+    });
+    setPage(1);
+    clearSelection();
+  };
+
+  const changeControlledTagGrouping = (definitionId: string) => {
+    setGroupByControlledTagDefinitionId(definitionId || null);
+    setPage(1);
+    clearSelection();
+  };
+
   const softDelete = async (definition: WorkflowDefinitionDetails["definition"]) => {
     if (!(await getDialogs().confirm({ message: `Delete workflow definition "${definition.name}"? You can restore it from the Deleted view.`, confirmLabel: "Delete", tone: "danger" }))) return;
     setStatus("");
@@ -331,6 +423,52 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
             })}
           </fieldset>
         ) : null}
+        {taggingState === "ready" && visibleControlledDefinitions.length > 0 ? (
+          <>
+            <fieldset className="wf-tag-filters wf-controlled-tag-filters">
+              <legend>Controlled tags</legend>
+              {visibleControlledDefinitions.map(tag => {
+                const existence = controlledTagClauses.find(clause => clause.definitionId === tag.id && (clause.operator === "exists" || clause.operator === "missing"));
+                const valuesClause = controlledTagClauses.find(clause => clause.definitionId === tag.id && (clause.operator === "anyOf" || clause.operator === "noneOf"));
+                const facet = controlledTagFacets.find(candidate => candidate.tagDefinitionId === tag.id);
+                const values = facet ? facet.values : (controlledValues[tag.id] ?? []).map(value => ({
+                  controlledValueId: value.id,
+                  canonicalKey: value.key,
+                  displayName: value.displayName,
+                  description: value.description,
+                  color: value.color,
+                  status: value.status,
+                  sortOrder: value.sortOrder,
+                  count: 0
+                }));
+                return <fieldset key={tag.id} className="wf-controlled-tag-filter">
+                  <legend>{tag.displayName}</legend>
+                  <label>Presence
+                    <select aria-label={`${tag.displayName} controlled tag presence`} value={existence?.operator ?? ""} onChange={event => changeControlledTagExistence(tag.id, event.target.value as "" | "exists" | "missing")}>
+                      <option value="">Any</option><option value="exists">Has value</option><option value="missing">Missing</option>
+                    </select>
+                  </label>
+                  <label>Values
+                    <select aria-label={`${tag.displayName} controlled tag value mode`} value={valuesClause?.operator ?? ""} onChange={event => changeControlledTagValueOperator(tag.id, event.target.value as "" | "anyOf" | "noneOf")}>
+                      <option value="">No value filter</option><option value="anyOf">Any of</option><option value="noneOf">None of</option>
+                    </select>
+                  </label>
+                  <label>Choices
+                    <select multiple aria-label={`${tag.displayName} controlled tag values`} disabled={!valuesClause} value={valuesClause?.controlledValueIds ?? []} onChange={event => changeControlledTagValues(tag.id, [...event.currentTarget.selectedOptions].map(option => option.value))}>
+                      {values.map(value => <option key={value.controlledValueId} value={value.controlledValueId}>{value.displayName} ({value.count}){value.status === "Retired" ? " · Retired" : ""}</option>)}
+                    </select>
+                  </label>
+                </fieldset>;
+              })}
+            </fieldset>
+            <label className="wf-page-size">Group
+              <select aria-label="Group workflow definitions by controlled tag" value={groupByControlledTagDefinitionId ?? ""} onChange={event => changeControlledTagGrouping(event.target.value)}>
+                <option value="">No grouping</option>
+                {visibleControlledDefinitions.map(tag => <option key={tag.id} value={tag.id}>{tag.displayName}</option>)}
+              </select>
+            </label>
+          </>
+        ) : null}
         {taggingState === "forbidden" ? <span className="wf-inline-note">Tag filters require tagging access.</span> : null}
         <button type="button" onClick={() => void load()}>Refresh</button>
         <div className="wf-actions">
@@ -376,7 +514,16 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
               <span>Modified</span>
               <span>Actions</span>
             </div>
-            {definitions.map(definition => (
+            {definitions.flatMap((definition, index) => {
+              const group = definition.group;
+              const previousGroup = definitions[index - 1]?.group;
+              const groupChanged = groupByControlledTagDefinitionId && group && groupKey(group) !== groupKey(previousGroup);
+              const groupInfo = group ? controlledTagGroups.find(candidate => groupKey(candidate) === groupKey(group)) : null;
+              return [
+                groupChanged ? <div className="wf-definition-group" role="row" key={`group-${groupKey(group)}`}>
+                  {groupInfo?.color ? <span className="wf-tag-chip-color" style={{ backgroundColor: groupInfo.color }} aria-hidden="true" /> : null}
+                  <strong>{groupInfo?.label ?? group?.kind}</strong><small>{groupInfo?.count ?? 0}</small>
+                </div> : null,
               <div
                 className="wf-grid-row"
                 role="row"
@@ -426,7 +573,8 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
                   )}
                 </span>
               </div>
-            ))}
+              ];
+            })}
           </div>
           <DefinitionPager
             page={page}
@@ -456,15 +604,15 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
   );
 }
 
-export function MarkerTagChips({ definition }: { definition: Pick<WorkflowDefinitionDetails["definition"], "markerTags"> }) {
-  const tags = definition.markerTags ?? [];
+export function MarkerTagChips({ definition }: { definition: Pick<WorkflowDefinitionDetails["definition"], "markerTags" | "tagChips"> }) {
+  const tags = definition.tagChips ?? definition.markerTags ?? [];
   const [overflowOpen, setOverflowOpen] = useState(false);
   const overflowId = useId();
   if (tags.length === 0) return <span className="wf-inline-note">None</span>;
   const visible = tags.slice(0, 2);
   const overflow = tags.slice(2);
-  return <span className="wf-tag-chip-list" aria-label={`Tags: ${tags.map(tag => tag.displayName).join(", ")}`}>
-    {visible.map(tag => <span className="wf-tag-chip" key={tag.tagDefinitionId}>{tag.displayName}</span>)}
+  return <span className="wf-tag-chip-list" aria-label={`Tags: ${tags.map(tagLabel).join(", ")}`}>
+    {visible.map(tag => <TagChip key={tag.tagDefinitionId} tag={tag} />)}
     {overflow.length > 0 ? <span className="wf-tag-overflow">
       <button
         type="button"
@@ -475,8 +623,27 @@ export function MarkerTagChips({ definition }: { definition: Pick<WorkflowDefini
         onClick={event => { event.stopPropagation(); setOverflowOpen(current => !current); }}
       >+{overflow.length}</button>
       {overflowOpen ? <ul id={overflowId} className="wf-tag-overflow-list" role="list">
-        {overflow.map(tag => <li key={tag.tagDefinitionId}>{tag.displayName}</li>)}
+        {overflow.map(tag => <li key={tag.tagDefinitionId}>{tagLabel(tag)}</li>)}
       </ul> : null}
     </span> : null}
   </span>;
+}
+
+function TagChip({ tag }: { tag: NonNullable<WorkflowDefinitionDetails["definition"]["tagChips"]>[number] | NonNullable<WorkflowDefinitionDetails["definition"]["markerTags"]>[number] }) {
+  const color = "controlledValueColor" in tag && tag.controlledValueColor ? tag.controlledValueColor : tag.color;
+  return <span className="wf-tag-chip" title={tagLabel(tag)}>
+    {color ? <span className="wf-tag-chip-color" style={{ backgroundColor: color }} aria-hidden="true" /> : null}
+    {tagLabel(tag)}
+  </span>;
+}
+
+function tagLabel(tag: NonNullable<WorkflowDefinitionDetails["definition"]["tagChips"]>[number] | NonNullable<WorkflowDefinitionDetails["definition"]["markerTags"]>[number]) {
+  if ("conflict" in tag && tag.conflict) return `${tag.displayName}: Conflicted`;
+  return "controlledValueDisplayName" in tag && tag.controlledValueDisplayName
+    ? `${tag.displayName}: ${tag.controlledValueDisplayName}`
+    : tag.displayName;
+}
+
+function groupKey(group: { kind: "Value" | "Untagged" | "Conflicted"; controlledValueId?: string | null } | null | undefined) {
+  return group ? `${group.kind}:${group.controlledValueId ?? ""}` : "";
 }

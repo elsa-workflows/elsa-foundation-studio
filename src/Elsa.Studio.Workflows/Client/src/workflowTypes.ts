@@ -11,6 +11,8 @@ export interface WorkflowDefinitionsResponse {
   page: number;
   pageSize: number;
   totalCount: number;
+  controlledTagFacets?: ControlledTagFacet[];
+  controlledTagGroups?: ControlledTagGroup[];
 }
 
 export interface WorkflowExecutablesResponse {
@@ -29,12 +31,51 @@ export interface WorkflowDefinitionSummary {
   latestVersion?: string | null;
   versionCount: number;
   markerTags?: MarkerTagSummary[];
+  tagChips?: WorkflowDefinitionTagChip[];
+  group?: ControlledTagItemGroup | null;
 }
 
 export interface MarkerTagSummary {
   tagDefinitionId: string;
   canonicalKey: string;
   displayName: string;
+  color?: string | null;
+}
+
+export interface WorkflowDefinitionTagChip extends MarkerTagSummary {
+  controlledValueId?: string | null;
+  controlledValueDisplayName?: string | null;
+  controlledValueColor?: string | null;
+  conflict?: boolean;
+}
+
+export interface ControlledTagFacet {
+  tagDefinitionId: string;
+  values: ControlledTagFacetValue[];
+}
+
+export interface ControlledTagFacetValue {
+  controlledValueId: string;
+  canonicalKey: string;
+  displayName: string;
+  description?: string | null;
+  color?: string | null;
+  status: "Active" | "Retired";
+  sortOrder: number;
+  count: number;
+}
+
+export interface ControlledTagGroup {
+  kind: "Value" | "Untagged" | "Conflicted";
+  controlledValueId?: string | null;
+  label: string;
+  color?: string | null;
+  count: number;
+}
+
+export interface ControlledTagItemGroup {
+  kind: ControlledTagGroup["kind"];
+  controlledValueId?: string | null;
 }
 
 export type DefinitionListState = "active" | "deleted" | "all";

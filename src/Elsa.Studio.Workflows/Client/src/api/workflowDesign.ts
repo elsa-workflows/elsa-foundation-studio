@@ -33,6 +33,9 @@ export interface DefinitionListRequest {
   sortBy?: DefinitionListSortBy;
   sortDirection?: DefinitionListSortDirection;
   markerTagClauses?: string[];
+  controlledTagClauses?: string[];
+  controlledTagFacetDefinitionIds?: string[];
+  groupByControlledTagDefinitionId?: string | null;
 }
 
 type WorkflowDraftResponse = Omit<WorkflowDraft, "validationErrors"> & {
@@ -100,18 +103,33 @@ export async function listDefinitions(context: StudioEndpointContext, request: D
   for (const clause of request.markerTagClauses ?? []) {
     if (/^[^:\s]+:(?:exists|missing)$/.test(clause)) parameters.append("markerTagClauses", clause);
   }
+  for (const clause of request.controlledTagClauses ?? []) {
+    if (/^[^,:\s]+:(?:exists|missing|anyOf:[^,:\s]+(?:,[^,:\s]+)*|noneOf:[^,:\s]+(?:,[^,:\s]+)*)$/.test(clause)) {
+      parameters.append("controlledTagClauses", clause);
+    }
+  }
+  for (const definitionId of [...new Set(request.controlledTagFacetDefinitionIds ?? [])]) {
+    if (/^[^,:\s]+$/.test(definitionId)) parameters.append("controlledTagFacets", definitionId);
+  }
+  if (request.groupByControlledTagDefinitionId && /^[^,:\s]+$/.test(request.groupByControlledTagDefinitionId)) {
+    parameters.set("groupByControlledTagDefinitionId", request.groupByControlledTagDefinitionId);
+  }
   const response = await context.http.getJson<{
     items: WorkflowDefinitionsResponse["definitions"];
     page: number;
     pageSize: number;
     totalCount: number;
+    controlledTagFacets?: WorkflowDefinitionsResponse["controlledTagFacets"];
+    controlledTagGroups?: WorkflowDefinitionsResponse["controlledTagGroups"];
   }>(
     `${await definitionsPath(context)}?${parameters.toString()}`);
   return {
     definitions: response.items ?? [],
     page: response.page,
     pageSize: response.pageSize,
-    totalCount: response.totalCount
+    totalCount: response.totalCount,
+    controlledTagFacets: response.controlledTagFacets ?? [],
+    controlledTagGroups: response.controlledTagGroups ?? []
   } satisfies WorkflowDefinitionsResponse;
 }
 

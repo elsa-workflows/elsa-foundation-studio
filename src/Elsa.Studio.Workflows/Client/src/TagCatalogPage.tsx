@@ -2,10 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { Check, Pencil, Plus, RefreshCw, Save, X } from "lucide-react";
 import type { StudioEndpointContext } from "@elsa-workflows/studio-sdk";
 import { createTagDefinition, listTagDefinitions, updateTagDefinition, type TagDefinition } from "./api/tagging";
+import { ControlledTagValuesManager } from "./ControlledTagValuesManager";
 
-type TagDraft = { canonicalKey: string; displayName: string; description: string; color: string };
+type TagDraft = { canonicalKey: string; displayName: string; description: string; color: string; valueMode: "Marker" | "Controlled" };
 
-const emptyDraft = (): TagDraft => ({ canonicalKey: "", displayName: "", description: "", color: "" });
+const emptyDraft = (): TagDraft => ({ canonicalKey: "", displayName: "", description: "", color: "", valueMode: "Marker" });
 
 export function TagCatalogPage({ context }: { context: StudioEndpointContext }) {
   const [items, setItems] = useState<TagDefinition[]>([]);
@@ -44,7 +45,9 @@ export function TagCatalogPage({ context }: { context: StudioEndpointContext }) 
         canonicalKey: draft.canonicalKey.trim(),
         displayName: draft.displayName.trim(),
         description: draft.description.trim() || null,
-        color: draft.color || null
+        color: draft.color || null,
+        valueMode: draft.valueMode,
+        cardinality: "Single"
       });
       await load();
       setDraft(emptyDraft());
@@ -71,7 +74,7 @@ export function TagCatalogPage({ context }: { context: StudioEndpointContext }) 
   const startEditing = (item: TagDefinition) => {
     setError("");
     setEditingId(item.id);
-    setEditDraft({ canonicalKey: item.key, displayName: item.displayName, description: item.description ?? "", color: item.color ?? "" });
+    setEditDraft({ canonicalKey: item.key, displayName: item.displayName, description: item.description ?? "", color: item.color ?? "", valueMode: item.valueMode === "Controlled" ? "Controlled" : "Marker" });
   };
 
   const saveEdit = async (item: TagDefinition) => {
@@ -93,13 +96,13 @@ export function TagCatalogPage({ context }: { context: StudioEndpointContext }) 
     }
   };
 
-  if (state === "loading") return <div className="wf-empty">Loading marker tags…</div>;
-  if (state === "forbidden") return <div className="wf-empty">You don’t have permission to view marker tags.</div>;
-  if (state === "unavailable") return <div className="wf-empty">Marker tags are unavailable for this server. {error}</div>;
+  if (state === "loading") return <div className="wf-empty">Loading tags…</div>;
+  if (state === "forbidden") return <div className="wf-empty">You don’t have permission to view tags.</div>;
+  if (state === "unavailable") return <div className="wf-empty">Tags are unavailable for this server. {error}</div>;
 
   return <section className="wf-page">
     <header className="wf-page-header">
-      <div><div className="wf-kicker">Workflow design</div><h2>Marker tags</h2></div>
+      <div><div className="wf-kicker">Workflow design</div><h2>Tags</h2></div>
       <button type="button" onClick={() => void load()}><RefreshCw size={15} /> Refresh</button>
     </header>
     {error ? <div className="wf-alert">{error}</div> : null}
@@ -107,11 +110,12 @@ export function TagCatalogPage({ context }: { context: StudioEndpointContext }) 
       <label>Key<input value={draft.canonicalKey} onChange={event => setDraft(current => ({ ...current, canonicalKey: event.target.value }))} placeholder="environment" required /></label>
       <label>Name<input value={draft.displayName} onChange={event => setDraft(current => ({ ...current, displayName: event.target.value }))} placeholder="Environment" required /></label>
       <label>Description<input value={draft.description} onChange={event => setDraft(current => ({ ...current, description: event.target.value }))} placeholder="Optional" /></label>
+      <label>Type<select aria-label="New tag type" value={draft.valueMode} onChange={event => setDraft(current => ({ ...current, valueMode: event.target.value as TagDraft["valueMode"] }))}><option value="Marker">Marker</option><option value="Controlled">Controlled (single)</option></select></label>
       <label>Color<input aria-label="New tag color" type="color" value={draft.color || "#0ea5e9"} onChange={event => setDraft(current => ({ ...current, color: event.target.value }))} /></label>
       <button type="submit" disabled={saving}><Plus size={15} /> Create tag</button>
-    </form> : <p className="wf-inline-note wf-tag-note">You can use marker tags, but only tag managers can change the catalog.</p>}
-    <div className="wf-grid wf-tag-catalog-grid" role="table" aria-label="Marker tag definitions">
-      <div className="wf-grid-head" role="row"><span>Name</span><span>Key</span><span>Status</span><span>Actions</span></div>
+    </form> : <p className="wf-inline-note wf-tag-note">You can use tags, but only tag managers can change the catalog.</p>}
+    <div className="wf-grid wf-tag-catalog-grid" role="table" aria-label="Tag definitions">
+      <div className="wf-grid-head" role="row"><span>Name</span><span>Key</span><span>Type</span><span>Status</span><span>Actions</span></div>
       {items.map(item => {
         const canEdit = canManage || item.canManage;
         const editing = editingId === item.id;
@@ -128,6 +132,7 @@ export function TagCatalogPage({ context }: { context: StudioEndpointContext }) 
             </> : <><TagColor color={item.color} /><strong>{item.displayName}</strong><small>{item.description}</small></>}
           </span>
           <span><code>{item.key}</code></span>
+          <span>{item.valueMode === "Controlled" ? "Controlled · Single" : item.valueMode}</span>
           <span>{item.status}</span>
           <span>{canEdit ? editing ? <>
             <button type="button" disabled={updating} onClick={() => void saveEdit(item)}><Save size={14} /> Save</button>
@@ -139,8 +144,11 @@ export function TagCatalogPage({ context }: { context: StudioEndpointContext }) 
         </div>;
       })}
     </div>
-    {items.length === 0 ? <div className="wf-empty">No marker tags have been defined.</div> : null}
-    <p className="wf-tag-note"><Check size={14} /> Marker tags are labels only; they never change runtime workflow behavior.</p>
+    {items.filter(item => item.valueMode === "Controlled" && item.cardinality === "Single").map(item => (
+      <ControlledTagValuesManager key={item.id} context={context} definition={item} canManage={canManage || item.canManage} />
+    ))}
+    {items.length === 0 ? <div className="wf-empty">No tags have been defined.</div> : null}
+    <p className="wf-tag-note"><Check size={14} /> Tags are descriptive metadata only; they never change runtime workflow behavior.</p>
   </section>;
 }
 

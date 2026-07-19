@@ -41,3 +41,37 @@ test("workflow definitions use bounded server requests for paging, search, scope
   await expect(requests).toContainText("/design/workflows/definitions?state=deleted&searchTerm=workflow+1&page=1&pageSize=100&sortBy=lastModifiedAt&sortDirection=desc");
   await expect(page.getByText("1 selected")).toBeHidden();
 });
+
+test("controlled tags persist value filters and render disjunctive facets, groups, and value colors", async ({ page }) => {
+  await page.goto("/?theme=light&mode=workflow-definitions");
+
+  const requests = page.getByLabel("Workflow definition requests");
+  await expect(page.getByLabel("Region controlled tag value mode")).toBeVisible();
+  await expect(page.getByRole("option", { name: "East (21)" })).toBeAttached();
+  await expect(page.getByLabel("Tags: Environment, Region: East").first()).toBeVisible();
+
+  const eastChipColor = page.getByTitle("Region: East").first().locator(".wf-tag-chip-color");
+  await expect(eastChipColor).toHaveCSS("background-color", "rgb(14, 165, 233)");
+
+  await page.getByLabel("Region controlled tag value mode").selectOption("anyOf");
+  await page.getByLabel("Region controlled tag values").selectOption(["value-east"]);
+  await expect(requests).toContainText("controlledTagClauses=tag-region%3AanyOf%3Avalue-east");
+  await expect(page).toHaveURL(/controlledTag=tag-region%3AanyOf%3Avalue-east/);
+
+  await page.getByLabel("Region controlled tag presence").selectOption("exists");
+  await expect(requests).toContainText("controlledTagClauses=tag-region%3Aexists");
+  await expect(requests).toContainText("controlledTagClauses=tag-region%3AanyOf%3Avalue-east");
+
+  await page.getByLabel("Group workflow definitions by controlled tag").selectOption("tag-region");
+  await expect(requests).toContainText("groupByControlledTagDefinitionId=tag-region");
+  await expect(page).toHaveURL(/groupByControlledTag=tag-region/);
+  await expect(page.getByText("East", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Untagged", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Conflicted", { exact: true }).first()).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByLabel("Region controlled tag value mode")).toHaveValue("anyOf");
+  await expect(page.getByLabel("Region controlled tag values")).toHaveValues(["value-east"]);
+  await expect(page.getByLabel("Region controlled tag presence")).toHaveValue("exists");
+  await expect(page.getByLabel("Group workflow definitions by controlled tag")).toHaveValue("tag-region");
+});
