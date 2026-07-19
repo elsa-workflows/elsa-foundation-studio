@@ -148,7 +148,7 @@ export function WorkflowEditor({
       if (active) setTaggingAvailable(true);
     }).catch(() => { if (active) setTaggingAvailable(false); });
     return () => { active = false; };
-  }, [context]);
+  }, [context, definitionId]);
 
   // Resolve the current scope + selection (designer mode, selected activity, descriptor/availability,
   // scoped-variable analysis) from the raw draft/frames/selection and the loaded catalog + descriptors.
