@@ -120,16 +120,21 @@ function normalizeTagDefinition(value: unknown): TagDefinition | null {
 
 function normalizeTagSet(value: unknown, requestedDefinitionId: string): WorkflowDefinitionTagSet {
   const record = object(value);
-  if (!record || !isNonBlankString(requestedDefinitionId) || record.workflowDefinitionId !== requestedDefinitionId || !isQuotedRevision(record.revision)) {
+  if (!record
+    || !isNonBlankString(requestedDefinitionId)
+    || record.workflowDefinitionId !== requestedDefinitionId
+    || !isQuotedRevision(record.revision)
+    || !Array.isArray(record.assertions)) {
     throw new Error("The server returned an invalid workflow definition tag set.");
   }
-  const assertions = Array.isArray(record?.assertions)
-    ? record.assertions.map(normalizeAssertion).filter((item): item is WorkflowDefinitionTagAssertion => item !== null)
-    : [];
+  const assertions = record.assertions.map(normalizeAssertion);
+  if (assertions.some(assertion => assertion === null)) {
+    throw new Error("The server returned an invalid workflow definition tag set.");
+  }
   return {
     workflowDefinitionId: record.workflowDefinitionId,
     revision: record.revision,
-    assertions,
+    assertions: assertions as WorkflowDefinitionTagAssertion[],
     canAssign: record?.canAssign === true
   };
 }
