@@ -77,4 +77,76 @@ describe("workflow definition marker tag filters", () => {
       .toBe(true);
     expect(container.querySelector(".wf-tag-filters")).toBeNull();
   });
+
+  it("keeps a referenced retired filter visible so it can be cleared", async () => {
+    window.history.replaceState({}, "", "/workflows?markerTag=tag-legacy%3Aexists");
+    const definitionRequests: string[] = [];
+    const getJson = vi.fn(async (url: string) => {
+      if (url === "/capabilities") {
+        return {
+          capabilities: [
+            {
+              id: "elsa.api.workflow-design",
+              contractVersion: "1",
+              links: [
+                { rel: "workflow-definitions", href: "design/workflows/definitions" },
+                {
+                  rel: "workflow-definition-tags",
+                  href: "design/workflows/definitions/{definitionId}/tags",
+                  templated: true
+                }
+              ]
+            },
+            {
+              id: "elsa.api.tagging",
+              contractVersion: "1",
+              links: [{ rel: "tag-definitions", href: "tagging/definitions" }]
+            }
+          ]
+        };
+      }
+      if (url === "/tagging/definitions") {
+        return {
+          items: [{
+            id: "tag-legacy",
+            canonicalKey: "legacy",
+            displayName: "Legacy",
+            status: "Retired",
+            revision: "\"tag-v2\""
+          }]
+        };
+      }
+      if (url.startsWith("/design/workflows/definitions?")) {
+        definitionRequests.push(url);
+        return { items: [], page: 1, pageSize: 25, totalCount: 0 };
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    const context = {
+      baseUrl: "https://studio.example",
+      http: { getJson }
+    } as unknown as StudioEndpointContext;
+    const container = document.createElement("div");
+    active = createRoot(container);
+    flushSync(() => active?.render(
+      <WorkflowDefinitions
+        context={context}
+        ai={{ promptActions: { list: () => [] } } as unknown as StudioAiContributionApi}
+        onOpen={() => undefined}
+      />));
+
+    const filter = await vi.waitFor(() => {
+      const element = container.querySelector<HTMLSelectElement>(
+        "select[aria-label='Legacy (Retired) marker tag filter']");
+      expect(element).not.toBeNull();
+      expect(definitionRequests.some(url => url.includes("markerTagClauses=tag-legacy%3Aexists"))).toBe(true);
+      return element!;
+    });
+
+    filter.value = "";
+    filter.dispatchEvent(new Event("change", { bubbles: true }));
+
+    await vi.waitFor(() => expect(window.location.search).not.toContain("markerTag"));
+    expect(container.querySelector(".wf-tag-filters")).toBeNull();
+  });
 });

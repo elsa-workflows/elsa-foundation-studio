@@ -46,6 +46,11 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
   const [tagDefinitions, setTagDefinitions] = useState<TagDefinition[]>([]);
   const [taggingState, setTaggingState] = useState<"loading" | "ready" | "unavailable" | "forbidden">("loading");
   const [markerTagClauses, setMarkerTagClauses] = useState<string[]>(() => markerTagClausesFromSearch(window.location.search));
+  const filterableTagDefinitions = useMemo(
+    () => tagDefinitions.filter(tag =>
+      tag.status === "Active"
+      || markerTagClauses.some(clause => clause.startsWith(`${tag.id}:`))),
+    [markerTagClauses, tagDefinitions]);
   const applicableMarkerTagClauses = useMemo(
     () => taggingState === "ready" ? markerTagClauses : noMarkerTagClauses,
     [markerTagClauses, taggingState]);
@@ -108,7 +113,7 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
     ])
       .then(([response]) => {
         if (!active) return;
-        setTagDefinitions(response.items.filter(tag => tag.status === "Active"));
+        setTagDefinitions(response.items);
         setTaggingState("ready");
       })
       .catch((reason: unknown) => {
@@ -308,15 +313,16 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
             {definitionSortOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </label>
-        {taggingState === "ready" && tagDefinitions.length > 0 ? (
+        {taggingState === "ready" && filterableTagDefinitions.length > 0 ? (
           <fieldset className="wf-tag-filters">
             <legend>Marker tags</legend>
-            {tagDefinitions.map(tag => {
+            {filterableTagDefinitions.map(tag => {
               const clause = markerTagClauses.find(value => value.startsWith(`${tag.id}:`));
               const value = clause?.split(":")[1] ?? "";
+              const filterLabel = `${tag.displayName}${tag.status === "Retired" ? " (Retired)" : ""}`;
               return <label key={tag.id}>
-                {tag.displayName}
-                <select aria-label={`${tag.displayName} marker tag filter`} value={value} onChange={event => changeMarkerTagClause(tag.id, event.target.value as "" | "exists" | "missing")}>
+                {filterLabel}
+                <select aria-label={`${filterLabel} marker tag filter`} value={value} onChange={event => changeMarkerTagClause(tag.id, event.target.value as "" | "exists" | "missing")}>
                   <option value="">Any</option>
                   <option value="exists">Has tag</option>
                   <option value="missing">Missing tag</option>
