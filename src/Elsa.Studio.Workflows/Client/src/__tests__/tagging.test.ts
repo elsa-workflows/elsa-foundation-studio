@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { StudioEndpointContext } from "@elsa-workflows/studio-sdk";
+import { StudioHttpError } from "@elsa-workflows/studio-sdk";
 import { clearApiCapabilityCache } from "../api/capabilities";
 import { getWorkflowDefinitionTags, listTagDefinitions, replaceWorkflowDefinitionTags, updateTagDefinition } from "../api/tagging";
 
@@ -50,9 +51,8 @@ describe("workflow definition marker tags", () => {
   });
 
   it("sends the quoted revision through If-Match and exposes structured revision conflicts", async () => {
-    const requestJson = vi.fn().mockRejectedValue(Object.assign(new Error("Conflict"), {
-      status: 409,
-      response: { code: "tag-set-revision-conflict" }
+    const requestJson = vi.fn().mockRejectedValue(new StudioHttpError(409, "Conflict", null, {
+      code: "tag-set-revision-conflict"
     }));
     const value = context(vi.fn().mockResolvedValue({ capabilities: [
       { id: "elsa.api.workflow-design", contractVersion: "1", links: [{ rel: "workflow-definition-tags", href: "design/workflows/definitions/{definitionId}/tags", templated: true }] }
@@ -66,6 +66,17 @@ describe("workflow definition marker tags", () => {
       headers: { "Content-Type": "application/json", Accept: "application/json", "If-Match": "\"tags-v3\"" },
       body: "{\"tagDefinitionIds\":[\"tag-prod\"]}"
     });
+  });
+
+  it.each([
+    { workflowDefinitionId: "definition-1", revision: "tags-v3", canAssign: true, assertions: [] },
+    { workflowDefinitionId: "another-definition", revision: "\"tags-v3\"", canAssign: true, assertions: [] }
+  ])("fails closed for an invalid tag-set response", async response => {
+    const value = context(vi.fn(async (url: string) => url === "/capabilities" ? {
+      capabilities: [{ id: "elsa.api.workflow-design", contractVersion: "1", links: [{ rel: "workflow-definition-tags", href: "design/workflows/definitions/{definitionId}/tags", templated: true }] }]
+    } : response));
+
+    await expect(getWorkflowDefinitionTags(value, "definition-1")).rejects.toThrow("invalid workflow definition tag set");
   });
 
   it("maps canonical catalog fields and sends their canonical spelling on mutations", async () => {

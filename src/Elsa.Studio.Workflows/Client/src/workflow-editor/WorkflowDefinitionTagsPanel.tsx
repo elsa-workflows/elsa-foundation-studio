@@ -54,8 +54,8 @@ export function WorkflowDefinitionTagsPanel({ context, definitionId }: { context
     {definitions.map(tag => {
       const assigned = assignedIds.has(tag.id);
       const retired = tag.status === "Retired";
-      const disabled = saving || !tagSet?.canAssign || retired;
-      return <label className="wf-tag-toggle" key={tag.id} title={retired ? "This tag is retired and cannot be assigned." : undefined}>
+      const disabled = saving || !tagSet?.canAssign || (retired && !assigned);
+      return <label className="wf-tag-toggle" key={tag.id} title={retired && !assigned ? "This tag is retired and cannot be assigned." : undefined}>
         <input type="checkbox" checked={assigned} disabled={disabled} onChange={() => void toggle(tag.id)} />
         <span><strong>{tag.displayName}</strong><small>{retired ? "Retired" : tag.key}</small></span>
       </label>;

@@ -120,12 +120,15 @@ function normalizeTagDefinition(value: unknown): TagDefinition | null {
 
 function normalizeTagSet(value: unknown, requestedDefinitionId: string): WorkflowDefinitionTagSet {
   const record = object(value);
+  if (!record || !isNonBlankString(requestedDefinitionId) || record.workflowDefinitionId !== requestedDefinitionId || !isQuotedRevision(record.revision)) {
+    throw new Error("The server returned an invalid workflow definition tag set.");
+  }
   const assertions = Array.isArray(record?.assertions)
     ? record.assertions.map(normalizeAssertion).filter((item): item is WorkflowDefinitionTagAssertion => item !== null)
     : [];
   return {
-    workflowDefinitionId: isNonBlankString(record?.workflowDefinitionId) ? record.workflowDefinitionId : requestedDefinitionId,
-    revision: isNonBlankString(record?.revision) ? record.revision : "",
+    workflowDefinitionId: record.workflowDefinitionId,
+    revision: record.revision,
     assertions,
     canAssign: record?.canAssign === true
   };
@@ -140,10 +143,10 @@ function normalizeAssertion(value: unknown): WorkflowDefinitionTagAssertion | nu
 
 function isRevisionConflict(error: unknown) {
   const record = object(error);
-  const response = object(record?.response) ?? object(record?.data) ?? record;
-  return record?.status === 409 || response?.status === 409
-    ? response?.code === "tag-set-revision-conflict" || record?.code === "tag-set-revision-conflict"
-    : false;
+  if (!record) return false;
+
+  const details = [record, object(record.payload), object(record.response), object(record.data)].filter((item): item is Record<string, unknown> => item !== null);
+  return details.some(item => item.status === 409) && details.some(item => item.code === "tag-set-revision-conflict");
 }
 
 function object(value: unknown): Record<string, unknown> | null {

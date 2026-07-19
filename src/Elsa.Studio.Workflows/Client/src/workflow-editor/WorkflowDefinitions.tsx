@@ -4,6 +4,7 @@ import type { StudioAiContributionApi, StudioEndpointContext } from "@elsa-workf
 import { createDefinition, deleteDefinition, deleteDefinitionPermanently, listDefinitions, restoreDefinition } from "../api/workflowDesign";
 import { listActivities } from "../api/activityDesign";
 import { listTagDefinitions, type TagDefinition } from "../api/tagging";
+import { capabilityIds, resolveCapabilityLink } from "../api/capabilities";
 import type { ActivityCatalogItem, DefinitionListSortBy, DefinitionListSortDirection, DefinitionListState, WorkflowDefinitionDetails } from "../workflowTypes";
 import { formatDate } from "../workflowFormatting";
 import { getDialogs } from "./dialogs";
@@ -23,6 +24,7 @@ const definitionSortOptions: { value: string; label: string; sortBy: DefinitionL
   { value: "createdAt:desc", label: "Created newest", sortBy: "createdAt", sortDirection: "desc" },
   { value: "createdAt:asc", label: "Created oldest", sortBy: "createdAt", sortDirection: "asc" }
 ];
+const noMarkerTagClauses: string[] = [];
 
 export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEndpointContext; ai: StudioAiContributionApi; onOpen(id: string): void }) {
   const [search, setSearch] = useState("");
@@ -44,6 +46,9 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
   const [tagDefinitions, setTagDefinitions] = useState<TagDefinition[]>([]);
   const [taggingState, setTaggingState] = useState<"loading" | "ready" | "unavailable" | "forbidden">("loading");
   const [markerTagClauses, setMarkerTagClauses] = useState<string[]>(() => markerTagClausesFromSearch(window.location.search));
+  const applicableMarkerTagClauses = useMemo(
+    () => taggingState === "ready" ? markerTagClauses : noMarkerTagClauses,
+    [markerTagClauses, taggingState]);
   const selectVisibleRef = useRef<HTMLInputElement | null>(null);
   const requestSequenceRef = useRef(0);
   const visibleDefinitionIds = useMemo(() => definitions.map(definition => definition.id), [definitions]);
@@ -57,7 +62,15 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
     setState("loading");
     setError("");
     try {
-      const response = await listDefinitions(context, { searchTerm: search, state: listState, page, pageSize, sortBy, sortDirection, markerTagClauses });
+      const response = await listDefinitions(context, {
+        searchTerm: search,
+        state: listState,
+        page,
+        pageSize,
+        sortBy,
+        sortDirection,
+        markerTagClauses: applicableMarkerTagClauses
+      });
       if (requestSequence !== requestSequenceRef.current) return;
       const effectiveTotalPages = getTotalPages(response.totalCount, response.pageSize);
 
@@ -74,7 +87,7 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
       setError(e instanceof Error ? e.message : String(e));
       setState("failed");
     }
-  }, [context, search, listState, page, pageSize, sortBy, sortDirection, markerTagClauses]);
+  }, [context, search, listState, page, pageSize, sortBy, sortDirection, applicableMarkerTagClauses]);
 
   useEffect(() => {
     void load();
@@ -85,14 +98,23 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
 
   useEffect(() => {
     let active = true;
-    void listTagDefinitions(context)
-      .then(response => {
+    void Promise.all([
+      listTagDefinitions(context),
+      resolveCapabilityLink(
+        context,
+        capabilityIds.workflowDesign,
+        "workflow-definition-tags",
+        { definitionId: "capability-check" })
+    ])
+      .then(([response]) => {
         if (!active) return;
         setTagDefinitions(response.items.filter(tag => tag.status === "Active"));
         setTaggingState("ready");
       })
       .catch((reason: unknown) => {
         if (!active) return;
+        setTagDefinitions([]);
+        setMarkerTagClauses([]);
         const status = typeof reason === "object" && reason && "status" in reason ? (reason as { status?: unknown }).status : undefined;
         setTaggingState(status === 403 ? "forbidden" : "unavailable");
       });
@@ -101,13 +123,16 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
 
   useEffect(() => {
     const restoreMarkerTagClauses = () => {
-      setMarkerTagClauses(markerTagClausesFromSearch(window.location.search));
+      setMarkerTagClauses(
+        taggingState === "unavailable" || taggingState === "forbidden"
+          ? []
+          : markerTagClausesFromSearch(window.location.search));
       setPage(1);
       setSelectedDefinitionIds(new Set());
     };
     window.addEventListener("popstate", restoreMarkerTagClauses);
     return () => window.removeEventListener("popstate", restoreMarkerTagClauses);
-  }, []);
+  }, [taggingState]);
 
   useEffect(() => {
     writeMarkerTagClausesToLocation(markerTagClauses);
