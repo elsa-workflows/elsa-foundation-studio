@@ -263,6 +263,44 @@ describe("workflows module", () => {
     await unmount();
   });
 
+  it("keeps the newest workflow-definition query when an older response resolves last", async () => {
+    let resolveInitialRequest!: (value: Response) => void;
+    const initialRequest = new Promise<Response>(resolve => {
+      resolveInitialRequest = resolve;
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("searchTerm=Newest")) {
+        return response({
+          items: [definition({ id: "definition-newest", name: "Newest workflow" })],
+          page: 1,
+          pageSize: 10,
+          totalCount: 1
+        });
+      }
+      return initialRequest;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { container, unmount } = await renderRegisteredRoute();
+
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await fill(container.querySelector<HTMLInputElement>("input[placeholder='Search definitions']"), "Newest");
+    await waitForText(container, "Newest workflow");
+
+    resolveInitialRequest(response({
+      items: [definition({ id: "definition-stale", name: "Stale workflow" })],
+      page: 1,
+      pageSize: 10,
+      totalCount: 1
+    }));
+    await flushPromises();
+
+    expect(container.textContent).toContain("Newest workflow");
+    expect(container.textContent).not.toContain("Stale workflow");
+
+    await unmount();
+  });
+
   it("opens the workflow editor when a definition row is clicked", async () => {
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);

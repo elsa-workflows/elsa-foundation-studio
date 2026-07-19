@@ -40,6 +40,7 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
   const [catalog, setCatalog] = useState<ActivityCatalogItem[]>([]);
   const [catalogState, setCatalogState] = useState<"idle" | "loading" | "ready" | "failed">("idle");
   const selectVisibleRef = useRef<HTMLInputElement | null>(null);
+  const requestSequenceRef = useRef(0);
   const visibleDefinitionIds = useMemo(() => definitions.map(definition => definition.id), [definitions]);
   const suggestMetadataAction = findAiAction(ai, "weaver.workflows.suggest-create-metadata");
   const explainDefinitionAction = findAiAction(ai, "weaver.workflows.explain-definition");
@@ -47,10 +48,12 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
   const allVisibleSelected = visibleDefinitionIds.length > 0 && selectedVisibleCount === visibleDefinitionIds.length;
 
   const load = useCallback(async () => {
+    const requestSequence = ++requestSequenceRef.current;
     setState("loading");
     setError("");
     try {
       const response = await listDefinitions(context, { searchTerm: search, state: listState, page, pageSize, sortBy, sortDirection });
+      if (requestSequence !== requestSequenceRef.current) return;
       const effectiveTotalPages = getTotalPages(response.totalCount, response.pageSize);
 
       if (response.totalCount > 0 && page > effectiveTotalPages) {
@@ -62,6 +65,7 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
       setTotalCount(response.totalCount);
       setState("ready");
     } catch (e) {
+      if (requestSequence !== requestSequenceRef.current) return;
       setError(e instanceof Error ? e.message : String(e));
       setState("failed");
     }
@@ -69,6 +73,9 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
 
   useEffect(() => {
     void load();
+    return () => {
+      requestSequenceRef.current += 1;
+    };
   }, [load]);
 
   useEffect(() => {
