@@ -53,10 +53,11 @@ export function WorkflowDefinitionTagsPanel({ context, definitionId }: { context
     {!tagSet?.canAssign ? <p className="wf-inline-note">You can view tags but need assignment permission to change them.</p> : null}
     {definitions.map(tag => {
       const assigned = assignedIds.has(tag.id);
-      const disabled = saving || !tagSet?.canAssign || tag.deleted;
-      return <label className="wf-tag-toggle" key={tag.id} title={tag.deleted ? "This tag has been deleted and cannot be assigned." : undefined}>
+      const retired = tag.status === "Retired";
+      const disabled = saving || !tagSet?.canAssign || retired;
+      return <label className="wf-tag-toggle" key={tag.id} title={retired ? "This tag is retired and cannot be assigned." : undefined}>
         <input type="checkbox" checked={assigned} disabled={disabled} onChange={() => void toggle(tag.id)} />
-        <span><strong>{tag.displayName}</strong><small>{tag.deleted ? "Deleted" : tag.key}</small></span>
+        <span><strong>{tag.displayName}</strong><small>{retired ? "Retired" : tag.key}</small></span>
       </label>;
     })}
     {definitions.length === 0 ? <div className="wf-panel-empty">No marker tags are available.</div> : null}

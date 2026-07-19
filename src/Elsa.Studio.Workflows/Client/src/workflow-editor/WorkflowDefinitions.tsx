@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { AlertCircle, Check, Package, Plus, RotateCcw, Search, Sparkles, Trash2 } from "lucide-react";
 import type { StudioAiContributionApi, StudioEndpointContext } from "@elsa-workflows/studio-sdk";
 import { createDefinition, deleteDefinition, deleteDefinitionPermanently, listDefinitions, restoreDefinition } from "../api/workflowDesign";
@@ -13,6 +13,7 @@ import { dispatchAiAction, findAiAction, getCreateInitialState, getTotalPages } 
 import { WfEmptyState, WfErrorCard, WfListSkeleton } from "./StatusViews";
 import { DefinitionPager } from "./DefinitionPager";
 import { CreateWorkflowDialog } from "./CreateWorkflowDialog";
+import { markerTagClausesFromSearch, writeMarkerTagClausesToLocation } from "./markerTagFilters";
 
 const definitionSortOptions: { value: string; label: string; sortBy: DefinitionListSortBy; sortDirection: DefinitionListSortDirection }[] = [
   { value: "name:asc", label: "Name A–Z", sortBy: "name", sortDirection: "asc" },
@@ -42,7 +43,7 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
   const [catalogState, setCatalogState] = useState<"idle" | "loading" | "ready" | "failed">("idle");
   const [tagDefinitions, setTagDefinitions] = useState<TagDefinition[]>([]);
   const [taggingState, setTaggingState] = useState<"loading" | "ready" | "unavailable" | "forbidden">("loading");
-  const [markerTagClauses, setMarkerTagClauses] = useState<string[]>([]);
+  const [markerTagClauses, setMarkerTagClauses] = useState<string[]>(() => markerTagClausesFromSearch(window.location.search));
   const selectVisibleRef = useRef<HTMLInputElement | null>(null);
   const requestSequenceRef = useRef(0);
   const visibleDefinitionIds = useMemo(() => definitions.map(definition => definition.id), [definitions]);
@@ -87,7 +88,7 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
     void listTagDefinitions(context)
       .then(response => {
         if (!active) return;
-        setTagDefinitions(response.items.filter(tag => !tag.deleted));
+        setTagDefinitions(response.items.filter(tag => tag.status === "Active"));
         setTaggingState("ready");
       })
       .catch((reason: unknown) => {
@@ -97,6 +98,20 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
       });
     return () => { active = false; };
   }, [context]);
+
+  useEffect(() => {
+    const restoreMarkerTagClauses = () => {
+      setMarkerTagClauses(markerTagClausesFromSearch(window.location.search));
+      setPage(1);
+      setSelectedDefinitionIds(new Set());
+    };
+    window.addEventListener("popstate", restoreMarkerTagClauses);
+    return () => window.removeEventListener("popstate", restoreMarkerTagClauses);
+  }, []);
+
+  useEffect(() => {
+    writeMarkerTagClausesToLocation(markerTagClauses);
+  }, [markerTagClauses]);
 
   useEffect(() => {
     if (selectVisibleRef.current) {
@@ -410,13 +425,27 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
   );
 }
 
-function MarkerTagChips({ definition }: { definition: WorkflowDefinitionDetails["definition"] }) {
+export function MarkerTagChips({ definition }: { definition: Pick<WorkflowDefinitionDetails["definition"], "markerTags"> }) {
   const tags = definition.markerTags ?? [];
+  const [overflowOpen, setOverflowOpen] = useState(false);
+  const overflowId = useId();
   if (tags.length === 0) return <span className="wf-inline-note">None</span>;
   const visible = tags.slice(0, 2);
   const overflow = tags.slice(2);
   return <span className="wf-tag-chip-list" aria-label={`Tags: ${tags.map(tag => tag.displayName).join(", ")}`}>
     {visible.map(tag => <span className="wf-tag-chip" key={tag.tagDefinitionId}>{tag.displayName}</span>)}
-    {overflow.length > 0 ? <span className="wf-tag-chip" title={overflow.map(tag => tag.displayName).join(", ")}>+{overflow.length}</span> : null}
+    {overflow.length > 0 ? <span className="wf-tag-overflow">
+      <button
+        type="button"
+        className="wf-tag-chip wf-tag-chip-button"
+        aria-expanded={overflowOpen}
+        aria-controls={overflowId}
+        aria-label={`Show ${overflow.length} more tag${overflow.length === 1 ? "" : "s"}`}
+        onClick={event => { event.stopPropagation(); setOverflowOpen(current => !current); }}
+      >+{overflow.length}</button>
+      {overflowOpen ? <ul id={overflowId} className="wf-tag-overflow-list" role="list">
+        {overflow.map(tag => <li key={tag.tagDefinitionId}>{tag.displayName}</li>)}
+      </ul> : null}
+    </span> : null}
   </span>;
 }

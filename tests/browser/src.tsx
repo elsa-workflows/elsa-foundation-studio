@@ -207,7 +207,7 @@ function WorkflowDefinitionListFixture() {
         }
 
         if (url === "/tagging/definitions") {
-          return { canManage: true, items: [{ id: "tag-environment", canonicalKey: "environment", displayName: "Environment", status: "Active" }] };
+          return { canManage: true, items: [{ id: "tag-environment", canonicalKey: "environment", displayName: "Environment", status: "Active", revision: "\"tag-v1\"" }] };
         }
 
         setRequests(current => [...current, url]);
@@ -222,7 +222,7 @@ function WorkflowDefinitionListFixture() {
           createdAt: "2026-07-19T00:00:00Z",
           lastModifiedAt: "2026-07-19T00:00:00Z",
           versionCount: 0,
-          markerTags: index % 3 === 0 ? [{ tagDefinitionId: "tag-environment", key: "environment", displayName: "Environment" }] : []
+          markerTags: index % 3 === 0 ? [{ tagDefinitionId: "tag-environment", canonicalKey: "environment", displayName: "Environment" }] : []
         })).filter(definition => definition.name.toLowerCase().includes(searchTerm));
         const offset = (page - 1) * pageSize;
         return {

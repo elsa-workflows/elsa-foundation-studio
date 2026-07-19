@@ -33,7 +33,7 @@ export interface WorkflowDefinitionSummary {
 
 export interface MarkerTagSummary {
   tagDefinitionId: string;
-  key: string;
+  canonicalKey: string;
   displayName: string;
 }
 

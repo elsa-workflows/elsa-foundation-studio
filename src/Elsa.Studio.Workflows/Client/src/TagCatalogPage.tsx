@@ -1,15 +1,22 @@
 import { useCallback, useEffect, useState } from "react";
-import { Check, Plus, RefreshCw } from "lucide-react";
+import { Check, Pencil, Plus, RefreshCw, Save, X } from "lucide-react";
 import type { StudioEndpointContext } from "@elsa-workflows/studio-sdk";
 import { createTagDefinition, listTagDefinitions, updateTagDefinition, type TagDefinition } from "./api/tagging";
+
+type TagDraft = { canonicalKey: string; displayName: string; description: string; color: string };
+
+const emptyDraft = (): TagDraft => ({ canonicalKey: "", displayName: "", description: "", color: "" });
 
 export function TagCatalogPage({ context }: { context: StudioEndpointContext }) {
   const [items, setItems] = useState<TagDefinition[]>([]);
   const [canManage, setCanManage] = useState(false);
   const [state, setState] = useState<"loading" | "ready" | "forbidden" | "unavailable">("loading");
   const [error, setError] = useState("");
-  const [draft, setDraft] = useState({ canonicalKey: "", displayName: "", description: "" });
+  const [draft, setDraft] = useState<TagDraft>(emptyDraft);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<TagDraft>(emptyDraft);
   const [saving, setSaving] = useState(false);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setState("loading");
@@ -33,13 +40,14 @@ export function TagCatalogPage({ context }: { context: StudioEndpointContext }) 
     setSaving(true);
     setError("");
     try {
-      const created = await createTagDefinition(context, {
+      await createTagDefinition(context, {
         canonicalKey: draft.canonicalKey.trim(),
         displayName: draft.displayName.trim(),
-        description: draft.description.trim() || null
+        description: draft.description.trim() || null,
+        color: draft.color || null
       });
-      setItems(current => [...current, created].sort((left, right) => left.displayName.localeCompare(right.displayName)));
-      setDraft({ canonicalKey: "", displayName: "", description: "" });
+      await load();
+      setDraft(emptyDraft());
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Couldn't create the tag.");
     } finally {
@@ -47,13 +55,41 @@ export function TagCatalogPage({ context }: { context: StudioEndpointContext }) 
     }
   };
 
-  const toggleDeleted = async (item: TagDefinition) => {
+  const toggleRetired = async (item: TagDefinition) => {
+    setUpdatingId(item.id);
     setError("");
     try {
-      const saved = await updateTagDefinition(context, item.id, { status: item.deleted ? "Active" : "Retired" });
-      setItems(current => current.map(candidate => candidate.id === saved.id ? saved : candidate));
+      await updateTagDefinition(context, item.id, item.revision, { status: item.status === "Retired" ? "Active" : "Retired" });
+      await load();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Couldn't update the tag.");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const startEditing = (item: TagDefinition) => {
+    setError("");
+    setEditingId(item.id);
+    setEditDraft({ canonicalKey: item.key, displayName: item.displayName, description: item.description ?? "", color: item.color ?? "" });
+  };
+
+  const saveEdit = async (item: TagDefinition) => {
+    if (!editDraft.displayName.trim()) return;
+    setUpdatingId(item.id);
+    setError("");
+    try {
+      await updateTagDefinition(context, item.id, item.revision, {
+        displayName: editDraft.displayName.trim(),
+        description: editDraft.description.trim() || null,
+        color: editDraft.color || null
+      });
+      await load();
+      setEditingId(null);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Couldn't update the tag.");
+    } finally {
+      setUpdatingId(null);
     }
   };
 
@@ -71,18 +107,43 @@ export function TagCatalogPage({ context }: { context: StudioEndpointContext }) 
       <label>Key<input value={draft.canonicalKey} onChange={event => setDraft(current => ({ ...current, canonicalKey: event.target.value }))} placeholder="environment" required /></label>
       <label>Name<input value={draft.displayName} onChange={event => setDraft(current => ({ ...current, displayName: event.target.value }))} placeholder="Environment" required /></label>
       <label>Description<input value={draft.description} onChange={event => setDraft(current => ({ ...current, description: event.target.value }))} placeholder="Optional" /></label>
+      <label>Color<input aria-label="New tag color" type="color" value={draft.color || "#0ea5e9"} onChange={event => setDraft(current => ({ ...current, color: event.target.value }))} /></label>
       <button type="submit" disabled={saving}><Plus size={15} /> Create tag</button>
     </form> : <p className="wf-inline-note wf-tag-note">You can use marker tags, but only tag managers can change the catalog.</p>}
     <div className="wf-grid wf-tag-catalog-grid" role="table" aria-label="Marker tag definitions">
       <div className="wf-grid-head" role="row"><span>Name</span><span>Key</span><span>Status</span><span>Actions</span></div>
-      {items.map(item => <div className="wf-grid-row" role="row" key={item.id}>
-        <span><strong>{item.displayName}</strong><small>{item.description}</small></span>
-        <span><code>{item.key}</code></span>
-        <span>{item.deleted ? "Deleted" : "Active"}</span>
-        <span>{canManage || item.canManage ? <button type="button" onClick={() => void toggleDeleted(item)}>{item.deleted ? "Restore" : "Delete"}</button> : <span className="wf-inline-note">Managed</span>}</span>
-      </div>)}
+      {items.map(item => {
+        const canEdit = canManage || item.canManage;
+        const editing = editingId === item.id;
+        const updating = updatingId === item.id;
+        return <div className="wf-grid-row" role="row" key={item.id}>
+          <span>
+            {editing ? <>
+              <label className="wf-visually-hidden" htmlFor={`tag-name-${item.id}`}>Name</label>
+              <input id={`tag-name-${item.id}`} value={editDraft.displayName} onChange={event => setEditDraft(current => ({ ...current, displayName: event.target.value }))} />
+              <label className="wf-visually-hidden" htmlFor={`tag-description-${item.id}`}>Description</label>
+              <input id={`tag-description-${item.id}`} value={editDraft.description} onChange={event => setEditDraft(current => ({ ...current, description: event.target.value }))} placeholder="Optional description" />
+              <label className="wf-visually-hidden" htmlFor={`tag-color-${item.id}`}>Color</label>
+              <input id={`tag-color-${item.id}`} type="color" value={editDraft.color || "#0ea5e9"} onChange={event => setEditDraft(current => ({ ...current, color: event.target.value }))} />
+            </> : <><TagColor color={item.color} /><strong>{item.displayName}</strong><small>{item.description}</small></>}
+          </span>
+          <span><code>{item.key}</code></span>
+          <span>{item.status}</span>
+          <span>{canEdit ? editing ? <>
+            <button type="button" disabled={updating} onClick={() => void saveEdit(item)}><Save size={14} /> Save</button>
+            <button type="button" disabled={updating} onClick={() => setEditingId(null)}><X size={14} /> Cancel</button>
+          </> : <>
+            <button type="button" disabled={updating} onClick={() => startEditing(item)}><Pencil size={14} /> Edit</button>
+            <button type="button" disabled={updating} onClick={() => void toggleRetired(item)}>{item.status === "Retired" ? "Reactivate" : "Retire"}</button>
+          </> : <span className="wf-inline-note">Managed</span>}</span>
+        </div>;
+      })}
     </div>
     {items.length === 0 ? <div className="wf-empty">No marker tags have been defined.</div> : null}
     <p className="wf-tag-note"><Check size={14} /> Marker tags are labels only; they never change runtime workflow behavior.</p>
   </section>;
+}
+
+function TagColor({ color }: { color?: string | null }) {
+  return color ? <span className="wf-tag-color" style={{ backgroundColor: color }} aria-hidden="true" /> : null;
 }

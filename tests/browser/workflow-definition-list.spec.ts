@@ -10,6 +10,7 @@ test("workflow definitions use bounded server requests for paging, search, scope
 
   await page.getByLabel("Environment marker tag filter").selectOption("exists");
   await expect(requests).toContainText("markerTagClauses=tag-environment%3Aexists");
+  await expect(page).toHaveURL(/markerTag=tag-environment%3Aexists/);
   await expect(page.getByText("Page 1 of 6")).toBeVisible();
 
   await page.getByRole("checkbox", { name: "Select workflow definition Active workflow 1", exact: true }).check();

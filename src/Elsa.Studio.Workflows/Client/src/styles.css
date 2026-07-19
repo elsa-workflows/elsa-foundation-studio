@@ -699,6 +699,54 @@
   white-space: nowrap;
 }
 
+.wf-tag-chip-button {
+  cursor: pointer;
+}
+
+.wf-tag-overflow {
+  position: relative;
+  display: inline-flex;
+}
+
+.wf-tag-overflow-list {
+  position: absolute;
+  z-index: 4;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 140px;
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--wf-border);
+  border-radius: var(--wf-radius);
+  background: var(--wf-panel);
+  box-shadow: var(--wf-shadow-menu);
+  color: var(--wf-text);
+  font-size: var(--wf-text-xs);
+  list-style: none;
+}
+
+.wf-tag-overflow-list li + li {
+  margin-top: 4px;
+}
+
+.wf-tag-color {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border: 1px solid var(--wf-border);
+  border-radius: 50%;
+}
+
+.wf-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 .wf-tag-create {
   display: flex;
   flex-wrap: wrap;

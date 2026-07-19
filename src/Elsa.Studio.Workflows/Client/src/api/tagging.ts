@@ -7,7 +7,8 @@ export interface TagDefinition {
   displayName: string;
   description?: string | null;
   color?: string | null;
-  deleted: boolean;
+  status: "Active" | "Retired";
+  revision: string;
   canManage: boolean;
 }
 
@@ -65,11 +66,12 @@ export async function createTagDefinition(context: StudioEndpointContext, reques
 export async function updateTagDefinition(
   context: StudioEndpointContext,
   tagDefinitionId: string,
+  revision: string,
   patch: { canonicalKey?: string; displayName?: string; description?: string | null; color?: string | null; status?: "Active" | "Retired" }
 ) {
   const response = await context.http.requestJson<unknown>(`${await definitionsPath(context)}/${encodeURIComponent(tagDefinitionId)}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    headers: { "Content-Type": "application/json", Accept: "application/json", "If-Match": revision },
     body: JSON.stringify(patch)
   });
   const definition = normalizeTagDefinition(response);
@@ -103,14 +105,15 @@ export async function replaceWorkflowDefinitionTags(
 
 function normalizeTagDefinition(value: unknown): TagDefinition | null {
   const record = object(value);
-  if (!record || !isNonBlankString(record.id) || !isNonBlankString(record.canonicalKey) || !isNonBlankString(record.displayName) || (record.status !== "Active" && record.status !== "Retired")) return null;
+  if (!record || !isNonBlankString(record.id) || !isNonBlankString(record.canonicalKey) || !isNonBlankString(record.displayName) || !isQuotedRevision(record.revision) || (record.status !== "Active" && record.status !== "Retired")) return null;
   return {
     id: record.id,
     key: record.canonicalKey,
     displayName: record.displayName,
     description: typeof record.description === "string" ? record.description : null,
     color: typeof record.color === "string" ? record.color : null,
-    deleted: record.status === "Retired",
+    status: record.status,
+    revision: record.revision,
     canManage: record.canManage === true
   };
 }
@@ -149,4 +152,8 @@ function object(value: unknown): Record<string, unknown> | null {
 
 function isNonBlankString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function isQuotedRevision(value: unknown): value is string {
+  return typeof value === "string" && /^".+"$/.test(value);
 }
