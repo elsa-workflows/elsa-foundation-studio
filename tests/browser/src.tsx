@@ -197,9 +197,24 @@ function WorkflowDefinitionListFixture() {
             capabilities: [{
               id: "elsa.api.workflow-design",
               contractVersion: "1",
-              links: [{ rel: "workflow-definitions", href: "design/workflows/definitions" }]
+              links: [
+                { rel: "workflow-definitions", href: "design/workflows/definitions" },
+                {
+                  rel: "workflow-definition-tags",
+                  href: "design/workflows/definitions/{definitionId}/tags",
+                  templated: true
+                }
+              ]
+            }, {
+              id: "elsa.api.tagging",
+              contractVersion: "1",
+              links: [{ rel: "tag-definitions", href: "tagging/definitions" }]
             }]
           };
+        }
+
+        if (url === "/tagging/definitions") {
+          return { canManage: true, items: [{ id: "tag-environment", canonicalKey: "environment", displayName: "Environment", status: "Active", revision: "\"tag-v1\"" }] };
         }
 
         setRequests(current => [...current, url]);
@@ -213,7 +228,8 @@ function WorkflowDefinitionListFixture() {
           name: `${state === "deleted" ? "Deleted" : "Active"} workflow ${index + 1}`,
           createdAt: "2026-07-19T00:00:00Z",
           lastModifiedAt: "2026-07-19T00:00:00Z",
-          versionCount: 0
+          versionCount: 0,
+          markerTags: index % 3 === 0 ? [{ tagDefinitionId: "tag-environment", canonicalKey: "environment", displayName: "Environment" }] : []
         })).filter(definition => definition.name.toLowerCase().includes(searchTerm));
         const offset = (page - 1) * pageSize;
         return {

@@ -77,10 +77,11 @@ describe("workflows module", () => {
     expect(nodes[2].position.x).toBe(600);
   });
 
-  it("registers Runs navigation while preserving instance routes", () => {
+  it("registers marker tags and Runs navigation when the catalog capability is available", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => response(taggingCapabilityDocument())));
     const api = testApi();
 
-    register(api);
+    await register(api);
 
     expect(api.featureAreas.list()).toEqual([
       expect.objectContaining({ id: "workflows", title: "Workflows", ownedPaths: ["/workflows"], required: true, defaultEnabled: true })
@@ -88,6 +89,7 @@ describe("workflows module", () => {
     expect(api.navigation.list()).toEqual([
       expect.objectContaining({ id: "workflows", path: "/workflows/definitions", activePathPrefix: "/workflows" }),
       expect.objectContaining({ id: "workflows-definitions", path: "/workflows/definitions", parentId: "workflows" }),
+      expect.objectContaining({ id: "workflows-marker tags", label: "Marker Tags", path: "/workflows/tags", parentId: "workflows" }),
       expect.objectContaining({ id: "workflows-executables", path: "/workflows/executables", parentId: "workflows" }),
       expect.objectContaining({ id: "workflows-runs", label: "Runs", path: "/workflows/instances", parentId: "workflows" }),
       expect.objectContaining({ id: "workflows-runtime diagnostics", label: "Runtime Diagnostics", path: "/workflows/runtime-diagnostics", parentId: "workflows" }),
@@ -95,6 +97,7 @@ describe("workflows module", () => {
     ]);
     expect(api.routes.list()).toEqual([
       expect.objectContaining({ id: "workflows-definitions", path: "/workflows/definitions" }),
+      expect.objectContaining({ id: "workflows-tags", label: "Marker tags", path: "/workflows/tags" }),
       expect.objectContaining({ id: "workflows-executables", path: "/workflows/executables" }),
       expect.objectContaining({ id: "workflows-executable-inspector", label: "Executable Inspector", path: "/workflows/executables/:artifactId" }),
       expect.objectContaining({ id: "workflows-instances", label: "Workflow runs", path: "/workflows/instances" }),
@@ -107,6 +110,23 @@ describe("workflows module", () => {
       expect.objectContaining({ id: "elsa.object-expression-editor", createDefaultValue: expect.any(Function) }),
       expect.objectContaining({ id: "studio.workflows.input-reference", createDefaultValue: expect.any(Function) })
     ]);
+  });
+
+  it.each([
+    ["absent", { capabilities: [] }],
+    ["malformed", { capabilities: [{ id: "elsa.api.tagging", contractVersion: "1", links: [{ rel: "tag-definitions" }] }] }]
+  ])("hides marker tag navigation and its route when the catalog capability is %s", async (_case, document) => {
+    vi.stubGlobal("fetch", vi.fn(async () => response(document)));
+    const api = testApi();
+
+    await register(api);
+
+    expect(api.navigation.list()).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: "/workflows/tags" })
+    ]));
+    expect(api.routes.list()).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: "/workflows/tags" })
+    ]));
   });
 
   it("announces while the workflow definitions route loads on demand", async () => {
@@ -143,9 +163,9 @@ describe("workflows module", () => {
     }
   });
 
-  it("passes late module run-input contributions through every routed run surface", () => {
+  it("passes late module run-input contributions through every routed run surface", async () => {
     const api = testApi();
-    register(api);
+    await register(api);
     const editor = createEnumWorkflowRunInputEditorContribution({
       id: "contoso.order-status",
       supports: input => input.type.alias === "Contoso.OrderStatus",
@@ -162,10 +182,10 @@ describe("workflows module", () => {
     }
   });
 
-  it("keeps the JSON fallback when hosted by a pre-slot SDK registry", () => {
+  it("keeps the JSON fallback when hosted by a pre-slot SDK registry", async () => {
     const { workflowRunInputEditors: _unsupportedSlot, ...api } = testApi();
 
-    expect(() => register(api)).not.toThrow();
+    await expect(register(api)).resolves.toBeUndefined();
     const route = api.routes.list().find(candidate => candidate.id === "workflows-definitions")!;
     const renderRoute = route.component as (props: { navigate(path: string): void }) => React.ReactElement<{ children: React.ReactNode }>;
     const boundary = renderRoute({ navigate: vi.fn() });
@@ -2971,7 +2991,7 @@ async function renderRegisteredRoute(
   window.history.replaceState({}, "", path);
   const api = testApi();
   configureApi?.(api);
-  register(api);
+  await register(api);
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
@@ -3129,6 +3149,20 @@ function capabilityDocument() {
           { rel: "activity-execution", href: "runtime/workflows/instances/{workflowExecutionId}/activity-executions/{activityExecutionId}", templated: true },
           { rel: "runtime-diagnostics", href: "runtime/workflows/diagnostics/settings" }
         ]
+      }
+    ]
+  };
+}
+
+function taggingCapabilityDocument() {
+  const document = capabilityDocument();
+  return {
+    capabilities: [
+      ...document.capabilities,
+      {
+        id: "elsa.api.tagging",
+        contractVersion: "1",
+        links: [{ rel: "tag-definitions", href: "tagging/definitions" }]
       }
     ]
   };

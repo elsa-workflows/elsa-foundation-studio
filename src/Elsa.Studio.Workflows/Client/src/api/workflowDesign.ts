@@ -32,6 +32,7 @@ export interface DefinitionListRequest {
   pageSize: number;
   sortBy?: DefinitionListSortBy;
   sortDirection?: DefinitionListSortDirection;
+  markerTagClauses?: string[];
 }
 
 type WorkflowDraftResponse = Omit<WorkflowDraft, "validationErrors"> & {
@@ -96,6 +97,9 @@ export async function listDefinitions(context: StudioEndpointContext, request: D
   parameters.set("pageSize", String(request.pageSize));
   parameters.set("sortBy", request.sortBy ?? "name");
   parameters.set("sortDirection", request.sortDirection ?? "asc");
+  for (const clause of request.markerTagClauses ?? []) {
+    if (/^[^:\s]+:(?:exists|missing)$/.test(clause)) parameters.append("markerTagClauses", clause);
+  }
   const response = await context.http.getJson<{
     items: WorkflowDefinitionsResponse["definitions"];
     page: number;

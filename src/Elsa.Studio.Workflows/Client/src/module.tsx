@@ -7,6 +7,7 @@ import "./styles.css";
 import { registerVariableReferenceContribution } from "./variableReferenceContribution";
 import { registerInputReferenceContribution } from "./inputReferenceContribution";
 import { WorkflowLazyBoundary } from "./WorkflowLazyBoundary";
+import { capabilityIds, resolveCapabilityLink } from "./api/capabilities";
 
 const WorkflowManagementPage = lazy(() => import("./workflow-editor/pages").then(module => ({ default: module.WorkflowManagementPage })));
 const WorkflowExecutablesPage = lazy(() => import("./workflow-editor/pages").then(module => ({ default: module.WorkflowExecutablesPage })));
@@ -15,6 +16,7 @@ const WorkflowInstancesPage = lazy(() => import("./workflow-editor/pages").then(
 const WorkflowInstanceDetailsPage = lazy(() => import("./workflow-editor/pages").then(module => ({ default: module.WorkflowInstanceDetailsPage })));
 const ActivityAvailabilityPage = lazy(() => import("./ActivityAvailabilityPage").then(module => ({ default: module.ActivityAvailabilityPage })));
 const RuntimeDiagnosticsSettingsPage = lazy(() => import("./RuntimeDiagnosticsSettingsPage").then(module => ({ default: module.RuntimeDiagnosticsSettingsPage })));
+const TagCatalogPage = lazy(() => import("./TagCatalogPage").then(module => ({ default: module.TagCatalogPage })));
 
 // Re-exported for the test suite (src/__tests__/module.test.tsx), which imports these connect-end
 // helpers directly alongside register().
@@ -26,12 +28,20 @@ export type { WorkflowConnectSource, WorkflowDesignerPanelContext } from "./work
 export { createEnumWorkflowRunInputEditorContribution } from "./workflowRunInputEditorContributions";
 export type { EnumWorkflowRunInputEditorOptions } from "./workflowRunInputEditorContributions";
 
-export function register(api: ElsaStudioModuleApi) {
+export async function register(api: ElsaStudioModuleApi) {
   setDialogs(api.dialogs);
   registerVariableReferenceContribution(api.expressionEditors);
   api.expressionEditors.add(createObjectExpressionEditorContribution(() => api.propertyEditors.list()));
   registerInputReferenceContribution(api.expressionEditors);
   const runInputEditors = () => api.workflowRunInputEditors?.list() ?? [];
+  const markerTagsAvailable = await resolveCapabilityLink(
+    api.backend,
+    capabilityIds.tagging,
+    "tag-definitions"
+  ).then(
+    () => true,
+    () => false
+  );
   api.featureAreas.add({
     id: "workflows",
     title: "Workflows",
@@ -47,6 +57,9 @@ export function register(api: ElsaStudioModuleApi) {
       iconColor: "#0ea5e9",
       items: [
         { title: "Definitions", path: "/workflows/definitions", iconColor: "#0ea5e9" },
+        ...(markerTagsAvailable
+          ? [{ title: "Marker Tags", path: "/workflows/tags", iconColor: "#0ea5e9" }]
+          : []),
         { title: "Executables", path: "/workflows/executables", iconColor: "#0ea5e9" },
         { title: "Runs", path: "/workflows/instances", iconColor: "#0ea5e9" },
         { title: "Runtime Diagnostics", path: "/workflows/runtime-diagnostics", iconColor: "#0ea5e9" },
@@ -64,6 +77,14 @@ export function register(api: ElsaStudioModuleApi) {
           </WorkflowLazyBoundary>
         )
       },
+      ...(markerTagsAvailable
+        ? [{
+            id: "workflows-tags",
+            path: "/workflows/tags",
+            label: "Marker tags",
+            component: () => <WorkflowLazyBoundary label="marker tags"><TagCatalogPage context={api.backend} /></WorkflowLazyBoundary>
+          }]
+        : []),
       {
         id: "workflows-executables",
         path: "/workflows/executables",

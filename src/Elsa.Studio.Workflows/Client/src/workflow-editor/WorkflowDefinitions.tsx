@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { AlertCircle, Check, Package, Plus, RotateCcw, Search, Sparkles, Trash2 } from "lucide-react";
 import type { StudioAiContributionApi, StudioEndpointContext } from "@elsa-workflows/studio-sdk";
 import { createDefinition, deleteDefinition, deleteDefinitionPermanently, listDefinitions, restoreDefinition } from "../api/workflowDesign";
 import { listActivities } from "../api/activityDesign";
+import { listTagDefinitions, type TagDefinition } from "../api/tagging";
+import { capabilityIds, resolveCapabilityLink } from "../api/capabilities";
 import type { ActivityCatalogItem, DefinitionListSortBy, DefinitionListSortDirection, DefinitionListState, WorkflowDefinitionDetails } from "../workflowTypes";
 import { formatDate } from "../workflowFormatting";
 import { getDialogs } from "./dialogs";
@@ -12,6 +14,7 @@ import { dispatchAiAction, findAiAction, getCreateInitialState, getTotalPages } 
 import { WfEmptyState, WfErrorCard, WfListSkeleton } from "./StatusViews";
 import { DefinitionPager } from "./DefinitionPager";
 import { CreateWorkflowDialog } from "./CreateWorkflowDialog";
+import { markerTagClausesFromSearch, writeMarkerTagClausesToLocation } from "./markerTagFilters";
 
 const definitionSortOptions: { value: string; label: string; sortBy: DefinitionListSortBy; sortDirection: DefinitionListSortDirection }[] = [
   { value: "name:asc", label: "Name A–Z", sortBy: "name", sortDirection: "asc" },
@@ -21,6 +24,7 @@ const definitionSortOptions: { value: string; label: string; sortBy: DefinitionL
   { value: "createdAt:desc", label: "Created newest", sortBy: "createdAt", sortDirection: "desc" },
   { value: "createdAt:asc", label: "Created oldest", sortBy: "createdAt", sortDirection: "asc" }
 ];
+const noMarkerTagClauses: string[] = [];
 
 export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEndpointContext; ai: StudioAiContributionApi; onOpen(id: string): void }) {
   const [search, setSearch] = useState("");
@@ -39,6 +43,17 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
   const [creating, setCreating] = useState(false);
   const [catalog, setCatalog] = useState<ActivityCatalogItem[]>([]);
   const [catalogState, setCatalogState] = useState<"idle" | "loading" | "ready" | "failed">("idle");
+  const [tagDefinitions, setTagDefinitions] = useState<TagDefinition[]>([]);
+  const [taggingState, setTaggingState] = useState<"loading" | "ready" | "unavailable" | "forbidden">("loading");
+  const [markerTagClauses, setMarkerTagClauses] = useState<string[]>(() => markerTagClausesFromSearch(window.location.search));
+  const filterableTagDefinitions = useMemo(
+    () => tagDefinitions.filter(tag =>
+      tag.status === "Active"
+      || markerTagClauses.some(clause => clause.startsWith(`${tag.id}:`))),
+    [markerTagClauses, tagDefinitions]);
+  const applicableMarkerTagClauses = useMemo(
+    () => taggingState === "ready" ? markerTagClauses : noMarkerTagClauses,
+    [markerTagClauses, taggingState]);
   const selectVisibleRef = useRef<HTMLInputElement | null>(null);
   const requestSequenceRef = useRef(0);
   const visibleDefinitionIds = useMemo(() => definitions.map(definition => definition.id), [definitions]);
@@ -52,7 +67,15 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
     setState("loading");
     setError("");
     try {
-      const response = await listDefinitions(context, { searchTerm: search, state: listState, page, pageSize, sortBy, sortDirection });
+      const response = await listDefinitions(context, {
+        searchTerm: search,
+        state: listState,
+        page,
+        pageSize,
+        sortBy,
+        sortDirection,
+        markerTagClauses: applicableMarkerTagClauses
+      });
       if (requestSequence !== requestSequenceRef.current) return;
       const effectiveTotalPages = getTotalPages(response.totalCount, response.pageSize);
 
@@ -69,7 +92,7 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
       setError(e instanceof Error ? e.message : String(e));
       setState("failed");
     }
-  }, [context, search, listState, page, pageSize, sortBy, sortDirection]);
+  }, [context, search, listState, page, pageSize, sortBy, sortDirection, applicableMarkerTagClauses]);
 
   useEffect(() => {
     void load();
@@ -77,6 +100,48 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
       requestSequenceRef.current += 1;
     };
   }, [load]);
+
+  useEffect(() => {
+    let active = true;
+    void Promise.all([
+      listTagDefinitions(context),
+      resolveCapabilityLink(
+        context,
+        capabilityIds.workflowDesign,
+        "workflow-definition-tags",
+        { definitionId: "capability-check" })
+    ])
+      .then(([response]) => {
+        if (!active) return;
+        setTagDefinitions(response.items);
+        setTaggingState("ready");
+      })
+      .catch((reason: unknown) => {
+        if (!active) return;
+        setTagDefinitions([]);
+        setMarkerTagClauses([]);
+        const status = typeof reason === "object" && reason && "status" in reason ? (reason as { status?: unknown }).status : undefined;
+        setTaggingState(status === 403 ? "forbidden" : "unavailable");
+      });
+    return () => { active = false; };
+  }, [context]);
+
+  useEffect(() => {
+    const restoreMarkerTagClauses = () => {
+      setMarkerTagClauses(
+        taggingState === "unavailable" || taggingState === "forbidden"
+          ? []
+          : markerTagClausesFromSearch(window.location.search));
+      setPage(1);
+      setSelectedDefinitionIds(new Set());
+    };
+    window.addEventListener("popstate", restoreMarkerTagClauses);
+    return () => window.removeEventListener("popstate", restoreMarkerTagClauses);
+  }, [taggingState]);
+
+  useEffect(() => {
+    writeMarkerTagClausesToLocation(markerTagClauses);
+  }, [markerTagClauses]);
 
   useEffect(() => {
     if (selectVisibleRef.current) {
@@ -180,6 +245,16 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
     setPage(1);
   };
 
+  const changeMarkerTagClause = (tagDefinitionId: string, operator: "" | "exists" | "missing") => {
+    setMarkerTagClauses(current => {
+      const next = current.filter(clause => !clause.startsWith(`${tagDefinitionId}:`));
+      if (operator) next.push(`${tagDefinitionId}:${operator}`);
+      return next;
+    });
+    setPage(1);
+    clearSelection();
+  };
+
   const softDelete = async (definition: WorkflowDefinitionDetails["definition"]) => {
     if (!(await getDialogs().confirm({ message: `Delete workflow definition "${definition.name}"? You can restore it from the Deleted view.`, confirmLabel: "Delete", tone: "danger" }))) return;
     setStatus("");
@@ -238,6 +313,25 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
             {definitionSortOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </label>
+        {taggingState === "ready" && filterableTagDefinitions.length > 0 ? (
+          <fieldset className="wf-tag-filters">
+            <legend>Marker tags</legend>
+            {filterableTagDefinitions.map(tag => {
+              const clause = markerTagClauses.find(value => value.startsWith(`${tag.id}:`));
+              const value = clause?.split(":")[1] ?? "";
+              const filterLabel = `${tag.displayName}${tag.status === "Retired" ? " (Retired)" : ""}`;
+              return <label key={tag.id}>
+                {filterLabel}
+                <select aria-label={`${filterLabel} marker tag filter`} value={value} onChange={event => changeMarkerTagClause(tag.id, event.target.value as "" | "exists" | "missing")}>
+                  <option value="">Any</option>
+                  <option value="exists">Has tag</option>
+                  <option value="missing">Missing tag</option>
+                </select>
+              </label>;
+            })}
+          </fieldset>
+        ) : null}
+        {taggingState === "forbidden" ? <span className="wf-inline-note">Tag filters require tagging access.</span> : null}
         <button type="button" onClick={() => void load()}>Refresh</button>
         <div className="wf-actions">
           <button type="button" title="Create workflow" onClick={openCreateDialog}><Plus size={15} /> Create</button>
@@ -264,7 +358,7 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
       ) : null}
       {state === "ready" && definitions.length > 0 ? (
         <>
-          <div className="wf-grid" role="table" aria-label="Workflow definitions">
+          <div className="wf-grid wf-definition-grid" role="table" aria-label="Workflow definitions">
             <div className="wf-grid-head" role="row">
               <label className="wf-row-select">
                 <input
@@ -276,6 +370,7 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
                 />
               </label>
               <span>Name</span>
+              <span>Tags</span>
               <span>Latest version</span>
               <span>{listState === "deleted" ? "Deleted" : "Draft"}</span>
               <span>Modified</span>
@@ -309,6 +404,7 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
                   <strong>{definition.name}</strong>
                   <small>{definition.description || definition.id}</small>
                 </span>
+                <span><MarkerTagChips definition={definition} /></span>
                 <span>{definition.latestVersion ?? "No version"}</span>
                 <span>{listState === "deleted" ? formatDate(definition.deletedAt) : (definition.draftId ? "Draft" : "None")}</span>
                 <span>{formatDate(definition.lastModifiedAt)}</span>
@@ -358,4 +454,29 @@ export function WorkflowDefinitions({ context, ai, onOpen }: { context: StudioEn
       ) : null}
     </>
   );
+}
+
+export function MarkerTagChips({ definition }: { definition: Pick<WorkflowDefinitionDetails["definition"], "markerTags"> }) {
+  const tags = definition.markerTags ?? [];
+  const [overflowOpen, setOverflowOpen] = useState(false);
+  const overflowId = useId();
+  if (tags.length === 0) return <span className="wf-inline-note">None</span>;
+  const visible = tags.slice(0, 2);
+  const overflow = tags.slice(2);
+  return <span className="wf-tag-chip-list" aria-label={`Tags: ${tags.map(tag => tag.displayName).join(", ")}`}>
+    {visible.map(tag => <span className="wf-tag-chip" key={tag.tagDefinitionId}>{tag.displayName}</span>)}
+    {overflow.length > 0 ? <span className="wf-tag-overflow">
+      <button
+        type="button"
+        className="wf-tag-chip wf-tag-chip-button"
+        aria-expanded={overflowOpen}
+        aria-controls={overflowId}
+        aria-label={`Show ${overflow.length} more tag${overflow.length === 1 ? "" : "s"}`}
+        onClick={event => { event.stopPropagation(); setOverflowOpen(current => !current); }}
+      >+{overflow.length}</button>
+      {overflowOpen ? <ul id={overflowId} className="wf-tag-overflow-list" role="list">
+        {overflow.map(tag => <li key={tag.tagDefinitionId}>{tag.displayName}</li>)}
+      </ul> : null}
+    </span> : null}
+  </span>;
 }
