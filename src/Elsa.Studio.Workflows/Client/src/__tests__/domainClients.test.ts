@@ -45,22 +45,27 @@ const capabilities = {
 };
 
 describe("canonical domain clients", () => {
-  it("normalizes the unpaged Design items response for Studio paging", async () => {
-    const items = Array.from({ length: 12 }, (_, index) => ({
-      id: `definition-${index + 1}`,
-      name: `Definition ${index + 1}`,
+  it("requests and preserves the authoritative server-paged definition result", async () => {
+    const items = Array.from({ length: 5 }, (_, index) => ({
+      id: `definition-${index + 6}`,
+      name: `Definition ${index + 6}`,
       createdAt: "2026-07-13T00:00:00Z",
       lastModifiedAt: "2026-07-13T00:00:00Z",
       versionCount: 0
     }));
-    const getJson = vi.fn(async (url: string) => url === "/capabilities" ? capabilities : { items });
+    const getJson = vi.fn(async (url: string) => url === "/capabilities" ? capabilities : {
+      items,
+      page: 2,
+      pageSize: 5,
+      totalCount: 12
+    });
     const context = createContext({ getJson });
 
-    const result = await listDefinitions(context, { search: "Definition", state: "all", page: 2, pageSize: 5 });
+    const result = await listDefinitions(context, { searchTerm: "Definition", state: "all", page: 2, pageSize: 5 });
 
     expect(result.definitions.map(item => item.id)).toEqual(["definition-6", "definition-7", "definition-8", "definition-9", "definition-10"]);
     expect(result).toMatchObject({ page: 2, pageSize: 5, totalCount: 12 });
-    expect(getJson).toHaveBeenLastCalledWith("/design/workflows/definitions?state=all&search=Definition");
+    expect(getJson).toHaveBeenLastCalledWith("/design/workflows/definitions?state=all&searchTerm=Definition&page=2&pageSize=5&sortBy=name&sortDirection=asc");
   });
 
   it("uses canonical Activity, Publishing, and Runtime links without probing alternates", async () => {

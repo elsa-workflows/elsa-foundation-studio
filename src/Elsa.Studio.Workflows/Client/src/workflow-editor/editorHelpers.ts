@@ -8,10 +8,6 @@ import { groupByCategory } from "../categoryGrouping";
 import { workflowSidePanelMaximizedStorageKey } from "./constants";
 import type { ActivityPaletteGroup, CreateWorkflowDraft, CreateWorkflowKind, WorkflowConnectSource, WorkflowGraphConnection, WorkflowMetadataSuggestion, WorkflowSidePanel } from "./editorTypes";
 
-export function pageItems<T>(items: T[], page: number, pageSize: number) {
-  return items.slice((page - 1) * pageSize, page * pageSize);
-}
-
 export function getTotalPages(totalCount: number, pageSize: number) {
   return Math.max(1, Math.ceil(totalCount / pageSize));
 }

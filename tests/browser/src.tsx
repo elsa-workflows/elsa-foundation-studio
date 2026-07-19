@@ -1,9 +1,10 @@
-import React, { lazy, useState } from "react";
+import React, { lazy, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ActivityPropertiesPanel } from "../../src/Elsa.Studio.Workflows/Client/src/ActivityPropertiesPanel";
 import { WorkflowLazyBoundary } from "../../src/Elsa.Studio.Workflows/Client/src/WorkflowLazyBoundary";
+import { WorkflowDefinitions } from "../../src/Elsa.Studio.Workflows/Client/src/workflow-editor/WorkflowDefinitions";
 import { useRunDetailLayout } from "../../src/Elsa.Studio.Workflows/Client/src/workflow-editor/useRunDetailLayout";
-import type { StudioActivityDescriptor, StudioExpressionDescriptor } from "@elsa-workflows/studio-sdk";
+import type { StudioActivityDescriptor, StudioAiContributionApi, StudioEndpointContext, StudioExpressionDescriptor } from "@elsa-workflows/studio-sdk";
 import type { ActivityNode } from "../../src/Elsa.Studio.Workflows/Client/src/workflowTypes";
 import "../../src/Elsa.Studio.Web/Client/src/app/ui/tokens.css";
 import "../../src/Elsa.Studio.Workflows/Client/src/styles.css";
@@ -14,6 +15,7 @@ const scrollingFixture = searchParams.get("mode") === "scroll";
 const dictionaryFixture = searchParams.get("mode") === "dictionary";
 const lazyBoundaryFixture = searchParams.get("mode") === "lazy-boundary";
 const runDetailFixture = searchParams.get("mode") === "run-detail";
+const workflowDefinitionListFixture = searchParams.get("mode") === "workflow-definitions";
 
 const DeferredWorkflowPanel = lazy(() => new Promise<{ default: React.ComponentType }>(resolve => {
   window.setTimeout(() => resolve({ default: () => <section aria-label="Deferred workflow designer">Workflow designer ready</section> }), 3_000);
@@ -184,9 +186,58 @@ function RunDetailFixture() {
   );
 }
 
+function WorkflowDefinitionListFixture() {
+  const [requests, setRequests] = useState<string[]>([]);
+  const context = useMemo(() => ({
+    baseUrl: "https://studio.example",
+    http: {
+      getJson: async (url: string) => {
+        if (url === "/capabilities") {
+          return {
+            capabilities: [{
+              id: "elsa.api.workflow-design",
+              contractVersion: "1",
+              links: [{ rel: "workflow-definitions", href: "design/workflows/definitions" }]
+            }]
+          };
+        }
+
+        setRequests(current => [...current, url]);
+        const parameters = new URL(url, "https://studio.example").searchParams;
+        const page = Number(parameters.get("page") ?? "1");
+        const pageSize = Number(parameters.get("pageSize") ?? "50");
+        const state = parameters.get("state") ?? "active";
+        const searchTerm = (parameters.get("searchTerm") ?? "").toLowerCase();
+        const definitions = Array.from({ length: 51 }, (_, index) => ({
+          id: `${state}-definition-${index + 1}`,
+          name: `${state === "deleted" ? "Deleted" : "Active"} workflow ${index + 1}`,
+          createdAt: "2026-07-19T00:00:00Z",
+          lastModifiedAt: "2026-07-19T00:00:00Z",
+          versionCount: 0
+        })).filter(definition => definition.name.toLowerCase().includes(searchTerm));
+        const offset = (page - 1) * pageSize;
+        return {
+          items: definitions.slice(offset, offset + pageSize),
+          page,
+          pageSize,
+          totalCount: definitions.length
+        };
+      }
+    }
+  }) as StudioEndpointContext, []);
+  const ai = useMemo(() => ({ promptActions: { list: () => [] } }) as StudioAiContributionApi, []);
+
+  return (
+    <main className="wf-page browser-fixture">
+      <WorkflowDefinitions context={context} ai={ai} onOpen={() => undefined} />
+      <output aria-label="Workflow definition requests">{requests.join("\n")}</output>
+    </main>
+  );
+}
+
 const theme = searchParams.get("theme");
 document.documentElement.dataset.theme = theme === "black-glass" ? "black-glass" : "harbor";
 document.documentElement.dataset.themeMode = theme === "black-glass" ? "dark" : "light";
 createRoot(document.getElementById("root")!).render(
-  runDetailFixture ? <RunDetailFixture /> : lazyBoundaryFixture ? <LazyBoundaryFixture /> : <Fixture />
+  workflowDefinitionListFixture ? <WorkflowDefinitionListFixture /> : runDetailFixture ? <RunDetailFixture /> : lazyBoundaryFixture ? <LazyBoundaryFixture /> : <Fixture />
 );

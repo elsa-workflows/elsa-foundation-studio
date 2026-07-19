@@ -8,9 +8,9 @@ import type {
 
 export interface WorkflowDefinitionsResponse {
   definitions: WorkflowDefinitionSummary[];
-  page?: number;
-  pageSize?: number;
-  totalCount?: number;
+  page: number;
+  pageSize: number;
+  totalCount: number;
 }
 
 export interface WorkflowExecutablesResponse {
@@ -31,6 +31,8 @@ export interface WorkflowDefinitionSummary {
 }
 
 export type DefinitionListState = "active" | "deleted" | "all";
+export type DefinitionListSortBy = "name" | "lastModifiedAt" | "createdAt";
+export type DefinitionListSortDirection = "asc" | "desc";
 
 export interface WorkflowDefinitionDetails {
   definition: WorkflowDefinitionSummary;
