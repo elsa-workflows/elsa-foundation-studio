@@ -345,9 +345,9 @@ public sealed class StudioBackendManagementBridgeTests : IAsyncDisposable
     // A backend that maps a Studio->backend management call to a fixed outcome: a bare status code, or (when null) a
     // transport failure.
     private static RecordingBackend BackendFor(HttpStatusCode? backendStatus) =>
-        backendStatus is null
-            ? RecordingBackend.Throwing(new HttpRequestException("connection refused"))
-            : RecordingBackend.RespondingWith(_ => new HttpResponseMessage(backendStatus.Value));
+        backendStatus is { } status
+            ? RecordingBackend.RespondingWith(_ => new HttpResponseMessage(status))
+            : RecordingBackend.Throwing(new HttpRequestException("connection refused"));
 
     // A backend that answers the identity/session probe with the given session JSON and every other (management) call
     // with the given payload.

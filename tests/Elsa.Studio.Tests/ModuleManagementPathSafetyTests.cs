@@ -10,7 +10,7 @@ namespace Elsa.Studio.Tests;
 public sealed class ModuleManagementPathSafetyTests
 {
     private static readonly string Root = Path.Combine(Path.GetTempPath(), "elsa-drop-folder");
-    private static readonly string StaticAssetsRoot = Path.GetFullPath(Path.Combine(Root, "staticwebassets"));
+    private static readonly string StaticAssetsRoot = Path.GetFullPath(Path.Join(Root, "staticwebassets"));
 
     [Theory]
     [InlineData("../evil.nupkg")]
@@ -43,7 +43,7 @@ public sealed class ModuleManagementPathSafetyTests
     [InlineData("../staticwebassets-sibling/asset.css")]
     public void IsChildPathRejectsPathsOutsideParent(string relative)
     {
-        var candidate = Path.GetFullPath(Path.Combine(StaticAssetsRoot, relative));
+        var candidate = Path.GetFullPath(Path.Join(StaticAssetsRoot, relative));
 
         Assert.False(NuplaneStaticWebAssetsEndpoint.IsChildPath(StaticAssetsRoot, candidate));
     }
@@ -57,7 +57,7 @@ public sealed class ModuleManagementPathSafetyTests
     [Fact]
     public void IsChildPathAllowsNestedAsset()
     {
-        var asset = Path.Combine(StaticAssetsRoot, "css", "site.css");
+        var asset = Path.Join(StaticAssetsRoot, "css", "site.css");
 
         Assert.True(NuplaneStaticWebAssetsEndpoint.IsChildPath(StaticAssetsRoot, asset));
     }
