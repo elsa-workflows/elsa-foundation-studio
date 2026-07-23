@@ -28,11 +28,14 @@ const manifest = JSON.parse(await readFile(resolve(outputRoot, ".vite/manifest.j
 // fuller workspace dependency dist than a local partial build, so CI measures higher than a local run
 // — the budgets below are sized against the CI-observed landing sizes (definitions 368.37 kB, upgrade
 // 356.31 kB; a local build reports ~366.70 kB and ~351.21 kB respectively). Definitions +2 kB, upgrade
-// +6 kB to clear the CI numbers with the usual ~2 kB margin.
+// +6 kB to clear the CI numbers with the usual ~2 kB margin. The definitions landing budget was raised
+// another 2 kB for the activity output-capture editor (the "Capture into" variable-target picker + its
+// conversion-disclosure reuse reached from the shared workflow-editor closure, plus a few capture-row
+// styles in the shared stylesheet; the measured definitions path moved 368.37 -> 369.60 kB locally).
 const budgets = {
   entryJavaScript: 125_000,
   stylesheet: 185_000,
-  definitionsLandingTotal: 370_000,
+  definitionsLandingTotal: 372_000,
   upgradeLandingTotal: 358_000,
   individualChunk: 500_000
 };
