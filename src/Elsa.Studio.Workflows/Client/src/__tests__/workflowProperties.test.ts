@@ -26,7 +26,11 @@ describe("incident strategy options", () => {
     const existing = {
       activationStrategyType: "Singleton",
       futureOption: { preserve: true },
-      incidentStrategy: { alias: "Fault", version: "1" }
+      incidentStrategy: {
+        alias: "Fault",
+        version: "1",
+        futureReferenceField: { preserve: true }
+      }
     };
 
     const updated = updateIncidentStrategyReference(existing, {
@@ -40,7 +44,12 @@ describe("incident strategy options", () => {
     });
     expect(updated).toMatchObject({
       activationStrategyType: "Singleton",
-      futureOption: { preserve: true }
+      futureOption: { preserve: true },
+      incidentStrategy: {
+        alias: "Acme.Operations.Review",
+        version: "2026.07",
+        futureReferenceField: { preserve: true }
+      }
     });
   });
 });

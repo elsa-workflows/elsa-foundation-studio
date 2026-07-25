@@ -38,9 +38,15 @@ export function updateIncidentStrategyReference(
   strategyOptions: unknown,
   incidentStrategy: IncidentStrategyReference | null
 ): WorkflowStrategyOptions {
+  const options = isPlainRecord(strategyOptions) ? strategyOptions : {};
+  const storedReference = isPlainRecord(options.incidentStrategy)
+    ? options.incidentStrategy
+    : {};
   return {
-    ...(isPlainRecord(strategyOptions) ? strategyOptions : {}),
-    incidentStrategy
+    ...options,
+    incidentStrategy: incidentStrategy
+      ? { ...storedReference, ...incidentStrategy }
+      : null
   };
 }
 
