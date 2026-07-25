@@ -126,10 +126,22 @@
 - [x] T024 Run the focused component suite from `specs/093-activity-inspector-tabs/quickstart.md` and record/fix all failures
 - [x] T025 Run Workflows typecheck/build plus repository lint and CSS lint from `specs/093-activity-inspector-tabs/quickstart.md` and record/fix all failures
 - [x] T026 Run the focused Chromium browser test and review light and black-glass screenshots at normal/minimum widths in `tests/browser/activity-inspector-tabs.spec.ts`
-- [ ] T027 Perform an independent correctness/accessibility/architecture review of changes under `src/Elsa.Studio.Workflows/Client/src/` and `tests/browser/` and resolve every material finding
-- [ ] T028 Mark completed tasks and record final verification evidence in `specs/093-activity-inspector-tabs/tasks.md`
+- [x] T027 Perform an independent correctness/accessibility/architecture review of changes under `src/Elsa.Studio.Workflows/Client/src/` and `tests/browser/` and resolve every material finding
+- [x] T028 Mark completed tasks and record final verification evidence in `specs/093-activity-inspector-tabs/tasks.md`
 - [ ] T029 Commit the changes listed in `specs/093-activity-inspector-tabs/tasks.md`, push `codex/activity-inspector-tabs`, open a draft organization PR against `main`, wait for required checks, address review/CI failures, mark ready, and merge via Model B
 - [ ] T030 Fetch `origin/main` after merge and audit the landed commit against every FR/SC and quickstart command in `specs/093-activity-inspector-tabs/`
+
+---
+
+## Verification Evidence
+
+- 2026-07-25 — Focused activity Inspector suite: 39/39 tests passed.
+- 2026-07-25 — Shared Studio tab accessibility suite: 17/17 tests passed.
+- 2026-07-25 — Focused Chromium proof: 3/3 scenarios passed; light and black-glass captures reviewed at normal/minimum widths and with Inputs scrolled.
+- 2026-07-25 — Repository `pnpm typecheck`: passed.
+- 2026-07-25 — Repository `pnpm lint`: passed with the existing 50-warning baseline and zero errors; CSS token lint passed.
+- 2026-07-25 — Repository `pnpm build`: passed, including Studio UI type compilation and Workflows bundle budgets.
+- 2026-07-25 — Independent Standards and Spec review axes: clean after replacing the local tab renderer with composed `StudioTabs`/`StudioTabPanel` primitives.
 
 ---
 
