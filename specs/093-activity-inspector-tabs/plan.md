@@ -32,7 +32,7 @@ Replace the workflow-authoring activity Inspector's single long scroll surface w
 
 *GATE: Passed before Phase 0 and re-checked after Phase 1 design.*
 
-- **Modular UI contract — PASS**: The design reuses the shared Studio tab-keyboard and element-ID primitives in a dedicated inner-tab renderer. Existing outer panel tabs remain unchanged; no module copies host CSS or gains a new contribution contract.
+- **Modular UI contract — PASS**: The design composes the shared `StudioTabs` and `StudioTabPanel` primitives. Their public contract gains narrowly scoped base-ID, class, and mounted-hidden options needed by module-owned panels. Existing outer panel tabs remain unchanged; no module copies host CSS or gains a new contribution contract.
 - **Workbench pattern fit — PASS**: The workflow designer remains a split configuration workbench. The change improves the existing right-hand Inspector without changing the workbench archetype.
 - **Typography and token discipline — PASS**: New Inspector layout rules reuse existing Workflows aliases backed by the public Studio token contract. No raw colors, fonts, radii, shadows, or status treatments are introduced.
 - **Accessible interaction — PASS**: The plan covers labelled tablist/tab/tabpanel relationships, roving keyboard focus, fixed context, pointer-independent access, empty/loading/unavailable states, conditional-tab fallback, and state reset between activities.
@@ -63,7 +63,7 @@ Outputs: [data-model.md](./data-model.md), [activity Inspector contract](./contr
 ### Phase 2 — Test-first implementation
 
 1. Add failing tests for core/conditional tab order, content ownership, empty states, ARIA linkage, keyboard behavior, and state transitions.
-2. Add controlled active-tab state at workflow-editor scope and a dedicated inner tab renderer using shared keyboard/ID primitives.
+2. Add controlled active-tab state at workflow-editor scope and compose the shared Studio tab/tab-panel primitives.
 3. Recompose Inspector content into fixed context plus mounted tab panels with independent scrolling.
 4. Add presentation options to existing input/output panels only where required to suppress duplicate headings and expose explicit empty states.
 5. Update the browser fixture and add constrained-width/fixed-context proof.

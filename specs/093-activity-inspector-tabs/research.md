@@ -48,9 +48,9 @@
 
 ## Decision 5 — Reuse shared tab helpers without changing outer tabs
 
-**Decision**: Build the inner tablist in `InspectorPanel` with the shared `useTablistKeyboard` and `tabElementIds` helpers. Leave the outer `PanelTabList` contract unchanged.
+**Decision**: Compose the shared `StudioTabs` and `StudioTabPanel` primitives in `InspectorPanel`. Extend their public presentation contract with optional caller-owned base IDs, CSS classes, and mounted-hidden panels. Leave the outer `PanelTabList` contract unchanged.
 
-**Rationale**: The shared helpers provide keyboard behavior, roving focus, and stable tab/panel IDs, while a dedicated inner renderer can emit complete `aria-controls`/`aria-labelledby` linkage for its mounted panels. Outer panel callers deliberately omit tabpanel linkage and need no change.
+**Rationale**: The shared components already own keyboard behavior, roving focus, stable tab/panel IDs, and focusable panel semantics. The additive options let a module link and style separately composed mounted panels without duplicating that interaction contract. Outer panel callers deliberately omit tabpanel linkage and need no change.
 
 **Alternatives considered**:
 

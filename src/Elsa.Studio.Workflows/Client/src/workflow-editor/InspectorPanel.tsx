@@ -1,6 +1,6 @@
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useState } from "react";
 import { AlertTriangle, Repeat2 } from "lucide-react";
-import { tabElementIds, useTablistKeyboard } from "@elsa-workflows/studio-ui";
+import { StudioTabPanel, StudioTabs, type StudioTabItem } from "@elsa-workflows/studio-ui";
 import type { StudioActivityDescriptor, StudioActivityPropertyEditorContribution, StudioEndpointContext, StudioExpressionDescriptor, StudioExpressionEditorContribution } from "@elsa-workflows/studio-sdk";
 import type { ActivityAvailabilityDiagnosticEntry, ActivityCatalogItem, ActivityNode, VariableDefinition, WorkflowDefinitionState } from "../workflowTypes";
 import type { ActivityDefinitionVersionView, RecommendedActivityDefinition } from "../activityDefinitionTypes";
@@ -28,11 +28,6 @@ interface SlotPickerState {
 }
 
 export type ActivityInspectorTabId = "inputs" | "outputs" | "variables" | "slots" | "details" | "version";
-
-interface ActivityInspectorTab {
-  id: ActivityInspectorTabId;
-  label: string;
-}
 
 export function resolveActivityInspectorTabId(
   requestedTabId: ActivityInspectorTabId,
@@ -120,7 +115,7 @@ export function InspectorPanel({
   const hasSlots = selectedSlots.length > 0;
   const requestedTabId = activeTabId ?? localActiveTabId;
   const effectiveActiveTabId = resolveActivityInspectorTabId(requestedTabId, selectedSupportsScopedVariables, hasSlots);
-  const inspectorTabs: ActivityInspectorTab[] = [
+  const inspectorTabs: StudioTabItem[] = [
     { id: "inputs", label: "Inputs" },
     { id: "outputs", label: "Outputs" },
     ...(selectedSupportsScopedVariables ? [{ id: "variables" as const, label: "Variables" }] : []),
@@ -129,15 +124,15 @@ export function InspectorPanel({
     { id: "version", label: "Version" }
   ];
   const selectTab = onActiveTabChange ?? setLocalActiveTabId;
-  const onTabKeyDown = useTablistKeyboard(
-    inspectorTabs.map(tab => tab.id),
-    effectiveActiveTabId,
-    tabId => selectTab(tabId as ActivityInspectorTabId)
-  );
   const tabIndexById = new Map(inspectorTabs.map((tab, index) => [tab.id, index]));
   const tabPanelProps = (tabId: ActivityInspectorTabId) => {
     const index = tabIndexById.get(tabId)!;
-    return { tab: inspectorTabs[index], index, baseId: tabBaseId, activeTabId: effectiveActiveTabId };
+    return {
+      index,
+      baseId: tabBaseId,
+      className: "wf-inspector-tab-panel",
+      hidden: tabId !== effectiveActiveTabId
+    };
   };
 
   useEffect(() => {
@@ -217,33 +212,19 @@ export function InspectorPanel({
           </div>
         ) : null}
       </div>
-      <div className="wf-inspector-tabs" role="tablist" aria-label="Activity inspector sections" onKeyDown={onTabKeyDown}>
-        {inspectorTabs.map((tab, index) => {
-          const isActive = tab.id === effectiveActiveTabId;
-          const ids = tabElementIds(tabBaseId, index);
-          return (
-            <button
-              key={tab.id}
-              id={ids.tabId}
-              data-tab-id={tab.id}
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              aria-controls={ids.panelId}
-              tabIndex={isActive ? 0 : -1}
-              className={isActive ? "active" : ""}
-              onClick={() => selectTab(tab.id)}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
+      <StudioTabs
+        baseId={tabBaseId}
+        className="wf-inspector-tabs"
+        tabs={inspectorTabs}
+        activeTab={effectiveActiveTabId}
+        ariaLabel="Activity inspector sections"
+        onSelect={tabId => selectTab(tabId as ActivityInspectorTabId)}
+      />
       <div className="wf-inspector-tab-panels">
-        <InspectorTabPanel {...tabPanelProps("inputs")}>
+        <StudioTabPanel {...tabPanelProps("inputs")}>
           {propertiesPanel}
-        </InspectorTabPanel>
-        <InspectorTabPanel {...tabPanelProps("outputs")}>
+        </StudioTabPanel>
+        <StudioTabPanel {...tabPanelProps("outputs")}>
           <ActivityOutputsPanel
             descriptor={selectedDescriptor}
             activity={selectedNode}
@@ -255,9 +236,9 @@ export function InspectorPanel({
             emptyLabel="This activity has no outputs."
             onChange={onSelectedActivityChange}
           />
-        </InspectorTabPanel>
+        </StudioTabPanel>
         {selectedSupportsScopedVariables ? (
-          <InspectorTabPanel {...tabPanelProps("variables")}>
+          <StudioTabPanel {...tabPanelProps("variables")}>
             <div className="wf-container-variables">
               <ScopedVariablesEditor
                 context={context}
@@ -269,10 +250,10 @@ export function InspectorPanel({
                 onChange={next => onSelectedActivityChange(writeContainerVariables(selectedNode, next as VariableDefinition[]))}
               />
             </div>
-          </InspectorTabPanel>
+          </StudioTabPanel>
         ) : null}
         {hasSlots ? (
-          <InspectorTabPanel {...tabPanelProps("slots")}>
+          <StudioTabPanel {...tabPanelProps("slots")}>
             <div className="wf-slot-list">
               {selectedSlots.map(slot => {
                 const label = slotCrumbLabel(selectedNodeLabel, slot);
@@ -311,17 +292,17 @@ export function InspectorPanel({
                 onClose={() => setSlotPicker(null)}
               />
             ) : null}
-          </InspectorTabPanel>
+          </StudioTabPanel>
         ) : null}
-        <InspectorTabPanel {...tabPanelProps("details")}>
+        <StudioTabPanel {...tabPanelProps("details")}>
           <dl>
             <dt>Node ID</dt>
             <dd>{selectedNode.nodeId}</dd>
             <dt>Activity type</dt>
             <dd>{selectedActivityType}</dd>
           </dl>
-        </InspectorTabPanel>
-        <InspectorTabPanel {...tabPanelProps("version")}>
+        </StudioTabPanel>
+        <StudioTabPanel {...tabPanelProps("version")}>
           <div className="wf-inspector-version">
             <dl>
               <dt>Activity version</dt>
@@ -339,36 +320,9 @@ export function InspectorPanel({
             />
           ) : null}
           </div>
-        </InspectorTabPanel>
+        </StudioTabPanel>
       </div>
     </div>
-  );
-}
-
-function InspectorTabPanel({
-  tab,
-  index,
-  baseId,
-  activeTabId,
-  children
-}: {
-  tab: ActivityInspectorTab;
-  index: number;
-  baseId: string;
-  activeTabId: ActivityInspectorTabId;
-  children: ReactNode;
-}) {
-  const ids = tabElementIds(baseId, index);
-  return (
-    <section
-      id={ids.panelId}
-      role="tabpanel"
-      aria-labelledby={ids.tabId}
-      className="wf-inspector-tab-panel"
-      hidden={tab.id !== activeTabId}
-    >
-      {children}
-    </section>
   );
 }
 
