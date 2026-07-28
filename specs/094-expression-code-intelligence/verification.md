@@ -13,7 +13,7 @@ Last reconciled: 2026-07-28
 | Static gates | `pnpm lint` passes with existing warnings; `pnpm typecheck` passes; CSS token lint passes |
 | Build/bundles | `pnpm build` passes; Workflows entry 122.01 kB/122.50 kB, Definitions 376.93 kB/379 kB, upgrades 365.34 kB/367.50 kB, and largest JavaScript chunk 259.74 kB/500 kB |
 | .NET Studio | `dotnet test Elsa.Studio.slnx --no-build --no-restore` passes |
-| Foundation coordination | 108 Expressions, 340 Design, 89 Design API, and 459 Publishing API tests pass; expression-tooling/custom-host architecture filters pass |
+| Foundation coordination | 108 Expressions, 344 Design, 89 Design API, and 459 Publishing API tests pass; expression-tooling/custom-host architecture filters pass |
 | Performance | Production fixture: warm activation p95 12.60 ms, cold activation p95 253.80 ms, and typing-task p95 0.50 ms for 100 keys at 4× CPU throttling |
 
 The browser fixture mounts the real `ActivityPropertiesPanel` with the JavaScript and Liquid contributions and a versioned, permission-safe tooling client. Fifty unfocused fields remain previews; only the selected field creates a CodeMirror surface.
