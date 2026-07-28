@@ -10,6 +10,7 @@ interface ActivityPalettePanelProps {
   onSearchChange(value: string): void;
   groups: ActivityPaletteGroup[];
   expandedCategories: Set<string>;
+  disabled?: boolean;
   onToggleCategory(category: string): void;
   onActivityClick(activity: ActivityCatalogItem): void;
   onActivityDragStart(event: React.DragEvent<HTMLButtonElement>, activity: ActivityCatalogItem): void;
@@ -24,6 +25,7 @@ export function ActivityPalettePanel({
   onSearchChange,
   groups,
   expandedCategories,
+  disabled = false,
   onToggleCategory,
   onActivityClick,
   onActivityDragStart,
@@ -140,7 +142,8 @@ export function ActivityPalettePanel({
                       data-category={group.category}
                       tabIndex={activeItemKey === activityKey ? 0 : -1}
                       key={activity.activityVersionId}
-                      draggable
+                      disabled={disabled}
+                      draggable={!disabled}
                       title={description || getActivityDisplay(activity)}
                       aria-describedby={descriptionId}
                       onClick={() => onActivityClick(activity)}
