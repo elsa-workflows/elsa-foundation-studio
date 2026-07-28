@@ -1,8 +1,15 @@
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { AlertTriangle, Repeat2 } from "lucide-react";
-import { StudioTabPanel, StudioTabs, type StudioTabItem } from "@elsa-workflows/studio-ui";
-import type { StudioActivityDescriptor, StudioActivityPropertyEditorContribution, StudioEndpointContext, StudioExpressionDescriptor, StudioExpressionEditorContribution } from "@elsa-workflows/studio-sdk";
-import type { ActivityAvailabilityDiagnosticEntry, ActivityCatalogItem, ActivityNode, VariableDefinition, WorkflowDefinitionState } from "../workflowTypes";
+import { CopyableIdentifier, StudioTabPanel, StudioTabs, type StudioTabItem } from "@elsa-workflows/studio-ui";
+import type {
+  StudioActivityDescriptor,
+  StudioActivityPropertyEditorContribution,
+  StudioEndpointContext,
+  StudioExpressionDescriptor,
+  StudioExpressionEditorContribution,
+  StudioExpressionToolingClient
+} from "@elsa-workflows/studio-sdk";
+import type { ActivityAvailabilityDiagnosticEntry, ActivityCatalogItem, ActivityNode, ActivityPresentationRecord, VariableDefinition, WorkflowDefinitionState } from "../workflowTypes";
 import type { ActivityDefinitionVersionView, RecommendedActivityDefinition } from "../activityDefinitionTypes";
 import type { ScopedVariableAnalysis } from "../api/workflowDesign";
 import { slotCrumbLabel, type ChildSlot } from "../workflowAdapter";
@@ -15,6 +22,7 @@ import { ScopedVariablesEditor } from "../WorkflowPropertiesView";
 import { readContainerVariables, shadowingWarningMap, writeContainerVariables } from "../scopedVariables";
 import { describeSlotContents } from "./editorHelpers";
 import { ConnectMenu } from "./graph";
+import { activityDescriptionMaxLength, activityDisplayNameMaxLength } from "../activityPresentation";
 
 // The open change-activity picker. Holds only the slot ID (not the ChildSlot descriptor): the menu can
 // stay open across draft edits (autosave merge, Weaver batch), so the pick handler re-resolves the slot
@@ -41,10 +49,14 @@ export function resolveActivityInspectorTabId(
 
 interface InspectorPanelProps {
   context: StudioEndpointContext;
+  draftId?: string;
+  expressionTooling?: StudioExpressionToolingClient;
+  expressionEditorSessionScope?: string;
   workflowState?: WorkflowDefinitionState;
   selectedNode: ActivityNode | null;
   selectedNodeLabel: string;
   selectedActivityType: string;
+  selectedPresentation?: ActivityPresentationRecord | null;
   selectedDescriptor: StudioActivityDescriptor | null;
   selectedNodeAvailability: ActivityAvailabilityDiagnosticEntry | null;
   selectedReusableDefinitionId?: string | null;
@@ -71,6 +83,7 @@ interface InspectorPanelProps {
   activeTabId?: ActivityInspectorTabId;
   onActiveTabChange?(tabId: ActivityInspectorTabId): void;
   onSelectedActivityChange(activity: ActivityNode): void;
+  onSelectedPresentationChange?(presentation: Pick<ActivityPresentationRecord, "displayName" | "description">): void;
   onChangeReusableVersion?(activity: ActivityNode, version: ActivityDefinitionVersionView): void;
   onEnterSlot(ownerNodeId: string, slot: ChildSlot, label: string): void;
   // Assign or replace the activity of a single-cardinality slot with a fresh instance of `activity`.
@@ -81,10 +94,14 @@ interface InspectorPanelProps {
 // container-variable editor, and embedded-slot navigation. Pure view driven by the resolved selection.
 export function InspectorPanel({
   context,
+  draftId,
+  expressionTooling,
+  expressionEditorSessionScope,
   workflowState = {},
   selectedNode,
   selectedNodeLabel,
   selectedActivityType,
+  selectedPresentation,
   selectedDescriptor,
   selectedNodeAvailability,
   selectedReusableDefinitionId,
@@ -109,6 +126,7 @@ export function InspectorPanel({
   activeTabId,
   onActiveTabChange,
   onSelectedActivityChange,
+  onSelectedPresentationChange,
   onChangeReusableVersion,
   onEnterSlot,
   onReplaceSlotActivity
@@ -165,6 +183,9 @@ export function InspectorPanel({
     <IntrinsicInspector
       intrinsic={intrinsicDescriptor}
       context={context}
+      draftId={draftId}
+      expressionTooling={expressionTooling}
+      expressionEditorSessionScope={expressionEditorSessionScope}
       workflowState={workflowState}
       activity={selectedNode}
       descriptor={selectedDescriptor}
@@ -184,6 +205,9 @@ export function InspectorPanel({
   ) : (
     <ActivityPropertiesPanel
       context={context}
+      draftId={draftId}
+      expressionTooling={expressionTooling}
+      expressionEditorSessionScope={expressionEditorSessionScope}
       workflowState={workflowState}
       activity={selectedNode}
       descriptor={selectedDescriptor}
@@ -206,6 +230,7 @@ export function InspectorPanel({
     <div className="wf-inspector-content">
       <div className="wf-inspector-context">
         <h3>{selectedNodeLabel}</h3>
+        <CopyableIdentifier label="Node ID" value={selectedNode.nodeId} />
         {inspectingScopeOwner ? (
           <p className="wf-muted wf-inspector-owner-hint">Container of this canvas — select a node to inspect it instead.</p>
         ) : null}
@@ -301,19 +326,43 @@ export function InspectorPanel({
           </StudioTabPanel>
         ) : null}
         <StudioTabPanel {...tabPanelProps("details")}>
-          <dl>
-            <dt>Node ID</dt>
-            <dd>{selectedNode.nodeId}</dd>
-            <dt>Activity type</dt>
-            <dd>{selectedActivityType}</dd>
-          </dl>
+          <div className="wf-activity-presentation-fields">
+            <label>
+              <span>Display name</span>
+              <input
+                type="text"
+                maxLength={activityDisplayNameMaxLength}
+                value={selectedPresentation?.displayName ?? ""}
+                placeholder={selectedNodeLabel}
+                disabled={!onSelectedPresentationChange}
+                onChange={event => onSelectedPresentationChange?.({
+                  displayName: event.target.value,
+                  description: selectedPresentation?.description
+                })}
+              />
+              <small>{selectedPresentation?.displayName?.length ?? 0}/{activityDisplayNameMaxLength}</small>
+            </label>
+            <label>
+              <span>Description</span>
+              <textarea
+                rows={5}
+                maxLength={activityDescriptionMaxLength}
+                value={selectedPresentation?.description ?? ""}
+                placeholder="Explain what this activity does in this workflow."
+                disabled={!onSelectedPresentationChange}
+                onChange={event => onSelectedPresentationChange?.({
+                  displayName: selectedPresentation?.displayName,
+                  description: event.target.value
+                })}
+              />
+              <small>{selectedPresentation?.description?.length ?? 0}/{activityDescriptionMaxLength}</small>
+            </label>
+          </div>
+          <CopyableIdentifier label="Activity type" value={selectedActivityType} />
         </StudioTabPanel>
         <StudioTabPanel {...tabPanelProps("version")}>
           <div className="wf-inspector-version">
-            <dl>
-              <dt>Activity version</dt>
-              <dd>{selectedNode.activityVersionId}</dd>
-            </dl>
+            <CopyableIdentifier label="Activity version ID" value={selectedNode.activityVersionId} />
           {selectedReusableDefinitionId ? (
             <ReusableActivityIdentity
               node={selectedNode}

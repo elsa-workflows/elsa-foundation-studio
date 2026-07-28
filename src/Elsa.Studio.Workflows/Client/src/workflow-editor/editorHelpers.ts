@@ -1,12 +1,13 @@
 import type { Node } from "@xyflow/react";
 import type { StudioActivityDescriptor, StudioAiContributionApi, StudioAiPromptActionContribution } from "@elsa-workflows/studio-sdk";
-import type { ActivityCatalogItem, ActivityExecutionStateSummary, ActivityNode, WorkflowDefinitionSummary, WorkflowDefinitionVersionDetails, WorkflowDraft, WorkflowExecutableReference, WorkflowExecutableRunResponse, WorkflowExecutableSummary, WorkflowTestRunView } from "../workflowTypes";
+import type { ActivityCatalogItem, ActivityExecutionStateSummary, ActivityNode, ActivityPresentationRecord, WorkflowDefinitionSummary, WorkflowDefinitionVersionDetails, WorkflowDraft, WorkflowExecutableReference, WorkflowExecutableRunResponse, WorkflowExecutableSummary, WorkflowTestRunView } from "../workflowTypes";
 import type { ChildSlot } from "../workflowAdapter";
 import { createActivityNode, flowchartEdges, getActivityDesignerSupport, getActivityDisplay, getChildSlots, resolveScope } from "../workflowAdapter";
 import { shortTypeName } from "../workflowFormatting";
 import { groupByCategory } from "../categoryGrouping";
 import { workflowSidePanelMaximizedStorageKey } from "./constants";
-import type { ActivityPaletteGroup, CreateWorkflowDraft, CreateWorkflowKind, WorkflowConnectSource, WorkflowEditorError, WorkflowErrorInput, WorkflowGraphConnection, WorkflowMetadataSuggestion, WorkflowSidePanel } from "./editorTypes";
+import type { ActivityPaletteGroup, CreateWorkflowDraft, CreateWorkflowKind, WorkflowEditorError, WorkflowErrorInput, WorkflowGraphConnection, WorkflowMetadataSuggestion, WorkflowSidePanel } from "./editorTypes";
+import { resolveActivityLabel } from "../activityPresentation";
 
 export function pageItems<T>(items: T[], page: number, pageSize: number) {
   return items.slice((page - 1) * pageSize, page * pageSize);
@@ -47,9 +48,7 @@ export function describeWorkflowError(error: unknown, fallbackMessage: string): 
     : undefined;
   if (typeof status === "number") result.status = status;
 
-  const payload = typeof error === "object" && error && "payload" in error
-    ? (error as { payload?: unknown }).payload
-    : null;
+  const payload = readWorkflowErrorPayload(error);
   if (payload && typeof payload === "object") {
     const problem = payload as Record<string, unknown>;
     result.detail = readStringField(problem, "detail");
@@ -60,8 +59,54 @@ export function describeWorkflowError(error: unknown, fallbackMessage: string): 
       if (typeof problemStatus === "number") result.status = problemStatus;
     }
   }
+  const diagnostics = extractExpressionValidationDiagnosticMessages(error);
+  if (diagnostics.length) {
+    result.detail = [result.detail, ...diagnostics]
+      .filter((value): value is string => !!value)
+      .join("\n");
+  }
 
   return result;
+}
+
+export function extractExpressionValidationDiagnosticMessages(error: unknown): string[] {
+  const payload = readWorkflowErrorPayload(error);
+  if (!payload || typeof payload !== "object") return [];
+  const diagnostics = (payload as { diagnostics?: unknown }).diagnostics;
+  if (!Array.isArray(diagnostics)) return [];
+
+  return Array.from(new Set(diagnostics.flatMap(entry => {
+    if (!entry || typeof entry !== "object") return [];
+    const diagnostic = entry as Record<string, unknown>;
+    const message = readStringField(diagnostic, "message");
+    if (!message) return [];
+    const code = readStringField(diagnostic, "code");
+    const path = readStringField(diagnostic, "authoredPath");
+    const range = diagnostic.range && typeof diagnostic.range === "object"
+      ? diagnostic.range as Record<string, unknown>
+      : null;
+    const start = range?.start && typeof range.start === "object"
+      ? range.start as Record<string, unknown>
+      : null;
+    const line = typeof start?.line === "number" ? start.line + 1 : null;
+    const character = typeof start?.character === "number" ? start.character + 1 : null;
+    const location = [
+      path,
+      line !== null && character !== null ? `line ${line}, column ${character}` : null
+    ].filter(Boolean).join(" · ");
+    return [`${code ? `[${code}] ` : ""}${location ? `${location}: ` : ""}${message}`];
+  })));
+}
+
+export function readWorkflowErrorPayload(error: unknown): unknown {
+  if (!error || typeof error !== "object") return null;
+  const candidate = error as { payload?: unknown; response?: { data?: unknown }; message?: unknown };
+  if (candidate.payload != null) return candidate.payload;
+  if (candidate.response?.data != null) return candidate.response.data;
+  if (typeof candidate.message === "string") {
+    try { return JSON.parse(candidate.message); } catch { return null; }
+  }
+  return null;
 }
 
 // Normalizes the `string | WorkflowEditorError` accepted by `setError` into either a structured banner
@@ -514,34 +559,12 @@ export function midpointBetween(source: Node, target: Node) {
   };
 }
 
-function clientPointFromEvent(event: MouseEvent | TouchEvent) {
-  if ("changedTouches" in event && event.changedTouches.length > 0) {
-    return { x: event.changedTouches[0].clientX, y: event.changedTouches[0].clientY };
-  }
-
-  return { x: (event as MouseEvent).clientX, y: (event as MouseEvent).clientY };
-}
-
-export function isConnectEndOverExistingWorkflowNode(event: MouseEvent | TouchEvent) {
-  const point = clientPointFromEvent(event);
-  const releaseTarget = document.elementFromPoint?.(point.x, point.y) as HTMLElement | null | undefined;
-  const target = releaseTarget ?? (event.target as HTMLElement | null);
-  return !!target?.closest(".react-flow__handle, .react-flow__node");
-}
-
-export function resolveConnectEndSource(
-  currentSource: WorkflowConnectSource | null,
-  connectionState: { fromNode?: { id?: string | null } | null; fromHandle?: { id?: string | null } | null }
-): WorkflowConnectSource | null {
-  if (currentSource) return currentSource;
-  const nodeId = connectionState.fromNode?.id;
-  return nodeId ? { nodeId, handleId: connectionState.fromHandle?.id ?? null } : null;
-}
-
-export { clientPointFromEvent };
-
 export function getDraftSignature(draft: WorkflowDraft) {
-  return JSON.stringify({ state: draft.state, layout: draft.layout });
+  return JSON.stringify({
+    state: draft.state,
+    layout: draft.layout,
+    activityPresentation: draft.activityPresentation
+  });
 }
 
 export function getDraftRevision(draft: WorkflowDraft) {
@@ -569,18 +592,34 @@ export function describeSlotContents(slot: ChildSlot, catalogByVersion?: Map<str
   return `${count} activit${count === 1 ? "y" : "ies"}`;
 }
 
-export function collectWorkflowContextActivities(activity: ActivityNode | null | undefined, catalogByVersion: Map<string, ActivityCatalogItem>, result: Array<{ id: string; type: string; displayName?: string }> = []) {
+export function collectWorkflowContextActivities(
+  activity: ActivityNode | null | undefined,
+  catalogByVersion: Map<string, ActivityCatalogItem>,
+  result: Array<{ id: string; type: string; displayName?: string; description?: string }> = [],
+  presentationByNodeId: Map<string, ActivityPresentationRecord> = new Map()
+) {
   if (!activity) return result;
 
   const catalogItem = catalogByVersion.get(activity.activityVersionId);
+  const presentation = presentationByNodeId.get(activity.nodeId);
   result.push({
     id: activity.nodeId,
     type: catalogItem?.activityTypeKey ?? activity.activityVersionId,
-    displayName: catalogItem ? getActivityDisplay(catalogItem) : undefined
+    displayName: resolveActivityLabel(
+      presentation,
+      catalogItem,
+      catalogItem?.activityTypeKey ?? activity.activityVersionId),
+    description: presentation?.description?.trim() || undefined
   });
 
   for (const slot of getChildSlots(activity, catalogByVersion)) {
-    for (const child of slot.activities) collectWorkflowContextActivities(child, catalogByVersion, result);
+    for (const child of slot.activities) {
+      collectWorkflowContextActivities(
+        child,
+        catalogByVersion,
+        result,
+        presentationByNodeId);
+    }
   }
 
   return result;
@@ -613,6 +652,9 @@ export function cloneWorkflowDraftForUndo(draft: WorkflowDraft) {
 }
 
 export function createDraftSnapshotId(draft: WorkflowDraft) {
+  // Test Run snapshot identity describes executable behavior. Presentation and canvas layout still
+  // participate in autosave/undo through getDraftSignature, but must not mint a different behavioral
+  // snapshot for an otherwise identical workflow.
   return `${draft.id}-${hashString(JSON.stringify(draft.state))}`;
 }
 
@@ -628,6 +670,14 @@ function hashString(value: string) {
 
 export function isRejectedTestRun(testRun: WorkflowTestRunView) {
   return testRun.status.toLowerCase() === "rejected";
+}
+
+export function isWorkflowEditorKeyboardTarget(target: HTMLElement | null) {
+  if (!target) return false;
+  return target.isContentEditable
+    || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)
+    || Boolean(target.closest("[contenteditable='true']"))
+    || Boolean(target.closest("[data-studio-code-editor]"));
 }
 
 export function formatWorkflowVersionLoadError(error: string) {

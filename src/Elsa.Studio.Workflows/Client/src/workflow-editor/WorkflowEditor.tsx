@@ -1,11 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Boxes, Check, ChevronRight, Code2, Download, GitBranch, ListTree, Network, Package, Play, Plus, Redo2, Save, SlidersHorizontal, Sparkles, Undo2, Upload, Workflow as WorkflowIcon } from "lucide-react";
-import type { StudioActivityPropertyEditorContribution, StudioAiContributionApi, StudioEndpointContext, StudioExpressionEditorContribution, StudioWorkflowDesignerPanelContribution, StudioWorkflowRunInputEditorContribution } from "@elsa-workflows/studio-sdk";
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Boxes, Check, ChevronLeft, ChevronRight, Code2, Download, GitBranch, ListTree, Maximize2, Minimize2, Network, Package, Play, Plus, Redo2, Save, SlidersHorizontal, Sparkles, Undo2, Upload, Workflow as WorkflowIcon } from "lucide-react";
+import { authSessionEndedEvent, authSessionStartedEvent, expressionEditorSessionEndedEvent, type StudioActivityPropertyEditorContribution, type StudioAiContributionApi, type StudioEndpointContext, type StudioExpressionEditorContribution, type StudioExpressionToolingClient, type StudioWorkflowDesignerPanelContribution, type StudioWorkflowRunInputEditorContribution } from "@elsa-workflows/studio-sdk";
 import type { ActivityCatalogItem, ActivityNode, WorkflowDraft } from "../workflowTypes";
 import {
+  collectActivityNodeIds,
   createActivityNode,
+  findActivityNode,
   findNodeScopePath,
   getActivityDisplay,
+  getChildSlots,
   normalizeActivityStructures,
   planSlotNavigation,
   replaceSlotActivities,
@@ -13,6 +16,12 @@ import {
   updateActivity,
   type ChildSlot
 } from "../workflowAdapter";
+import {
+  indexActivityPresentation,
+  removeActivityPresentation,
+  resolveActivityLabel,
+  updateActivityPresentation
+} from "../activityPresentation";
 import { buildDraftFromJson } from "../workflowSerialization";
 import { WorkflowCodeView } from "../WorkflowCodeView";
 import { WorkflowPropertiesView } from "../WorkflowPropertiesView";
@@ -25,6 +34,7 @@ import {
   findAiAction,
   getDraftSignature,
   groupActivityPalette,
+  isWorkflowEditorKeyboardTarget,
   normalizeWorkflowError
 } from "./editorHelpers";
 import { WorkflowAlert } from "./WorkflowAlert";
@@ -73,6 +83,8 @@ import {
   findActivityOccurrence,
   validateActivityVersionChangePrecondition
 } from "./activityVersionChangeModel";
+import { createLazyExpressionToolingClient } from "../expression-tooling/lazyExpressionToolingClient";
+import type { ExpressionToolingCacheIdentity } from "../expression-tooling/expressionToolingClient";
 
 const ActivityVersionChangeDialog = React.lazy(() =>
   import("./ActivityVersionChangeDialog").then(module => ({ default: module.ActivityVersionChangeDialog })));
@@ -85,6 +97,8 @@ export function WorkflowEditor({
   ai,
   propertyEditors,
   expressionEditors,
+  expressionTooling,
+  expressionToolingIdentity,
   runInputEditors,
   workflowDesignerPanels,
   autosaveEnabledByDefault,
@@ -95,11 +109,39 @@ export function WorkflowEditor({
   ai: StudioAiContributionApi;
   propertyEditors: StudioActivityPropertyEditorContribution[];
   expressionEditors: StudioExpressionEditorContribution[];
+  expressionTooling?: StudioExpressionToolingClient;
+  expressionToolingIdentity?: ExpressionToolingCacheIdentity;
   runInputEditors: StudioWorkflowRunInputEditorContribution[];
   workflowDesignerPanels: StudioWorkflowDesignerPanelContribution[];
   autosaveEnabledByDefault?: boolean;
   onBack(): void;
 }) {
+  const expressionEditorSessionScope = useId();
+  const ownedExpressionTooling = useMemo(
+    () => expressionToolingIdentity
+      ? createLazyExpressionToolingClient(context, expressionToolingIdentity, expressionEditorSessionScope)
+      : undefined,
+    [context, expressionEditorSessionScope, expressionToolingIdentity]
+  );
+  const resolvedExpressionTooling = expressionTooling ?? ownedExpressionTooling;
+  useEffect(() => {
+    if (!resolvedExpressionTooling) return;
+    const revoke = () => resolvedExpressionTooling.revokeAuthorization?.();
+    const restore = () => resolvedExpressionTooling.restoreAuthorization?.();
+    window.addEventListener(authSessionEndedEvent, revoke);
+    window.addEventListener(authSessionStartedEvent, restore);
+    return () => {
+      window.removeEventListener(authSessionEndedEvent, revoke);
+      window.removeEventListener(authSessionStartedEvent, restore);
+    };
+  }, [resolvedExpressionTooling]);
+  useEffect(() => () => ownedExpressionTooling?.dispose(), [ownedExpressionTooling]);
+  useEffect(() => () => {
+    window.dispatchEvent(new CustomEvent(expressionEditorSessionEndedEvent, {
+      detail: { scope: expressionEditorSessionScope }
+    }));
+  }, [expressionEditorSessionScope]);
+
   // The interdependent draft/scope/selection/test-run/artifact cluster now lives in an explicit reducer,
   // so each mutation (below) declares the transition it makes instead of cascading loose setState calls.
   const editorDoc = useWorkflowDocument();
@@ -350,9 +392,16 @@ export function WorkflowEditor({
       if (!current?.state.rootActivity) return null;
       const normalizedRoot = normalizeActivityStructures(current.state.rootActivity, catalogByVersion);
       if (!normalizedRoot || normalizedRoot === current.state.rootActivity) return null;
+      const previousNodeIds = collectActivityNodeIds(current.state.rootActivity, catalogByVersion);
+      const normalizedNodeIds = collectActivityNodeIds(normalizedRoot, catalogByVersion);
+      const removedNodeIds = new Set(
+        [...previousNodeIds].filter(nodeId => !normalizedNodeIds.has(nodeId)));
 
       return {
         ...current,
+        activityPresentation: removeActivityPresentation(
+          current.activityPresentation ?? [],
+          removedNodeIds),
         state: {
           ...current.state,
           rootActivity: normalizedRoot
@@ -413,6 +462,9 @@ export function WorkflowEditor({
     runInputPrompt,
     confirmRunInputs,
     cancelRunInputs,
+    expressionValidationWarning,
+    confirmUnavailableExpressionValidation,
+    cancelUnavailableExpressionValidation,
     run
   } = useWorkflowOperations({
     context,
@@ -454,7 +506,7 @@ export function WorkflowEditor({
       if (canvasView !== "designer") return;
       if (!(event.metaKey || event.ctrlKey)) return;
       const target = event.target as HTMLElement | null;
-      if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+      if (isWorkflowEditorKeyboardTarget(target)) return;
       const key = event.key.toLowerCase();
       if (key === "z" && !event.shiftKey) {
         event.preventDefault();
@@ -488,6 +540,12 @@ export function WorkflowEditor({
       if (!current || !rootActivity) return null;
       return {
         ...current,
+        activityPresentation: removeActivityPresentation(
+          current.activityPresentation ?? [],
+          slot.activities.reduce(
+            (nodeIds, oldActivity) =>
+              collectActivityNodeIds(oldActivity, catalogByVersion, nodeIds),
+            new Set<string>())),
         state: {
           ...current.state,
           rootActivity: updateActivity(rootActivity, ownerNodeId, owner => replaceSlotActivities(owner, slot, [next]), catalogByVersion)
@@ -521,6 +579,22 @@ export function WorkflowEditor({
       };
     });
   }, [catalogByVersion, editDraft]);
+
+  const updateSelectedPresentation = useCallback((
+    presentation: { displayName?: string | null; description?: string | null }
+  ) => {
+    const nodeId = inspectedNode?.nodeId;
+    if (!nodeId) return;
+    editDraft(({ draft: current }) => current
+      ? {
+          ...current,
+          activityPresentation: updateActivityPresentation(
+            current.activityPresentation ?? [],
+            nodeId,
+            presentation)
+        }
+      : null);
+  }, [editDraft, inspectedNode?.nodeId]);
 
   // Rewrites the current scope owner's BPMN payload through `apply` (inspector edits for pure
   // elements and their outbound sequence flows).
@@ -575,7 +649,7 @@ export function WorkflowEditor({
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `${details?.definition.name || "workflow"}.bpmn`;
+      anchor.download = `${details?.definition?.name || "workflow"}.bpmn`;
       anchor.click();
       URL.revokeObjectURL(url);
       setError("");
@@ -584,7 +658,7 @@ export function WorkflowEditor({
       setStatus("");
       setError("BPMN export failed.");
     }
-  }, [context, details?.definition.name, draft, setError, setStatus]);
+  }, [context, details?.definition?.name, draft, setError, setStatus]);
 
   const importBpmn = useCallback(async (file: File) => {
     const rootActivity = draft?.state.rootActivity;
@@ -696,9 +770,34 @@ export function WorkflowEditor({
 
   // The inspected node is either a canvas node (labelled by its node data) or the scope owner, which
   // has no node on its own canvas — fall back to its catalog display name.
+  const presentationByNodeId = indexActivityPresentation(draft.activityPresentation);
+  const visibleFrames = frames.map(frame => {
+    const owner = findActivityNode(draft.state.rootActivity, frame.ownerNodeId, catalogByVersion);
+    const slot = owner
+      ? getChildSlots(owner, catalogByVersion).find(candidate => candidate.id === frame.slotId)
+      : undefined;
+    const catalogItem = owner ? catalogByVersion.get(owner.activityVersionId) : undefined;
+    return owner && slot
+      ? {
+          ...frame,
+          label: slotCrumbLabel(
+            resolveActivityLabel(
+              presentationByNodeId.get(owner.nodeId),
+              catalogItem,
+              catalogItem?.activityTypeKey ?? owner.activityVersionId),
+            slot)
+        }
+      : frame;
+  });
+  const inspectedPresentation = inspectedNode
+    ? presentationByNodeId.get(inspectedNode.nodeId)
+    : undefined;
   const inspectedLabel = inspectedNode
     ? (nodes.find(node => node.id === inspectedNode.nodeId)?.data.label
-      ?? (inspectedCatalogItem ? getActivityDisplay(inspectedCatalogItem) : inspectedNode.nodeId))
+      ?? resolveActivityLabel(
+        inspectedPresentation,
+        inspectedCatalogItem,
+        inspectedCatalogItem?.activityTypeKey ?? inspectedNode.activityVersionId))
     : "";
 
   const visibleStatus = renderedTestRun && status.startsWith("Test run") ? "" : status;
@@ -762,10 +861,14 @@ export function WorkflowEditor({
         <InspectorPanel
           key={inspectedNode?.nodeId ?? "no-activity"}
           context={context}
+          draftId={draft.id}
+          expressionTooling={resolvedExpressionTooling}
+          expressionEditorSessionScope={expressionEditorSessionScope}
           workflowState={draft.state}
           selectedNode={inspectedNode}
           selectedNodeLabel={inspectedLabel}
           selectedActivityType={inspectedNode ? (inspectedDescriptor?.typeName ?? catalogByVersion.get(inspectedNode.activityVersionId)?.activityTypeKey ?? "Unknown") : ""}
+          selectedPresentation={inspectedPresentation}
           selectedDescriptor={inspectedDescriptor}
           selectedNodeAvailability={inspectedNodeAvailability}
           selectedReusableDefinitionId={inspectedReusableDefinitionId}
@@ -794,6 +897,7 @@ export function WorkflowEditor({
           activeTabId={activeInspectorTabId}
           onActiveTabChange={setActiveInspectorTabId}
           onSelectedActivityChange={updateSelectedActivity}
+          onSelectedPresentationChange={updateSelectedPresentation}
           onChangeReusableVersion={openVersionChange}
           onEnterSlot={enterSlotScope}
           onReplaceSlotActivity={replaceSlotActivity}
@@ -986,6 +1090,30 @@ export function WorkflowEditor({
         />
       ) : null}
 
+      {expressionValidationWarning ? (
+        <div className="wf-dialog-backdrop" role="presentation">
+          <section
+            className="wf-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="expression-validation-warning-title"
+            aria-describedby="expression-validation-warning-description"
+          >
+            <h3 id="expression-validation-warning-title">Expression validation is unavailable</h3>
+            <p id="expression-validation-warning-description">
+              The backend cannot currently verify every expression. No known blocking error was found,
+              but this Test Run may fail. Proceed only if you accept that risk.
+            </p>
+            <div className="wf-dialog-actions">
+              <button type="button" onClick={cancelUnavailableExpressionValidation}>Cancel</button>
+              <button type="button" onClick={() => { void confirmUnavailableExpressionValidation(); }}>
+                Proceed with Test Run
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
       <GraphAuthoringWorkbench
         resourceKind="workflow-definition"
         layout={sidePanelLayout}
@@ -1011,7 +1139,7 @@ export function WorkflowEditor({
             <WorkflowPropertiesView details={details} draft={draft} context={context} onStateChange={updateDraftState} onDefinitionMetaChange={updateDefinitionMeta} />
           ) : (
           <>
-          <ScopeBreadcrumb frames={frames} onNavigate={next => navigateToScope(next, null)} />
+          <ScopeBreadcrumb frames={visibleFrames} onNavigate={next => navigateToScope(next, null)} />
           <GraphAuthoringCanvas
             canvasRef={canvasRef}
             canvasProps={{

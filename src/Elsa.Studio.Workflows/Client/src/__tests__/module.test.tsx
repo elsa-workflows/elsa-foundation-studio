@@ -4,7 +4,10 @@ import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { authSessionEndedEvent, type ElsaStudioModuleApi, type StudioContributionRegistry, type StudioSlotDefinition } from "@elsa-workflows/studio-sdk";
-import { clearApiCapabilityCache, createEnumWorkflowRunInputEditorContribution, isConnectEndOverExistingWorkflowNode, register, resolveConnectEndSource, type WorkflowDesignerPanelContext } from "../module";
+import { register, type WorkflowDesignerPanelContext } from "../module";
+import { clearApiCapabilityCache } from "../api/capabilities";
+import { createEnumWorkflowRunInputEditorContribution } from "../workflowRunInputEditorContributions";
+import { isConnectEndOverExistingWorkflowNode, resolveConnectEndSource } from "../workflow-editor/connectEndHelpers";
 import { workflowInspectorCollapsedStorageKey, workflowInspectorWidthStorageKey, workflowSidePanelMaximizedStorageKey } from "../workflow-editor/constants";
 import { createDraftSnapshotId, insertSequenceNodeAfter } from "../workflow-editor/editorHelpers";
 import { ValidationPanel } from "../workflow-editor/editorPanels";
@@ -587,7 +590,8 @@ describe("workflows module", () => {
     const writeLine = Array.from(container.querySelectorAll<HTMLButtonElement>(".wf-palette-activity"))
       .find(button => button.textContent?.includes("Write Line"));
     expect(writeLine?.getAttribute("role")).toBe("treeitem");
-    expect(writeLine?.getAttribute("title")).toBe("Writes a line to the console.");
+    expect(writeLine?.getAttribute("title")).toBe(
+      "Writes a line to the console. — Exact version 1.0.0");
     expect(writeLine?.textContent).toContain("Writes a line to the console.");
     expect(writeLine?.querySelector(".wf-activity-icon")).toBeTruthy();
     expect(writeLine?.querySelector(".wf-palette-activity-grip")).toBeTruthy();
@@ -1853,7 +1857,18 @@ describe("workflows module", () => {
       if (url.includes("/executables/artifact-1")) {
         return url.includes("ref=ref-0")
           ? response(executableDetail({ chosenReference: { sourceReferenceId: "ref-0", selection: "requested", layout: [] } }))
-          : response(executableDetail());
+          : response(executableDetail({
+              chosenReference: {
+                sourceReferenceId: "ref-1",
+                selection: "newest-live",
+                layout: [{ nodeId: "write-line-1", x: 40, y: 20 }, { nodeId: "send-email-1", x: 320, y: 20 }],
+                activityPresentation: [{
+                  executableNodeId: "exec-write-line-1",
+                  displayName: "Log greeting",
+                  description: "Writes the user-facing greeting to the console."
+                }]
+              }
+            }));
       }
       if (url.includes("/activities")) return response({ activities: [
         activity({ activityVersionId: "sequence-v1", activityTypeKey: "Elsa.Activities.Sequence.Activities.Sequence", displayName: "Sequence" }),
@@ -1873,10 +1888,15 @@ describe("workflows module", () => {
     expect(container.textContent).toContain("Executable Inspector");
 
     // Canvas: catalog hit renders its display name; the catalog miss is an honest ghost.
-    await waitForText(container, "Write Line");
+    await waitForText(container, "Log greeting");
     await waitForText(container, "Not available in this environment");
     const ghost = container.querySelector(".wf-node-ghost");
     expect(ghost?.textContent).toContain("SendEmail");
+    const namedNode = [...container.querySelectorAll<HTMLElement>(".react-flow__node")]
+      .find(node => node.textContent?.includes("Log greeting"));
+    expect(namedNode).toBeTruthy();
+    await click(namedNode!);
+    expect(container.textContent).toContain("Writes the user-facing greeting to the console.");
 
     // The reference is current with the definition's latest version: no drift caption, source link enabled.
     expect(container.textContent).not.toContain("the definition's latest is");
@@ -2451,6 +2471,53 @@ describe("workflows module", () => {
     expect(container.textContent).toContain("1 activity");
     expect(container.textContent).toContain("0 incidents");
 
+    await unmount();
+  });
+
+  it("requires explicit confirmation before retrying a Test Run with unavailable expression validation", async () => {
+    vi.stubGlobal("ResizeObserver", class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    });
+    let testRunAttempts = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === "POST" && urlPath(url) === "/publishing/workflows/drafts/test-runs") {
+        testRunAttempts++;
+        return response(testRunAttempts === 1
+          ? testRunView({
+              status: "Rejected",
+              reason: "Expression validation is unavailable. Set acknowledgeUnavailableExpressionValidation to proceed with this test run."
+            })
+          : testRunView());
+      }
+      if (url.includes("/activities")) return response({ activities: [
+        activity({ activityVersionId: "flowchart-v1", activityTypeKey: "Elsa.Activities.Flowchart", category: "Composition", displayName: "Flowchart" })
+      ] });
+      if (url.includes("/definitions/definition-1")) return response({
+        definition: definition(),
+        draft: draftWithFlowchartRoot([], []),
+        versions: []
+      });
+      return response({ items: [definition()] });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { container, unmount } = await renderRegisteredRoute("/workflows/definitions?definition=definition-1");
+
+    await waitForText(container, "Run");
+    await click(buttonByText(container, "Run"));
+    await waitForText(container, "Expression validation is unavailable");
+    expect(testRunAttempts).toBe(1);
+    await click(buttonByText(container, "Proceed with Test Run"));
+    await waitForText(container, "Test run dispatched");
+
+    const requests = fetchMock.mock.calls
+      .filter(([url, init]) => init?.method === "POST" && urlPath(String(url)) === "/publishing/workflows/drafts/test-runs")
+      .map(([, init]) => JSON.parse(String(init?.body)));
+    expect(requests).toHaveLength(2);
+    expect(requests[0].acknowledgeUnavailableExpressionValidation).toBe(false);
+    expect(requests[1].acknowledgeUnavailableExpressionValidation).toBe(true);
     await unmount();
   });
 
