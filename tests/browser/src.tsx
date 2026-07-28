@@ -82,6 +82,7 @@ const activityInspectorTabsFixture = searchParams.get("mode") === "activity-insp
 const publicationReviewFixture = searchParams.get("mode") === "publication-review";
 const activityGraphAuthoringFixture = searchParams.get("mode") === "activity-definition-graph-authoring";
 const expressionCodeIntelligenceFixture = searchParams.get("mode") === "expression-code-intelligence";
+const expressionToolingUnavailable = searchParams.get("tooling") === "unavailable";
 const expressionFieldCount = Math.max(1, Math.min(50, Number(searchParams.get("fields") ?? 1)));
 const referenceJavaScriptExpression = `formatTotal(total)${" + total".repeat(248)}`;
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -362,6 +363,13 @@ const expressionToolingFixture: StudioExpressionToolingClient = {
   },
   async getAuthoringContext(document) {
     expressionToolingReadiness.authoringContextRequests++;
+    if (expressionToolingUnavailable) {
+      return {
+        state: "unavailable",
+        contractVersion: 1,
+        expressionType: document.expressionType
+      };
+    }
     const rootSymbols = [
       { id: "input:total", name: "total", kind: "value" as const, documentation: "The workflow total." },
       { id: "function:formatTotal", name: "formatTotal", kind: "function" as const, documentation: "Formats the workflow total.", signatures: [{ label: "formatTotal(value)", parameters: [] }] }

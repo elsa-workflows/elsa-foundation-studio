@@ -266,7 +266,7 @@ function editabilityExtensions(readOnly: boolean, ariaLabel: string) {
 }
 
 function editorKeymap(runtime: CodeMirrorRuntime): KeyBinding[] {
-  const standard = [...completionKeymap, ...defaultKeymap, ...historyKeymap, { key: "Mod-m", run: toggleTabFocusMode }];
+  const standard = [...completionKeymap, ...defaultKeymap, ...historyKeymap, { key: "Ctrl-m", run: toggleTabFocusMode }];
   const hoverHelp = ["Ctrl-Shift-h", "F1", "Alt-i"].map(key => ({
     key,
     run: (view: EditorView) => {

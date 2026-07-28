@@ -415,6 +415,24 @@ describe("StudioCodeEditor", () => {
     unmount();
   }, 20000);
 
+  it("uses the documented Control M shortcut to let Tab leave an expanded editor", async () => {
+    const { container, unmount } = renderEditor({
+      document: codeDocument(),
+      languageAdapter: javaScriptLanguageAdapter,
+      profile: "expanded"
+    });
+
+    await waitFor(() => !!container.querySelector<HTMLElement>(".cm-content"));
+
+    const content = container.querySelector<HTMLElement>(".cm-content")!;
+    const toggle = key(content, "m", { ctrlKey: true });
+    const tab = key(content, "Tab");
+
+    expect(toggle.defaultPrevented).toBe(true);
+    expect(tab.defaultPrevented).toBe(false);
+    unmount();
+  }, 20000);
+
   it("reconfigures read-only state on an existing rich editor session", async () => {
     const props = {
       document: codeDocument(),
@@ -522,9 +540,9 @@ function click(element: HTMLElement) {
   flushSync(() => element.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 }
 
-function key(element: HTMLElement, value: string) {
+function key(element: HTMLElement, value: string, init: KeyboardEventInit = {}) {
   const keyCode = value === "Escape" ? 27 : value === "Tab" ? 9 : 0;
-  const event = new KeyboardEvent("keydown", { key: value, keyCode, bubbles: true, cancelable: true });
+  const event = new KeyboardEvent("keydown", { key: value, keyCode, bubbles: true, cancelable: true, ...init });
   element.dispatchEvent(event);
   return event;
 }

@@ -40,4 +40,4 @@ All implementation tasks are complete. File names below reflect the landed desig
 - [x] T022 Validate Workflows bundle budgets with the expression tooling client deferred from landing routes.
 - [x] T023 Reconcile the OpenAPI fixture with Foundation work unit 143 and record verification evidence.
 - [x] T024 Run repository lint/typecheck/build, focused regression suites, browser tests, and Foundation coordinated gates.
-- [ ] T025 Complete iterative cross-repository self-review and required manual assistive-technology acceptance with no actionable release blockers.
+- [x] T025 Complete iterative cross-repository self-review and required manual assistive-technology acceptance with no actionable release blockers.

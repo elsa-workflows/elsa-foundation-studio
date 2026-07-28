@@ -86,3 +86,22 @@ test("the compact editor remains operable at a narrow touch viewport", async ({ 
   await expect(page.getByRole("button", { name: "Open expanded Path editor" })).toBeVisible();
   await context.close();
 });
+
+test("unavailable code intelligence keeps syntax-aware editing available", async ({ page }) => {
+  await page.goto("/?mode=expression-code-intelligence&tooling=unavailable");
+
+  await page.getByRole("button", { name: /JavaScript expression\. Activate to edit\./ }).click();
+
+  const editor = page.locator(".studio-code-editor-rich-compact .cm-content");
+  await expect(editor).toBeVisible();
+  await expect(editor).toHaveAttribute("contenteditable", "true");
+  await expect(page.getByText(
+    "JavaScript code intelligence is unavailable. Syntax highlighting remains active."
+  )).toBeVisible();
+
+  const initialSource = await editor.textContent();
+  expect(initialSource).toContain("formatTotal(total)");
+  await editor.press("End");
+  await page.keyboard.insertText(" updated");
+  await expect.poll(() => editor.textContent()).toBe(`${initialSource} updated`);
+});
