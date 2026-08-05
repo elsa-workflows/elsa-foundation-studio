@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type Edge, type Node, type XYPosition } from "@xyflow/react";
 import type { ActivityCatalogItem, ActivityNode, WorkflowDraft } from "../workflowTypes";
 import { formatActivitySummary } from "../activitySummary";
@@ -213,11 +213,34 @@ export function useWorkflowCanvas({
     };
   }, [isBpmnDesigner]);
 
+  // Focus is owned by the shared interaction layer, which is constructed below (it needs `addActivity`).
+  // A ref breaks that cycle for the BPMN placement path.
+  const queueCanvasNodeFocusRef = useRef<(nodeId: string) => void>(() => {});
+
+  // BPMN placements cannot go through the document routing below: buildBpmnCanvas renders nodes from
+  // the process ELEMENTS, so an activity added to the slot alone would be invisible and dropped by the
+  // next syncBpmnCanvasToScope. Stamp the bound element onto the canvas and commit it instead.
+  const addCatalogActivityToBpmn = useCallback((activity: ActivityCatalogItem, position?: XYPosition): ActivityNode | null => {
+    const fallback: XYPosition = { x: 120 + (nodes.length % 5) * 220, y: 120 + Math.floor(nodes.length / 5) * 140 };
+    const placement = createPlacement(activity, position ?? fallback);
+    if (!placement) return null;
+    const nextNodes = [...nodes.map(node => node.selected ? { ...node, selected: false } : node), placement.node];
+    setNodes(nextNodes);
+    select(placement.node.id);
+    commitCanvas(nextNodes, edges, { createdActivities: [placement.activityNode] });
+    queueCanvasNodeFocusRef.current(placement.node.id);
+    return placement.activityNode;
+  }, [commitCanvas, createPlacement, edges, nodes, select]);
+
   // Returns the created ActivityNode when it became the root or landed in the current scope's slot (so
   // callers can restore focus or chain navigation); null for wrapping and rejected/stale outcomes.
   const addActivity = useCallback((activity: ActivityCatalogItem, position?: XYPosition): ActivityNode | null => {
     if (draft?.state.rootActivity && isUnsupportedDesigner) {
       return null;
+    }
+
+    if (draft?.state.rootActivity && isBpmnDesigner) {
+      return addCatalogActivityToBpmn(activity, position);
     }
 
     const next = createActivityNode(activity, createNodeId(activity));
@@ -298,7 +321,7 @@ export function useWorkflowCanvas({
 
     observeReusablePlacement(activity);
     return next;
-  }, [catalogByVersion, draft?.state.rootActivity, frames, isUnsupportedDesigner, editDraftAndSelect, observeReusablePlacement, resetToRoot, pinLayout, setError, setStatus]);
+  }, [addCatalogActivityToBpmn, catalogByVersion, draft?.state.rootActivity, frames, isBpmnDesigner, isUnsupportedDesigner, editDraftAndSelect, observeReusablePlacement, resetToRoot, pinLayout, setError, setStatus]);
 
   const resolveRemovedActivityNodeIds = useCallback((deletedNodes: Node<WorkflowNodeData>[]) =>
     deletedNodes.reduce((result, node) => {
@@ -331,6 +354,7 @@ export function useWorkflowCanvas({
     onStatus: setStatus,
     onActivityPlaced: observeReusablePlacement
   });
+  queueCanvasNodeFocusRef.current = interactions.queueCanvasNodeFocus;
 
   // Stamps a pure BPMN shape (event/gateway/unbound task) from the shape palette onto the canvas.
   // Shapes carry no ActivityNode, so this is the one placement the shared layer cannot express.
@@ -343,8 +367,8 @@ export function useWorkflowCanvas({
     setNodes(nextNodes);
     select(placedNode.id);
     commitCanvas(nextNodes, edges);
-    interactions.queueCanvasNodeFocus(placedNode.id);
-  }, [commitCanvas, edges, interactions, isBpmnDesigner, nodes, select]);
+    queueCanvasNodeFocusRef.current(placedNode.id);
+  }, [commitCanvas, edges, isBpmnDesigner, nodes, select]);
 
   const { accessibleNodes, accessibleEdges, ...rest } = interactions;
 
