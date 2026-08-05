@@ -90,6 +90,48 @@ describe("bpmn designer mode plumbing", () => {
     expect(facet?.payload.mode).toBe("bpmn");
     expect(getActivityDesignerSupport(null, facetItem)).toBe("bpmn");
   });
+
+  it("clears a default-flow reference when its sequence flow is deleted", () => {
+    const owner = bpmnOwner(
+      [
+        { elementId: "gateway", elementType: "exclusiveGateway", defaultFlowId: "flow-default" },
+        { elementId: "end", elementType: "endEvent" }
+      ],
+      [{ flowId: "flow-default", sourceRef: "gateway", targetRef: "end", isDefault: true }]
+    );
+    const nodes = [
+      { id: "gateway", position: { x: 0, y: 0 }, data: { element: { elementId: "gateway", elementType: "exclusiveGateway" }, label: "" } },
+      { id: "end", position: { x: 200, y: 0 }, data: { element: { elementId: "end", elementType: "endEvent" }, label: "" } }
+    ] as unknown as Node<BpmnNodeData>[];
+
+    // The default edge is gone from the canvas; the gateway must not keep naming it.
+    const next = syncBpmnCanvasToScope({ owner, slot: getChildSlots(owner)[0] }, nodes, []);
+    const payload = next.structure?.payload as { elements: Array<{ elementId: string; defaultFlowId?: string | null }>; sequenceFlows: unknown[] };
+
+    expect(payload.sequenceFlows).toEqual([]);
+    expect(payload.elements.find(element => element.elementId === "gateway")?.defaultFlowId).toBeNull();
+  });
+
+  it("keeps a default-flow reference whose sequence flow survives", () => {
+    const owner = bpmnOwner(
+      [
+        { elementId: "gateway", elementType: "exclusiveGateway", defaultFlowId: "flow-default" },
+        { elementId: "end", elementType: "endEvent" }
+      ],
+      [{ flowId: "flow-default", sourceRef: "gateway", targetRef: "end", isDefault: true }]
+    );
+    const nodes = [
+      { id: "gateway", position: { x: 0, y: 0 }, data: { element: { elementId: "gateway", elementType: "exclusiveGateway" }, label: "" } },
+      { id: "end", position: { x: 200, y: 0 }, data: { element: { elementId: "end", elementType: "endEvent" }, label: "" } }
+    ] as unknown as Node<BpmnNodeData>[];
+    const edges = [{ id: "flow-default", source: "gateway", target: "end" }] as Edge[];
+
+    const next = syncBpmnCanvasToScope({ owner, slot: getChildSlots(owner)[0] }, nodes, edges);
+    const payload = next.structure?.payload as { elements: Array<{ elementId: string; defaultFlowId?: string | null }> };
+
+    expect(payload.elements.find(element => element.elementId === "gateway")?.defaultFlowId).toBe("flow-default");
+  });
+
 });
 
 describe("buildBpmnCanvas", () => {

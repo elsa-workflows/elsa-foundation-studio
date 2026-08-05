@@ -121,11 +121,11 @@ export function syncBpmnCanvasToScope(
   const previousElementsById = new Map(readBpmnElements(owner).map(element => [element.elementId, element]));
   const previousFlowsById = new Map(readBpmnSequenceFlows(owner).map(flow => [flow.flowId, flow]));
 
-  const elements = nodes
+  const retainedElements = nodes
     .map(node => previousElementsById.get(node.id) ?? node.data?.element)
     .filter(isBpmnElement);
 
-  const elementIds = new Set(elements.map(element => element.elementId));
+  const elementIds = new Set(retainedElements.map(element => element.elementId));
   const sequenceFlows = edges
     .filter(edge => elementIds.has(edge.source) && elementIds.has(edge.target))
     .map(edge => {
@@ -140,6 +140,15 @@ export function syncBpmnCanvasToScope(
         isDefault: previous?.isDefault ?? data.isDefault ?? false
       } satisfies BpmnSequenceFlow;
     });
+
+  // A retained element is carried forward verbatim, so a gateway whose default flow was just deleted
+  // would keep pointing at a flowId that no longer exists. Drop the reference rather than persist a
+  // process that names a sequence flow it no longer contains.
+  const flowIds = new Set(sequenceFlows.map(flow => flow.flowId));
+  const elements = retainedElements.map(element =>
+    element.defaultFlowId && !flowIds.has(element.defaultFlowId)
+      ? { ...element, defaultFlowId: null }
+      : element);
 
   const referencedChildNodeIds = new Set(
     elements.map(element => element.childNodeId).filter((nodeId): nodeId is string => !!nodeId)
