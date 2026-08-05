@@ -438,6 +438,15 @@ describe("Object-to-Literal demotion on read", () => {
     expect(conflictsWithStructuredEditor("collection", { a: 1 })).toBe(true);
   });
 
+  // Half-typed JSON has no confirmable shape, so the structured editors must not touch it — the
+  // repeater would otherwise wrap the broken text into a one-item list on sight.
+  it("reports a conflict for JSON-looking text that does not parse", () => {
+    for (const value of ['["GET"', "{", '{"a":', "[1,2,"]) {
+      expect(conflictsWithStructuredEditor("collection", value)).toBe(true);
+      expect(conflictsWithStructuredEditor("dictionary", value)).toBe(true);
+    }
+  });
+
   it("reports no conflict for matching shapes, scalars, or absent values", () => {
     expect(conflictsWithStructuredEditor("collection", '["GET"]')).toBe(false);
     expect(conflictsWithStructuredEditor("dictionary", '{"a":1}')).toBe(false);

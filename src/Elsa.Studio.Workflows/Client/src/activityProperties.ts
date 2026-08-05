@@ -204,12 +204,21 @@ export function structuredEditorKind(
  * the JSON string an Object-syntax value carries after a wire round-trip.
  *
  * Scalars and absent values return false: the editors' coercions for those (a bare string becoming a
- * single row, an empty value starting an empty list) are intended and long-standing.
+ * single row, an empty value starting an empty list) are intended and long-standing. Text that is
+ * *meant* to be JSON but does not parse conflicts too — the shape cannot be confirmed, so coercing it
+ * would destroy a half-typed value the author still needs to repair.
  */
 export function conflictsWithStructuredEditor(kind: "collection" | "dictionary", value: unknown): boolean {
   const structured = asStructuredValue(value);
-  if (structured === undefined) return false;
+  if (structured === undefined) return looksLikeJsonText(value);
   return kind === "collection" ? !Array.isArray(structured) : Array.isArray(structured);
+}
+
+/** Text opening with a JSON container token — an author's attempt at structured JSON, parsable or not. */
+function looksLikeJsonText(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const trimmed = value.trim();
+  return trimmed.startsWith("[") || trimmed.startsWith("{");
 }
 
 // Mirrors `toWireArgument`'s `isRecord` test (arrays and plain objects), seeing through the JSON string
@@ -217,11 +226,9 @@ export function conflictsWithStructuredEditor(kind: "collection" | "dictionary",
 // so an unparsable value stays repairable in the JSON editor instead of being silently reshaped.
 function asStructuredValue(value: unknown): unknown {
   if (typeof value === "object" && value !== null) return value;
-  if (typeof value !== "string") return undefined;
-  const trimmed = value.trim();
-  if (!trimmed.startsWith("[") && !trimmed.startsWith("{")) return undefined;
+  if (!looksLikeJsonText(value)) return undefined;
   try {
-    const parsed = JSON.parse(trimmed);
+    const parsed = JSON.parse(value.trim());
     return typeof parsed === "object" && parsed !== null ? parsed : undefined;
   } catch {
     return undefined;
