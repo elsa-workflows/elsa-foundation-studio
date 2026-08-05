@@ -10,7 +10,7 @@ import type {
   StudioExpressionEditorContribution,
   StudioExpressionEditorProps
 } from "@elsa-workflows/studio-sdk";
-import { describeCollectionType, describeDictionaryType, isRepeaterOptOut } from "./activityProperties";
+import { describeCollectionForInput, describeDictionaryForInput, isRepeaterOptOut } from "./activityProperties";
 import { CollectionValueEditor } from "./CollectionValueEditor";
 import { DictionaryValueEditor } from "./DictionaryValueEditor";
 
@@ -28,8 +28,8 @@ export function ObjectInlineEditor({
   propertyEditors
 }: StudioExpressionEditorProps & { propertyEditors: StudioActivityPropertyEditorContribution[] }) {
   const summaryRef = useRef<HTMLDivElement>(null);
-  const dictionaryType = !isRepeaterOptOut(descriptor) ? describeDictionaryType(descriptor.typeName) : null;
-  const collectionType = !isRepeaterOptOut(descriptor) ? describeCollectionType(descriptor.typeName) : null;
+  const dictionaryType = !isRepeaterOptOut(descriptor) ? describeDictionaryForInput(descriptor) : null;
+  const collectionType = !isRepeaterOptOut(descriptor) ? describeCollectionForInput(descriptor) : null;
 
   useEffect(() => {
     if (initialFocus && !dictionaryType && !collectionType) summaryRef.current?.focus();
@@ -93,7 +93,7 @@ export function ObjectExpandedEditor({
   onChange,
   propertyEditors = []
 }: StudioExpressionEditorProps & { propertyEditors?: StudioActivityPropertyEditorContribution[] }) {
-  const dictionaryType = !isRepeaterOptOut(descriptor) ? describeDictionaryType(descriptor.typeName) : null;
+  const dictionaryType = !isRepeaterOptOut(descriptor) ? describeDictionaryForInput(descriptor) : null;
   if (dictionaryType) {
     return (
       <DictionaryValueEditor
@@ -277,6 +277,6 @@ export function createObjectExpressionEditorContribution(
       inline: props => <ObjectInlineEditor {...props} propertyEditors={getPropertyEditors()} />,
       expanded: props => <ObjectExpandedEditor {...props} propertyEditors={getPropertyEditors()} />
     },
-    createDefaultValue: context => describeCollectionType(context.descriptor.typeName) ? [] : {}
+    createDefaultValue: context => describeCollectionForInput(context.descriptor) ? [] : {}
   };
 }

@@ -33,6 +33,8 @@ import {
   formatTypeName,
   getInputPropertyName,
   getLiteralEditorValue,
+  describeCollectionForInput,
+  describeDictionaryForInput,
   getLiteralDefaultValue,
   isRepeaterOptOut,
   planExpressionModeTransition,
@@ -56,7 +58,6 @@ import {
   type ConversionProfileReference
 } from "./conversionSettings";
 import { listConversionProfiles } from "./api/expressions";
-import { describeCollectionForInput, describeDictionaryForInput } from "./collectionInputDescriptor";
 import { readOptionsProvider, useActivityInputOptions } from "./activityInputOptions";
 import {
   readWorkflowInputs,

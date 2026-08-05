@@ -63,6 +63,33 @@ describe("Object Expression Editor Contribution", () => {
     expect(container.querySelector(".wf-collection-editor")).toBeNull();
   });
 
+  // Under elsa-foundation#945 a collection input's `typeName` is the ELEMENT alias ("System.String") with
+  // the shape in `collectionKind`, so the old `describeCollectionType(typeName)` check saw a scalar, skipped
+  // the repeater, and stranded the input on the "Open the expanded editor to edit JSON." summary.
+  it("detects an element-alias collection descriptor via collectionKind, not just a full type name", () => {
+    const collectionEditor: StudioActivityPropertyEditorContribution = {
+      id: "test.collection-options",
+      supports: (_descriptor, editorContext) => editorContext.scope === "collection",
+      component: ({ value }) => <div className="test-checklist">{(value as unknown[]).join(",")}</div>
+    };
+    const contribution = createObjectExpressionEditorContribution(() => [collectionEditor]);
+    const Inline = contribution.surfaces.inline!;
+    const input = { ...descriptor("SupportedMethods", "System.String"), collectionKind: "List" };
+    const container = render(
+      <Inline descriptor={input} syntax="Object" value={["GET"]} context={context(input)} onChange={vi.fn()} />
+    );
+
+    expect(container.querySelector(".test-checklist")?.textContent).toBe("GET");
+    expect(container.textContent).not.toContain("Open the expanded editor to edit JSON.");
+  });
+
+  it("creates an array default for an element-alias collection descriptor", () => {
+    const contribution = createObjectExpressionEditorContribution(() => []);
+    const input = { ...descriptor("SupportedMethods", "System.String"), collectionKind: "List" };
+
+    expect(contribution.createDefaultValue?.(context(input))).toEqual([]);
+  });
+
   it("uses the dictionary editor for string-keyed Object expressions", () => {
     const contribution = createObjectExpressionEditorContribution(() => []);
     const Inline = contribution.surfaces.inline!;
