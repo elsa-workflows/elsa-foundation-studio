@@ -44,6 +44,7 @@ import {
   buildBpmnCanvas,
   createBpmnBoundNode,
   createBpmnFlowEdge,
+  readBpmnElements,
   syncBpmnCanvasToScope,
   type BpmnNodeData
 } from "./bpmn/bpmnAdapter";
@@ -316,7 +317,7 @@ export function ActivityGraphImplementationEditor({
     return activityGraphDocumentAdapter.replaceGraph(
       document,
       nextRoot,
-      mergeCanvasLayout(activityGraphDocumentAdapter.readLayout(document), nextNodes)
+      mergeCanvasLayout(activityGraphDocumentAdapter.readLayout(document), nextNodes, options?.removedNodeIds)
     );
   }, [catalogByVersion, scopePath]);
 
@@ -1054,9 +1055,13 @@ function fromVariableEditorRecords(values: unknown[]) {
 
 function mergeCanvasLayout(
   layout: ReturnType<typeof activityGraphLayoutToDesign>,
-  nodes: Node<WorkflowNodeData>[]
+  nodes: Node<WorkflowNodeData>[],
+  removedNodeIds: Iterable<string> = []
 ) {
   const byNodeId = new Map(layout.map(record => [record.nodeId, record]));
+  // Upserting the current nodes alone would strand a record for every node ever deleted, growing the
+  // saved payload on each removal.
+  for (const nodeId of removedNodeIds) byNodeId.delete(nodeId);
   for (const node of nodes) {
     const previous = byNodeId.get(node.id);
     byNodeId.set(node.id, {
@@ -1077,7 +1082,7 @@ export interface PinnedGraphNodePosition {
   y: number;
 }
 
-function reconcileGraphLayout(
+export function reconcileGraphLayout(
   root: ActivityNode,
   catalog: Map<string, ActivityCatalogItem>,
   current: ReturnType<typeof activityGraphLayoutToDesign>,
@@ -1085,6 +1090,10 @@ function reconcileGraphLayout(
 ) {
   const activeNodeIds: string[] = [];
   const visit = (owner: ActivityNode) => {
+    // A BPMN scope positions its ELEMENTS, not its slot activities. Collecting only activity ids here
+    // would drop every element record the canvas wrote, so an inspector edit — which commits through
+    // this path — would scatter the process back to default grid positions.
+    for (const element of readBpmnElements(owner)) activeNodeIds.push(element.elementId);
     for (const child of getChildSlots(owner, catalog).flatMap(slot => slot.activities)) {
       activeNodeIds.push(child.nodeId);
       visit(child);
