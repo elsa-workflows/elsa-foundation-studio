@@ -42,6 +42,37 @@ describe("useWorkflowCanvas BPMN placement", () => {
     expect(readActivities(harness.committedDraft()).map(activity => activity.nodeId)).toContain(added!.nodeId);
   });
 
+  // React Flow settles a drag by calling updateNodePositions and onNodeDragStop back to back in one
+  // synchronous block, so the hook's `nodes` closure still holds the pre-drag position. The dragged
+  // node React Flow passes in is the authority.
+  it("persists the dragged node's final position rather than the mirror's", () => {
+    const harness = renderBpmnCanvas();
+    const added = harness.addActivity(writeLineCatalogItem(), { x: 100, y: 100 });
+
+    harness.dragStop({ id: elementIdFor(harness.committedDraft(), added!.nodeId), position: { x: 640, y: 480 } });
+
+    const layout = harness.committedDraft().layout.find(record => record.nodeId !== "start");
+    expect(layout).toMatchObject({ x: 640, y: 480 });
+  });
+
+  it("persists every node of a multi-selection drag", () => {
+    const harness = renderBpmnCanvas();
+    const added = harness.addActivity(writeLineCatalogItem(), { x: 100, y: 100 });
+    const elementId = elementIdFor(harness.committedDraft(), added!.nodeId);
+
+    harness.dragStop(
+      { id: elementId, position: { x: 10, y: 20 } },
+      [
+        { id: elementId, position: { x: 10, y: 20 } },
+        { id: "start", position: { x: 30, y: 40 } }
+      ]
+    );
+
+    const layout = harness.committedDraft().layout;
+    expect(layout.find(record => record.nodeId === elementId)).toMatchObject({ x: 10, y: 20 });
+    expect(layout.find(record => record.nodeId === "start")).toMatchObject({ x: 30, y: 40 });
+  });
+
   it("honours the drop position for a BPMN placement", () => {
     const harness = renderBpmnCanvas();
 
@@ -66,7 +97,10 @@ function renderBpmnCanvas() {
     commits.push(next);
   };
 
-  const api: { addActivity?: ReturnType<typeof useWorkflowCanvas>["addActivity"] } = {};
+  const api: {
+    addActivity?: ReturnType<typeof useWorkflowCanvas>["addActivity"];
+    commitLayout?: ReturnType<typeof useWorkflowCanvas>["commitLayout"];
+  } = {};
 
   function Harness() {
     const scope = resolveScope(draft.state.rootActivity, [], catalogByVersion);
@@ -89,6 +123,7 @@ function renderBpmnCanvas() {
       setError: vi.fn()
     });
     api.addActivity = canvas.addActivity;
+    api.commitLayout = canvas.commitLayout;
     return null;
   }
 
@@ -109,11 +144,31 @@ function renderBpmnCanvas() {
       });
       return added as ActivityNode | null;
     },
+    // Mirrors React Flow's onNodeDragStop payload: the settled node, plus every node of a
+    // multi-selection drag.
+    dragStop: (
+      node: { id: string; position: { x: number; y: number } },
+      draggedNodes?: Array<{ id: string; position: { x: number; y: number } }>
+    ) => {
+      flushSync(() => {
+        api.commitLayout!(
+          new MouseEvent("mouseup") as unknown as Parameters<NonNullable<typeof api.commitLayout>>[0],
+          node as unknown as Parameters<NonNullable<typeof api.commitLayout>>[1],
+          (draggedNodes ?? [node]) as unknown as Parameters<NonNullable<typeof api.commitLayout>>[2]
+        );
+      });
+    },
     committedDraft: () => {
       if (commits.length === 0) throw new Error("No draft was committed");
       return commits[commits.length - 1];
     }
   };
+}
+
+function elementIdFor(draft: WorkflowDraft, childNodeId: string) {
+  const element = readElements(draft).find(candidate => candidate.childNodeId === childNodeId);
+  if (!element) throw new Error(`No BPMN element bound to ${childNodeId}`);
+  return element.elementId;
 }
 
 function readElements(draft: WorkflowDraft) {

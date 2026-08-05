@@ -11,6 +11,7 @@ import {
   type NodeChange,
   type OnConnectEnd,
   type OnConnectStart,
+  type OnNodeDrag,
   type OnReconnect,
   type ReactFlowInstance,
   type Viewport,
@@ -539,8 +540,25 @@ export function useGraphCanvasInteractions({
     commitCanvas(nodes, nextEdges);
   };
 
-  const commitLayout = () => {
-    commitCanvas(nodes, edges);
+  /**
+   * Persists node positions after a drag. React Flow settles the drag by calling `updateNodePositions`
+   * and `onNodeDragStop` back to back in one synchronous block, so the `nodes` captured by this
+   * closure has not re-rendered with the final position yet — the dragged nodes React Flow hands us
+   * are the authority. Falls back to the mirror when invoked without them (plain layout commits).
+   */
+  const commitLayout: OnNodeDrag<Node<WorkflowNodeData>> = (_event, node, draggedNodes) => {
+    const dragged = draggedNodes?.length ? draggedNodes : node ? [node] : [];
+    if (dragged.length === 0) {
+      commitCanvas(nodes, edges);
+      return;
+    }
+    const positions = new Map(dragged.map(dragTarget => [dragTarget.id, dragTarget.position]));
+    const nextNodes = nodes.map(current => {
+      const position = positions.get(current.id);
+      return position ? { ...current, position } : current;
+    });
+    setNodes(nextNodes);
+    commitCanvas(nextNodes, edges);
   };
 
   const canAutoLayout = !isUnsupported && nodes.length > 0;
