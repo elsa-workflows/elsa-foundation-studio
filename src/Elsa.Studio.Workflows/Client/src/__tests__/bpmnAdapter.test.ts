@@ -5,6 +5,7 @@ import { getActivityDesignerSupport, getChildSlots, readStructureDesignFacet } f
 import {
   buildBpmnCanvas,
   createBpmnBoundNode,
+  collectRemovedGraphNodeIds,
   createBpmnShapeNode,
   syncBpmnCanvasToScope,
   updateBpmnElement,
@@ -130,6 +131,54 @@ describe("bpmn designer mode plumbing", () => {
     const payload = next.structure?.payload as { elements: Array<{ elementId: string; defaultFlowId?: string | null }> };
 
     expect(payload.elements.find(element => element.elementId === "gateway")?.defaultFlowId).toBe("flow-default");
+  });
+
+
+  it("expands a deleted bound subprocess to its nested BPMN element ids", () => {
+    // A subprocess element bound to an activity whose own structure is a BPMN scope: the nested
+    // element's layout is keyed by its elementId, which the activity walk alone never reaches.
+    const nested: ActivityNode = {
+      nodeId: "subprocess-activity",
+      activityVersionId: "bpmn@1",
+      inputs: [],
+      outputs: [],
+      structure: {
+        kind: bpmnStructureKind,
+        schemaVersion: "1.0.0",
+        payload: {
+          elements: [{ elementId: "nested-task-element", elementType: "task", childNodeId: "nested-activity" }],
+          sequenceFlows: [],
+          activities: [{ nodeId: "nested-activity", activityVersionId: "writeline@1", inputs: [], outputs: [] }]
+        }
+      }
+    };
+    const deleted = [{
+      id: "subprocess-element",
+      position: { x: 0, y: 0 },
+      data: {
+        element: { elementId: "subprocess-element", elementType: "subProcess", childNodeId: "subprocess-activity" },
+        label: "",
+        boundActivity: { nodeId: "subprocess-activity", activityVersionId: "bpmn@1", label: "", icon: "flowchart" }
+      }
+    }] as unknown as Node<BpmnNodeData>[];
+
+    const removed = collectRemovedGraphNodeIds(deleted, [nested], undefined);
+
+    expect([...removed].sort()).toEqual([
+      "nested-activity",
+      "nested-task-element",
+      "subprocess-activity"
+    ]);
+  });
+
+  it("falls back to the canvas node id when no slot activity matches", () => {
+    const deleted = [{
+      id: "start",
+      position: { x: 0, y: 0 },
+      data: { element: { elementId: "start", elementType: "startEvent" }, label: "" }
+    }] as unknown as Node<BpmnNodeData>[];
+
+    expect([...collectRemovedGraphNodeIds(deleted, [], undefined)]).toEqual(["start"]);
   });
 
 });

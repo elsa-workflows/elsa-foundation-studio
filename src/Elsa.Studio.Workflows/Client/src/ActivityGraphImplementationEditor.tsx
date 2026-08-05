@@ -12,7 +12,6 @@ import type {
 import type { ActivityCatalogItem, ActivityNode, VariableDefinition, WorkflowDefinitionState, WorkflowInput } from "./workflowTypes";
 import {
   buildCanvas,
-  collectActivityNodeIds,
   createActivityNode,
   getActivityDisplay,
   getChildSlots,
@@ -42,6 +41,7 @@ import {
 } from "./graph-authoring/useGraphCanvasInteractions";
 import {
   buildBpmnCanvas,
+  collectRemovedGraphNodeIds,
   createBpmnBoundNode,
   createBpmnFlowEdge,
   readBpmnElements,
@@ -453,17 +453,11 @@ export function ActivityGraphImplementationEditor({
     return next;
   }, [activities, commitDocument, isBpmnSlot, payload, placeBpmnActivity, readOnly, root.activityVersionId, root.nodeId, slot, updateOwnerActivities, value]);
 
-  // BPMN canvas nodes are elements, so a delete must expand to the activity the element binds (plus any
-  // nested children) or the activity survives its own element.
+  // BPMN canvas nodes are elements, so a delete must expand to the activity the element binds, that
+  // activity's nested activities, and the element ids of any BPMN scope inside it.
   const resolveRemovedActivityNodeIds = useCallback((deleted: Node<WorkflowNodeData>[]) =>
-    deleted.reduce((result, node) => {
-      const boundNodeId = (node.data as unknown as BpmnNodeData).boundActivity?.nodeId;
-      const activityNodeId = boundNodeId ?? node.id;
-      const activity = activities.find(candidate => candidate.nodeId === activityNodeId);
-      return activity
-        ? collectActivityNodeIds(activity, catalogByVersion, result)
-        : result.add(activityNodeId);
-    }, new Set<string>()), [activities, catalogByVersion]);
+    collectRemovedGraphNodeIds(deleted as unknown as Node<BpmnNodeData>[], activities, catalogByVersion),
+    [activities, catalogByVersion]);
 
   const interactions = useGraphCanvasInteractions({
     nodes,
