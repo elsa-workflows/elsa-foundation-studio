@@ -180,16 +180,36 @@ function resolveAuthoredExpression(
   if (expression.type !== "Object" || isRepeaterOptOut(descriptor)) return expression;
   const structured = asStructuredValue(expression.value);
   if (structured === undefined) return expression;
-  // The demoted value has to match the shape its Literal editor authors, or that editor would coerce it
-  // on sight and the authored value would change just by opening the row: `toLiteralCollection` wraps a
-  // stray object into a one-item list, and the dictionary editor flattens a stray array to {}. A
-  // mismatch is a genuinely malformed value, so leave it as Object where the JSON editor can repair it.
-  const matchesDescriptorShape = describeCollectionForInput(descriptor)
-    ? Array.isArray(structured)
-    : describeDictionaryForInput(descriptor)
-      ? !Array.isArray(structured)
-      : false;
-  return matchesDescriptorShape ? { type: "Literal", value: structured } : expression;
+  const kind = structuredEditorKind(descriptor);
+  if (!kind || conflictsWithStructuredEditor(kind, structured)) return expression;
+  return { type: "Literal", value: structured };
+}
+
+/** Which structured editor a descriptor authors with, or null for a scalar input. */
+export function structuredEditorKind(
+  descriptor: StudioActivityInputDescriptor
+): "collection" | "dictionary" | null {
+  if (describeCollectionForInput(descriptor)) return "collection";
+  return describeDictionaryForInput(descriptor) ? "dictionary" : null;
+}
+
+/**
+ * Whether a value's shape disagrees with the structured editor that would author it.
+ *
+ * Those editors coerce on sight, so merely rendering the row would rewrite an authored value:
+ * `toLiteralCollection` wraps a stray object into a one-item list, and the dictionary editor flattens a
+ * stray array to `{}`. A mismatch means the value is genuinely malformed, so it belongs in the generic
+ * Object/JSON editor until the author repairs it — which is why every site that routes a value into a
+ * collection or dictionary editor has to ask this, not just the Object-to-Literal demotion. Sees through
+ * the JSON string an Object-syntax value carries after a wire round-trip.
+ *
+ * Scalars and absent values return false: the editors' coercions for those (a bare string becoming a
+ * single row, an empty value starting an empty list) are intended and long-standing.
+ */
+export function conflictsWithStructuredEditor(kind: "collection" | "dictionary", value: unknown): boolean {
+  const structured = asStructuredValue(value);
+  if (structured === undefined) return false;
+  return kind === "collection" ? !Array.isArray(structured) : Array.isArray(structured);
 }
 
 // Mirrors `toWireArgument`'s `isRecord` test (arrays and plain objects), seeing through the JSON string

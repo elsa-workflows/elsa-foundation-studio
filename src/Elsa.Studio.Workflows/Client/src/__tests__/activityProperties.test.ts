@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { StudioActivityInputDescriptor } from "@elsa-workflows/studio-sdk";
 import {
   camelize,
+  conflictsWithStructuredEditor,
   defaultCollectionItem,
   describeCollectionForInput,
   describeDictionaryForInput,
@@ -428,6 +429,23 @@ describe("Object-to-Literal demotion on read", () => {
     const dictionaryInput = { ...listInput, collectionKind: "Dictionary" } as StudioActivityInputDescriptor;
     expect(readWrappedInput(objectExpression("[]"), dictionaryInput).expression)
       .toEqual({ type: "Object", value: "[]" });
+  });
+
+  it("reports a shape conflict through the JSON string an Object value carries", () => {
+    expect(conflictsWithStructuredEditor("dictionary", "[]")).toBe(true);
+    expect(conflictsWithStructuredEditor("dictionary", [])).toBe(true);
+    expect(conflictsWithStructuredEditor("collection", '{"a":1}')).toBe(true);
+    expect(conflictsWithStructuredEditor("collection", { a: 1 })).toBe(true);
+  });
+
+  it("reports no conflict for matching shapes, scalars, or absent values", () => {
+    expect(conflictsWithStructuredEditor("collection", '["GET"]')).toBe(false);
+    expect(conflictsWithStructuredEditor("dictionary", '{"a":1}')).toBe(false);
+    // Scalars and empties keep the editors' long-standing coercions (a bare string becomes one row).
+    for (const value of ["", null, undefined, "GET", 42]) {
+      expect(conflictsWithStructuredEditor("collection", value)).toBe(false);
+      expect(conflictsWithStructuredEditor("dictionary", value)).toBe(false);
+    }
   });
 
   it("leaves an unparsable value as Object so it stays repairable in the JSON editor", () => {
