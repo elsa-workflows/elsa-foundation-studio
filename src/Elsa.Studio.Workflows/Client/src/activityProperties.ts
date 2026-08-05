@@ -127,8 +127,10 @@ export function isEmptyExpressionValue(value: unknown): boolean {
 
 export function getLiteralDefaultValue(descriptor: StudioActivityInputDescriptor): unknown {
   if (descriptor.defaultValue != null) return descriptor.defaultValue;
-  if (describeDictionaryType(descriptor.typeName)) return {};
-  if (describeCollectionType(descriptor.typeName)) return [];
+  // Descriptor-aware, not a `typeName` parse: under #945 a collection input's typeName is the element
+  // alias, so parsing it would hand back a scalar "" instead of [] when switching into Literal mode.
+  if (describeDictionaryForInput(descriptor)) return {};
+  if (describeCollectionForInput(descriptor)) return [];
   const typeName = descriptor.typeName.trim().toLowerCase();
   return typeName === "system.boolean" || typeName === "boolean" || typeName === "bool" ? false : "";
 }
@@ -176,9 +178,18 @@ function resolveAuthoredExpression(
   descriptor: StudioActivityInputDescriptor
 ): ActivityExpression {
   if (expression.type !== "Object" || isRepeaterOptOut(descriptor)) return expression;
-  if (!describeCollectionForInput(descriptor) && !describeDictionaryForInput(descriptor)) return expression;
   const structured = asStructuredValue(expression.value);
-  return structured === undefined ? expression : { type: "Literal", value: structured };
+  if (structured === undefined) return expression;
+  // The demoted value has to match the shape its Literal editor authors, or that editor would coerce it
+  // on sight and the authored value would change just by opening the row: `toLiteralCollection` wraps a
+  // stray object into a one-item list, and the dictionary editor flattens a stray array to {}. A
+  // mismatch is a genuinely malformed value, so leave it as Object where the JSON editor can repair it.
+  const matchesDescriptorShape = describeCollectionForInput(descriptor)
+    ? Array.isArray(structured)
+    : describeDictionaryForInput(descriptor)
+      ? !Array.isArray(structured)
+      : false;
+  return matchesDescriptorShape ? { type: "Literal", value: structured } : expression;
 }
 
 // Mirrors `toWireArgument`'s `isRecord` test (arrays and plain objects), seeing through the JSON string

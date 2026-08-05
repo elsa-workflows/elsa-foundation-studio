@@ -336,6 +336,14 @@ describe("dictionary literal authoring", () => {
       typeName: "System.Collections.Generic.IDictionary`2[System.String,System.String]"
     })).toEqual({});
   });
+
+  // Under #945 the typeName is the element alias, so a typeName-only parse would hand back a scalar ""
+  // and switching an element-alias collection into Literal mode would start it as text, not a list.
+  it("uses the descriptor's collectionKind, not its typeName, for element-alias defaults", () => {
+    expect(getLiteralDefaultValue({ name: "SupportedMethods", typeName: "System.String", collectionKind: "List" })).toEqual([]);
+    expect(getLiteralDefaultValue({ name: "Headers", typeName: "System.String", collectionKind: "Dictionary" })).toEqual({});
+    expect(getLiteralDefaultValue({ name: "Path", typeName: "System.String", collectionKind: "Single" })).toBe("");
+  });
 });
 
 describe("descriptor-aware collection/dictionary detection (collectionKind, #945)", () => {
@@ -406,6 +414,20 @@ describe("Object-to-Literal demotion on read", () => {
     const dictionaryInput = { ...listInput, collectionKind: "Dictionary" } as StudioActivityInputDescriptor;
     expect(readWrappedInput(objectExpression('{"a":1}'), dictionaryInput).expression)
       .toEqual({ type: "Literal", value: { a: 1 } });
+  });
+
+  // A shape that disagrees with the descriptor would be silently rewritten by the Literal editor the
+  // moment the row rendered — `toLiteralCollection({})` yields `[{}]`, and the dictionary editor
+  // flattens an array to `{}`. Opening and saving a workflow must never alter an authored value.
+  it("keeps a collection input's non-array Object value as Object", () => {
+    expect(readWrappedInput(objectExpression('{"a":1}'), listInput).expression)
+      .toEqual({ type: "Object", value: '{"a":1}' });
+  });
+
+  it("keeps a dictionary input's array Object value as Object", () => {
+    const dictionaryInput = { ...listInput, collectionKind: "Dictionary" } as StudioActivityInputDescriptor;
+    expect(readWrappedInput(objectExpression("[]"), dictionaryInput).expression)
+      .toEqual({ type: "Object", value: "[]" });
   });
 
   it("leaves an unparsable value as Object so it stays repairable in the JSON editor", () => {
