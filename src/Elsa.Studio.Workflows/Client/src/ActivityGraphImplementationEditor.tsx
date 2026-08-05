@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Node, XYPosition } from "@xyflow/react";
+import type { Edge, Node, XYPosition } from "@xyflow/react";
 import { ArrowLeft, ArrowRight, Boxes, ListTree, Network, Plus, Redo2, Trash2, Undo2 } from "lucide-react";
 import type {
   StudioActivityDefinitionContract,
@@ -12,6 +12,7 @@ import type {
 import type { ActivityCatalogItem, ActivityNode, VariableDefinition, WorkflowDefinitionState, WorkflowInput } from "./workflowTypes";
 import {
   buildCanvas,
+  collectActivityNodeIds,
   createActivityNode,
   getActivityDisplay,
   getChildSlots,
@@ -36,8 +37,16 @@ import { useGraphAuthoringCanvas } from "./graph-authoring/useGraphAuthoringCanv
 import {
   useGraphCanvasInteractions,
   type GraphCanvasCommitOptions,
-  type GraphCanvasMode
+  type GraphCanvasMode,
+  type GraphCanvasPlacement
 } from "./graph-authoring/useGraphCanvasInteractions";
+import {
+  buildBpmnCanvas,
+  createBpmnBoundNode,
+  createBpmnFlowEdge,
+  syncBpmnCanvasToScope,
+  type BpmnNodeData
+} from "./bpmn/bpmnAdapter";
 import { filterGraphAuthoringContributions } from "./graph-authoring/graphAuthoringContributions";
 import { ScopedVariablesEditor } from "./WorkflowPropertiesView";
 import { toActivityDescriptor } from "./workflow-editor/useWorkflowEditorData";
@@ -261,7 +270,14 @@ export function ActivityGraphImplementationEditor({
       ? getChildSlots(documentOwner, catalogByVersion)[0]
       : undefined;
     if (!documentSlot) return { nodes: [], edges: [] };
-    const model = buildCanvas({ owner: documentOwner, slot: documentSlot }, catalog, layout);
+    // A BPMN scope's canvas nodes are its process ELEMENTS (an activity-bearing element carries its
+    // child through `childNodeId`), not the slot activities — see the bpmn adapter.
+    const model = documentSlot.mode === "bpmn"
+      ? buildBpmnCanvas({ owner: documentOwner, slot: documentSlot }, catalog, layout) as unknown as {
+          nodes: Node<WorkflowNodeData>[];
+          edges: Edge[];
+        }
+      : buildCanvas({ owner: documentOwner, slot: documentSlot }, catalog, layout);
     return { nodes: model.nodes, edges: model.edges as WorkflowEdge[] };
   }, [catalog, catalogByVersion, scopePath]);
 
@@ -280,13 +296,22 @@ export function ActivityGraphImplementationEditor({
     if (!documentSlot) return document;
     // Activities the shared canvas layer created in place (edge splice, connect menu) are not in the
     // slot yet; without them the sync would drop the node it just placed.
-    let nextOwner = syncCanvasToScope(
-      { owner: documentOwner, slot: documentSlot },
-      nextNodes,
-      nextEdges,
-      options?.createdActivities ?? []
-    );
-    if (documentSlot.mode === "flowchart") nextOwner = withFlowchartConnections(nextOwner, nextEdges);
+    const createdActivities = options?.createdActivities ?? [];
+    const documentScope = { owner: documentOwner, slot: documentSlot };
+    let nextOwner: ActivityNode;
+    if (documentSlot.mode === "bpmn") {
+      // Writes the elements and sequence flows as well as the slot activities; syncCanvasToScope would
+      // persist the activities alone and leave the process structure without matching elements.
+      nextOwner = syncBpmnCanvasToScope(
+        documentScope,
+        nextNodes as unknown as Node<BpmnNodeData>[],
+        nextEdges,
+        createdActivities
+      );
+    } else {
+      nextOwner = syncCanvasToScope(documentScope, nextNodes, nextEdges, createdActivities);
+      if (documentSlot.mode === "flowchart") nextOwner = withFlowchartConnections(nextOwner, nextEdges);
+    }
     const nextRoot = updateActivity(documentRoot, documentOwner.nodeId, () => nextOwner, catalogByVersion);
     return activityGraphDocumentAdapter.replaceGraph(
       document,
@@ -311,9 +336,16 @@ export function ActivityGraphImplementationEditor({
   const ownerCatalogItem = catalogByVersion.get(owner.activityVersionId);
   const ownerSupported = supportsActivityNode(owner, ownerCatalogItem);
   const slot = ownerSupported ? getChildSlots(owner, catalogByVersion)[0] : undefined;
+  const isBpmnSlot = slot?.mode === "bpmn";
   const activities = slot?.activities ?? emptyActivities;
   const scopeFrames = useMemo(() => toScopeFrames(root, scopePath, catalogByVersion), [catalogByVersion, root, scopePath]);
-  const selected = activities.find(activity => activity.nodeId === selectedNodeId) ?? null;
+  // A BPMN canvas selects ELEMENTS, whose id is the elementId rather than an activity node id. An
+  // activity-bearing element resolves to the activity it binds so the ordinary inspector applies; a
+  // pure structure element (event/gateway) binds nothing and leaves the scope owner inspected.
+  const selectedActivityNodeId = isBpmnSlot
+    ? (nodes.find(node => node.id === selectedNodeId)?.data as unknown as BpmnNodeData | undefined)?.boundActivity?.nodeId ?? null
+    : selectedNodeId;
+  const selected = activities.find(activity => activity.nodeId === selectedActivityNodeId) ?? null;
   const selectedCatalogItem = selected ? catalogByVersion.get(selected.activityVersionId) : undefined;
   const selectedIndex = selected ? activities.findIndex(activity => activity.nodeId === selected.nodeId) : -1;
   const selectedSupported = selected ? supportsActivityNode(selected, selectedCatalogItem) : true;
@@ -363,6 +395,36 @@ export function ActivityGraphImplementationEditor({
     );
   }, [catalogByVersion, commitRoot, owner.nodeId, root, slot]);
 
+  // Canvas node + ActivityNode pair for an activity placed in a BPMN scope: the element becomes the
+  // canvas node (its id is the elementId) and binds the activity through `childNodeId`.
+  const createPlacement = useCallback((activity: ActivityCatalogItem, position: XYPosition): GraphCanvasPlacement | null => {
+    if (!isBpmnSlot) return null;
+    const activityNode = createActivityNode(activity, createNodeId(activity));
+    return {
+      activityNode,
+      node: createBpmnBoundNode(activity, activityNode, position) as unknown as Node<WorkflowNodeData>
+    };
+  }, [isBpmnSlot]);
+
+  // Focus belongs to the shared interaction layer, which is constructed below (it consumes
+  // `placeActivity`). A ref breaks that cycle for the BPMN placement path.
+  const queueCanvasNodeFocusRef = useRef<(nodeId: string) => void>(() => {});
+
+  // BPMN placements cannot append to the slot the way the other modes do: the canvas is rendered from
+  // the process elements, so an activity without a bound element has no representation and is dropped
+  // by the next syncBpmnCanvasToScope. Stamp the element onto the canvas and commit that instead.
+  const placeBpmnActivity = useCallback((activity: ActivityCatalogItem, position?: XYPosition) => {
+    const fallback: XYPosition = { x: 120 + (nodes.length % 5) * 220, y: 120 + Math.floor(nodes.length / 5) * 140 };
+    const placement = createPlacement(activity, position ?? fallback);
+    if (!placement) return null;
+    const nextNodes = [...nodes.map(node => node.selected ? { ...node, selected: false } : node), placement.node];
+    setNodes(nextNodes);
+    setSelectedNodeId(placement.node.id);
+    commitCanvas(nextNodes, edges, { createdActivities: [placement.activityNode] });
+    queueCanvasNodeFocusRef.current(placement.node.id);
+    return placement.activityNode;
+  }, [commitCanvas, createPlacement, edges, nodes, setNodes]);
+
   // The Activity Definition graph's answer to the workflow editor's drop routing: a graph with no root
   // yet adopts the first composition dropped on it, otherwise the activity appends to the open slot at
   // the cursor position.
@@ -380,6 +442,7 @@ export function ActivityGraphImplementationEditor({
       return null;
     }
     if (!slot) return null;
+    if (isBpmnSlot) return placeBpmnActivity(activity, position);
     const next = createActivityNode(activity, createNodeId(activity));
     updateOwnerActivities(
       [...activities, next],
@@ -387,7 +450,19 @@ export function ActivityGraphImplementationEditor({
     );
     setSelectedNodeId(next.nodeId);
     return next;
-  }, [activities, commitDocument, payload, readOnly, root.activityVersionId, root.nodeId, slot, updateOwnerActivities, value]);
+  }, [activities, commitDocument, isBpmnSlot, payload, placeBpmnActivity, readOnly, root.activityVersionId, root.nodeId, slot, updateOwnerActivities, value]);
+
+  // BPMN canvas nodes are elements, so a delete must expand to the activity the element binds (plus any
+  // nested children) or the activity survives its own element.
+  const resolveRemovedActivityNodeIds = useCallback((deleted: Node<WorkflowNodeData>[]) =>
+    deleted.reduce((result, node) => {
+      const boundNodeId = (node.data as unknown as BpmnNodeData).boundActivity?.nodeId;
+      const activityNodeId = boundNodeId ?? node.id;
+      const activity = activities.find(candidate => candidate.nodeId === activityNodeId);
+      return activity
+        ? collectActivityNodeIds(activity, catalogByVersion, result)
+        : result.add(activityNodeId);
+    }, new Set<string>()), [activities, catalogByVersion]);
 
   const interactions = useGraphCanvasInteractions({
     nodes,
@@ -401,8 +476,14 @@ export function ActivityGraphImplementationEditor({
     catalogByVersion,
     select: setSelectedNodeId,
     commitCanvas,
-    placeActivity
+    placeActivity,
+    createPlacement: isBpmnSlot ? createPlacement : undefined,
+    createEdge: isBpmnSlot
+      ? (source, target) => createBpmnFlowEdge(source, target) as WorkflowEdge
+      : undefined,
+    resolveRemovedActivityNodeIds
   });
+  queueCanvasNodeFocusRef.current = interactions.queueCanvasNodeFocus;
 
   // The provider-owned diagnostic focus seam addresses canvas nodes by document node id, which React
   // Flow does not put on the DOM.
@@ -412,9 +493,14 @@ export function ActivityGraphImplementationEditor({
   })), [interactions.accessibleNodes]);
 
   useEffect(() => {
-    if (!selectedNodeId || activities.some(activity => activity.nodeId === selectedNodeId)) return;
+    if (!selectedNodeId) return;
+    // BPMN selects elements by elementId, every other mode selects activities by node id.
+    const present = isBpmnSlot
+      ? nodes.some(node => node.id === selectedNodeId)
+      : activities.some(activity => activity.nodeId === selectedNodeId);
+    if (present) return;
     setSelectedNodeId(null);
-  }, [activities, selectedNodeId]);
+  }, [activities, isBpmnSlot, nodes, selectedNodeId]);
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -489,6 +575,14 @@ export function ActivityGraphImplementationEditor({
   const deleteSelected = () => {
     if (!selected) return;
     if (!window.confirm("Remove this activity and any nested graph content? This change will autosave.")) return;
+    if (isBpmnSlot) {
+      // Delete the bound ELEMENT through the canvas so its sequence flows go with it; dropping the
+      // activity alone would leave an element pointing at a childNodeId that no longer exists.
+      const elementNode = nodes.find(node =>
+        (node.data as unknown as BpmnNodeData).boundActivity?.nodeId === selected.nodeId);
+      if (elementNode) interactions.onNodesDelete([elementNode]);
+      return;
+    }
     updateOwnerActivities(activities.filter(activity => activity.nodeId !== selected.nodeId));
     setSelectedNodeId(null);
   };
@@ -592,8 +686,9 @@ export function ActivityGraphImplementationEditor({
       render: () => (
         <>
           {selected ? <div className="ad-graph-node-actions">
-            <button type="button" aria-label="Move activity left" onClick={() => moveSelected(-1)} disabled={readOnly || selectedIndex <= 0}><ArrowLeft size={15} /></button>
-            <button type="button" aria-label="Move activity right" onClick={() => moveSelected(1)} disabled={readOnly || selectedIndex < 0 || selectedIndex === activities.length - 1}><ArrowRight size={15} /></button>
+            {/* Ordering is a slot-list concept; a BPMN process is ordered by its sequence flows. */}
+            <button type="button" aria-label="Move activity left" onClick={() => moveSelected(-1)} disabled={readOnly || isBpmnSlot || selectedIndex <= 0}><ArrowLeft size={15} /></button>
+            <button type="button" aria-label="Move activity right" onClick={() => moveSelected(1)} disabled={readOnly || isBpmnSlot || selectedIndex < 0 || selectedIndex === activities.length - 1}><ArrowRight size={15} /></button>
             <button type="button" onClick={deleteSelected} disabled={readOnly}><Trash2 size={15} /> Remove</button>
           </div> : null}
           {!selectedSupported ? <span role="alert">This existing nested structure is preserved but cannot be structurally edited here.</span> : null}
