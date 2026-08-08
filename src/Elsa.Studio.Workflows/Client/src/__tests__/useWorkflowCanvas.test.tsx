@@ -120,6 +120,23 @@ describe("useWorkflowCanvas side tables of deleted nodes", () => {
 
     expect(harness.committedDraft().layout.find(record => record.nodeId === "start")).toMatchObject({ x: 0, y: 0 });
   });
+
+  // Overwriting a single-cardinality slot evicts its occupant without any canvas delete, so it is the
+  // other way a node leaves the document. The evicted activity here owns a BPMN scope, whose elements
+  // are keyed by element id — an eviction that expands only the activity walk strands one record per
+  // nested element.
+  it("drops the side tables of an activity displaced from a single-cardinality slot", () => {
+    const harness = renderSingleSlotCanvas();
+
+    harness.addActivity(writeLineCatalogItem(), { x: 400, y: 300 });
+
+    const draft = harness.committedDraft();
+    expect(draft.layout.map(record => record.nodeId)).not.toContain("displaced-process");
+    expect(draft.layout.map(record => record.nodeId)).not.toContain("nested-activity");
+    expect(draft.layout.map(record => record.nodeId)).not.toContain("nested-element");
+    expect(draft.layout.map(record => record.nodeId)).toContain("unrelated");
+    expect((draft.activityPresentation ?? []).map(record => record.nodeId)).not.toContain("displaced-process");
+  });
 });
 
 describe("forgetRemovedNodes", () => {
@@ -159,6 +176,14 @@ function renderFlowchartCanvas() {
   return renderCanvas({
     draft: flowchartDraft(),
     catalog: [flowchartCatalogItem(), writeLineCatalogItem()],
+    isBpmnDesigner: false
+  });
+}
+
+function renderSingleSlotCanvas() {
+  return renderCanvas({
+    draft: singleSlotDraft(),
+    catalog: [containerCatalogItem(), bpmnCatalogItem(), writeLineCatalogItem()],
     isBpmnDesigner: false
   });
 }
@@ -337,6 +362,71 @@ function flowchartDraft(): WorkflowDraft {
     layout: [{ nodeId: "node-a", x: 240, y: 160 }],
     activityPresentation: [{ nodeId: "node-a", displayName: "Renamed" }]
   } as unknown as WorkflowDraft;
+}
+
+// A generic container whose `body` property holds one ActivityNode rather than an array — that is what
+// makes the slot single-cardinality, so a drop replaces the occupant instead of appending.
+function singleSlotDraft(): WorkflowDraft {
+  return {
+    state: {
+      rootActivity: {
+        nodeId: "node-container",
+        activityVersionId: "container@1",
+        inputs: [],
+        outputs: [],
+        structure: {
+          kind: "Container",
+          schemaVersion: "1.0.0",
+          payload: {
+            body: {
+              nodeId: "displaced-process",
+              activityVersionId: "bpmn@1",
+              inputs: [],
+              outputs: [],
+              structure: {
+                kind: bpmnStructureKind,
+                schemaVersion: "1.0.0",
+                payload: {
+                  elements: [{ elementId: "nested-element", elementType: "task", childNodeId: "nested-activity" }],
+                  sequenceFlows: [],
+                  activities: [{
+                    nodeId: "nested-activity",
+                    activityVersionId: "writeline@1",
+                    inputs: [],
+                    outputs: [],
+                    structure: null
+                  }]
+                }
+              }
+            }
+          }
+        }
+      },
+      inputs: [],
+      outputs: [],
+      variables: []
+    },
+    layout: [
+      { nodeId: "displaced-process", x: 10, y: 20 },
+      { nodeId: "nested-element", x: 30, y: 40 },
+      { nodeId: "nested-activity", x: 50, y: 60 },
+      { nodeId: "unrelated", x: 70, y: 80 }
+    ],
+    activityPresentation: [{ nodeId: "displaced-process", displayName: "Old process" }]
+  } as unknown as WorkflowDraft;
+}
+
+function containerCatalogItem(): ActivityCatalogItem {
+  return {
+    activityVersionId: "container@1",
+    activityTypeKey: "Elsa.Container",
+    version: "1.0.0",
+    category: "Composition",
+    displayName: "Container",
+    executionType: "Action",
+    inputs: [],
+    outputs: []
+  } as unknown as ActivityCatalogItem;
 }
 
 function flowchartCatalogItem(): ActivityCatalogItem {
