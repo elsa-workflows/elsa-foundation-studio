@@ -16,8 +16,17 @@ import {
   startWorkflowDraftTestRun,
   type PublicationIntent
 } from "../api/publishing";
+import {
+  describeWorkflowExecutableExportFailure,
+  exportWorkflowExecutableClosure
+} from "../api/executableArtifactExport";
 import { decorateConversionDiagnostic } from "../conversionSettings";
-import { buildExportPayload, downloadWorkflowJson } from "../workflowSerialization";
+import {
+  buildExecutableArtifactFileName,
+  buildExportPayload,
+  downloadExecutableArtifactJson,
+  downloadWorkflowJson
+} from "../workflowSerialization";
 import { readWorkflowInputs } from "../workflowReferenceAuthoring";
 import {
   createDraftSnapshotId,
@@ -27,7 +36,8 @@ import {
   isRejectedTestRun,
   readWorkflowErrorPayload
 } from "./editorHelpers";
-import type { WorkflowEditorOperation, WorkflowErrorInput, WorkflowTestRunState } from "./editorTypes";
+import type { WorkflowEditorError, WorkflowEditorOperation, WorkflowErrorInput, WorkflowTestRunState } from "./editorTypes";
+import type { PublishedExecutableTarget } from "./useExecutableArtifactExport";
 import {
   createPublicationReview,
   publicationBlockedMessage,
@@ -43,6 +53,11 @@ interface WorkflowOperationsParams {
   details: WorkflowDefinitionDetails | null;
   catalog: ActivityCatalogItem[];
   busy: boolean;
+  /**
+   * The published version whose compiled artifact can be exported (foundation #1304), or null when the
+   * workflow has no published version or the server does not advertise the export relation.
+   */
+  publishedExecutable?: PublishedExecutableTarget | null;
   saveDraft(draft: WorkflowDraft, savedStatus: string): Promise<WorkflowDraft>;
   flushPendingSave(): Promise<void>;
   reload(): Promise<void>;
@@ -65,6 +80,7 @@ export function useWorkflowOperations({
   details,
   catalog,
   busy,
+  publishedExecutable = null,
   saveDraft,
   flushPendingSave,
   reload,
@@ -95,6 +111,31 @@ export function useWorkflowOperations({
     downloadWorkflowJson(buildExportPayload(draft, name), name);
     setStatus("Exported workflow as JSON.");
   }, [draft, details, setStatus]);
+
+  // Distinct from `exportJson` above: that serializes the design draft, this downloads the *compiled*
+  // artifact closure the server produced for the published version (foundation #1304). The payload is
+  // saved exactly as it arrived — Studio never assembles or reshapes a closure (FR-C-004).
+  const exportExecutableArtifact = useCallback(async () => {
+    if (busy) return;
+    if (!publishedExecutable) {
+      setError({ message: publishFirstMessage });
+      return;
+    }
+    setOperation("exportingArtifact");
+    setStatus("Exporting executable artifact...");
+    setError("");
+    try {
+      const closure = await exportWorkflowExecutableClosure(context, publishedExecutable.versionId);
+      // Only reached on 200, so a failed export never leaves a partial or empty file behind.
+      downloadExecutableArtifactJson(closure, buildExecutableArtifactFileName(publishedExecutable));
+      setStatus("Exported executable artifact.");
+    } catch (e) {
+      setStatus("");
+      setError(describeExecutableArtifactExportFailure(e));
+    } finally {
+      setOperation("idle");
+    }
+  }, [busy, context, publishedExecutable, setError, setOperation, setStatus]);
 
   const save = useCallback(async () => {
     if (!draft || busy) return;
@@ -495,6 +536,7 @@ export function useWorkflowOperations({
 
   return {
     exportJson,
+    exportExecutableArtifact,
     save,
     preparePublication,
     publicationReview,
@@ -510,6 +552,47 @@ export function useWorkflowOperations({
     cancelUnavailableExpressionValidation,
     run
   };
+}
+
+export const publishFirstMessage =
+  "Publish this workflow before exporting its executable artifact. Only a published version has a compiled runtime artifact.";
+
+/**
+ * Turns an export failure into editor copy that matches the endpoint's contracted responses: the two
+ * 409s get their own affordance (publish first, and the named missing dependencies), and the engine
+ * faults say they are about the server rather than the workflow. The server's own message is kept as
+ * the alert detail so an operator can still see it verbatim.
+ */
+export function describeExecutableArtifactExportFailure(error: unknown): WorkflowEditorError {
+  const failure = describeWorkflowExecutableExportFailure(error);
+  const base = failure.status === undefined ? {} : { status: failure.status };
+  const withDetail = (message: string, extraDetail: string[] = []): WorkflowEditorError => {
+    const detail = [...extraDetail, ...failure.serverErrors, failure.message]
+      .filter((line, index, lines) => !!line && line !== message && lines.indexOf(line) === index)
+      .join("\n");
+    return { ...base, message, ...(detail ? { detail } : {}) };
+  };
+
+  switch (failure.kind) {
+    case "notPublished":
+      return withDetail(publishFirstMessage);
+    case "incompleteClosure":
+      return withDetail(
+        failure.missingArtifactIds.length
+          ? `The executable artifact was not exported: ${failure.missingArtifactIds.length} dependency artifact${failure.missingArtifactIds.length === 1 ? "" : "s"} ${failure.missingArtifactIds.length === 1 ? "is" : "are"} missing from the server's executable store. Republish the workflow so its dependencies are compiled again.`
+          : "The executable artifact was not exported because its dependency closure is incomplete on the server. Republish the workflow so its dependencies are compiled again.",
+        failure.missingArtifactIds.length
+          ? [`Missing dependency artifacts: ${failure.missingArtifactIds.join(", ")}`]
+          : []);
+    case "notFound":
+      return withDetail("The server has no exportable executable for this workflow version. Publish the workflow again, then export.");
+    case "engineMisconfigured":
+      return withDetail("This engine cannot export executable artifacts: it has no export delivery configured. Ask an operator to check the server composition.");
+    case "engineFault":
+      return withDetail("The server could not produce the executable artifact, so nothing was downloaded.");
+    default:
+      return withDetail(failure.message || "The executable artifact export failed, so nothing was downloaded.");
+  }
 }
 
 function isExpressionValidationUnavailable(testRun: { status: string; reason?: string | null }) {
