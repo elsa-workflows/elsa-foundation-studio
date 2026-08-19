@@ -5,6 +5,7 @@ import {
   describeWorkflowExecutableExportFailure,
   exportWorkflowExecutableClosure,
   isWorkflowExecutableExportAvailable,
+  readContentDispositionFileName,
   workflowExecutableExportRelation
 } from "../api/executableArtifactExport";
 import {
@@ -54,13 +55,37 @@ describe("executable artifact export client", () => {
   it("GETs the closure at the advertised publishing link for the published version", async () => {
     const { context, getJson } = createContext();
 
-    const payload = await exportWorkflowExecutableClosure(context, "version-1");
+    const exported = await exportWorkflowExecutableClosure(context, "version-1");
 
     expect(getJson).toHaveBeenLastCalledWith(
       "/publishing/workflows/version-1/executable-export",
       { signal: undefined });
     // Returned untouched: no export payload is built and nothing is reshaped.
-    expect(payload).toEqual(closure);
+    expect(exported.closure).toEqual(closure);
+    // No header-capable client: the caller reconstructs the name.
+    expect(exported.fileName).toBeNull();
+  });
+
+  it("takes the download name from the server's Content-Disposition when the client exposes headers", async () => {
+    const { context, getJsonWithHeaders } = createHeaderAwareContext(
+      'attachment; filename="orders-1.4.0-closure.json"');
+
+    const exported = await exportWorkflowExecutableClosure(context, "version-1");
+
+    expect(getJsonWithHeaders).toHaveBeenLastCalledWith(
+      "/publishing/workflows/version-1/executable-export",
+      { signal: undefined });
+    expect(exported.fileName).toBe("orders-1.4.0-closure.json");
+    expect(exported.closure).toEqual(closure);
+  });
+
+  it("reports no name when the header is stripped, which is what a host that does not expose it does", async () => {
+    // Content-Disposition is not CORS-safelisted: without Access-Control-Expose-Headers the browser
+    // hands back a 200 and a valid body with the header simply absent.
+    const { context } = createHeaderAwareContext(null);
+
+    await expect(exportWorkflowExecutableClosure(context, "version-1"))
+      .resolves.toMatchObject({ fileName: null });
   });
 
   it("escapes the version id into the templated link", async () => {
@@ -101,6 +126,13 @@ describe("executable artifact export failures", () => {
     expect(failure.kind).toBe("notFound");
     expect(failure.status).toBe(404);
     expect(failure.missingArtifactIds).toEqual([]);
+  });
+
+  it("separates a bodyless 404 from a version with nothing to export", () => {
+    // Nothing on the server cross-checks an advertised href against a mapped route, so an advertised
+    // relation can 404 with no problem detail at all. That is not "this version has nothing".
+    expect(describeWorkflowExecutableExportFailure(Object.assign(new Error("Request failed with 404."), { status: 404 })).kind)
+      .toBe("endpointUnavailable");
   });
 
   it("classifies a never-published version as the publish-first conflict", () => {
@@ -172,6 +204,31 @@ describe("executable artifact export failures", () => {
     expect(failure.kind).toBe("unknown");
     expect(failure.status).toBeUndefined();
     expect(failure.message).toBe("Network request failed.");
+  });
+});
+
+describe("Content-Disposition parsing", () => {
+  it("prefers the RFC 5987 extended form and decodes it", () => {
+    expect(readContentDispositionFileName(
+      "attachment; filename=\"fallback.json\"; filename*=UTF-8''orders-1.4.0-closure.json"))
+      .toBe("orders-1.4.0-closure.json");
+  });
+
+  it("accepts an unquoted name", () => {
+    expect(readContentDispositionFileName("attachment; filename=orders-1.4.0-closure.json"))
+      .toBe("orders-1.4.0-closure.json");
+  });
+
+  it("never lets a header value become a path or carry control characters", () => {
+    expect(readContentDispositionFileName('attachment; filename="../../etc/passwd"')).toBe("passwd");
+    expect(readContentDispositionFileName('attachment; filename="a\r\nb.json"')).toBe("ab.json");
+    expect(readContentDispositionFileName('attachment; filename="niño cierre.json"')).toBe("ni-o-cierre.json");
+  });
+
+  it("treats a missing or empty name as no name", () => {
+    expect(readContentDispositionFileName(null)).toBeNull();
+    expect(readContentDispositionFileName("attachment")).toBeNull();
+    expect(readContentDispositionFileName('attachment; filename="///"')).toBeNull();
   });
 });
 
@@ -258,6 +315,20 @@ function readBlobText(blob: Blob): Promise<string> {
     reader.onload = () => resolve(String(reader.result));
     reader.readAsText(blob);
   });
+}
+
+function createHeaderAwareContext(contentDisposition: string | null) {
+  const getJsonWithHeaders = vi.fn(async (_url: string) => ({
+    value: closure,
+    status: 200,
+    headers: new Headers(contentDisposition ? { "content-disposition": contentDisposition } : {})
+  }));
+  const base = createContext();
+  const context = {
+    baseUrl: base.context.baseUrl,
+    http: { getJson: base.getJson, getJsonWithHeaders }
+  } as unknown as StudioEndpointContext;
+  return { context, getJson: base.getJson, getJsonWithHeaders };
 }
 
 function httpError(status: number, payload: Record<string, unknown>) {

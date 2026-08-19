@@ -17,6 +17,17 @@ export function isWorkflowExecutableExportAvailable(context: StudioEndpointConte
   return hasCapabilityLink(context, capabilityIds.publishing, workflowExecutableExportRelation);
 }
 
+export interface WorkflowExecutableClosureExport {
+  /** The closure exactly as the server produced it. */
+  closure: unknown;
+  /**
+   * The file name the server named in `Content-Disposition`, or null when the header was not readable —
+   * it is not CORS-safelisted, so an API host that does not expose it (and any http client that hides
+   * response headers) leaves this null and the caller reconstructs the name instead.
+   */
+  fileName: string | null;
+}
+
 /**
  * GETs the artifact closure for a *published* workflow definition version.
  *
@@ -28,21 +39,73 @@ export async function exportWorkflowExecutableClosure(
   context: StudioEndpointContext,
   versionId: string,
   signal?: AbortSignal
-): Promise<unknown> {
+): Promise<WorkflowExecutableClosureExport> {
   const path = await resolveCapabilityLink(
     context,
     capabilityIds.publishing,
     workflowExecutableExportRelation,
     { versionId });
-  return context.http.getJson<unknown>(path, { signal });
+
+  // The server names the download; the header is only readable when the http client surfaces response
+  // headers and the API exposes it through CORS, so both absences degrade to the caller's own name.
+  const http = context.http;
+  if (typeof http.getJsonWithHeaders === "function") {
+    const response = await http.getJsonWithHeaders<unknown>(path, { signal });
+    return {
+      closure: response.value,
+      fileName: readContentDispositionFileName(response.headers.get("content-disposition"))
+    };
+  }
+  return { closure: await http.getJson<unknown>(path, { signal }), fileName: null };
+}
+
+/**
+ * Reads the `filename` from a `Content-Disposition` header, preferring RFC 5987's `filename*`.
+ *
+ * The value is a server-supplied string that becomes a download name, so it is accepted only after the
+ * same reduction the server applies to its own segments: path separators, quotes and control characters
+ * cannot survive, and anything that reduces to nothing is treated as no name at all.
+ */
+export function readContentDispositionFileName(header: string | null | undefined): string | null {
+  if (!header) return null;
+
+  const extended = /filename\*\s*=\s*(?:UTF-8|utf-8)?''([^;]+)/i.exec(header);
+  const quoted = /filename\s*=\s*"([^"]*)"/i.exec(header);
+  const bare = /filename\s*=\s*([^;"]+)/i.exec(header);
+  const raw = extended ? safeDecode(extended[1]) : (quoted?.[1] ?? bare?.[1] ?? "");
+  const sanitized = raw
+    .trim()
+    // Drop control characters (a CRLF in a header value must never reach a file name), then any
+    // directory prefix, then reduce the rest to the alphabet the server itself emits.
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u001f\u007f]+/g, "")
+    .replace(/^.*[\\/]/, "")
+    .replace(/[^A-Za-z0-9._-]+/g, "-")
+    .replace(/^[-.]+/, "")
+    .replace(/[-.]+$/, "");
+  return sanitized || null;
+}
+
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 export type WorkflowExecutableExportFailureKind =
-  /** 404 — the version is unknown, or carries no executable source reference at all. */
+  /**
+   * 404 with no problem detail — the advertised href answered nothing. Nothing on the server
+   * cross-checks a capability href against a registered route, so advertisement is a declaration and
+   * not proof of a live route; this is that case, not a client-side URL mistake.
+   */
+  | "endpointUnavailable"
+  /** 404 — the version is unknown, has no source reference of any scope, or its published artifact is gone from the store. */
   | "notFound"
   /** 409 — the version exists but was never published; only expiring test-run snapshots exist. */
   | "notPublished"
-  /** 409 — the stored closure is incomplete; `missingArtifactIds` names the gaps. */
+  /** 409 — the stored closure is incomplete; `serverErrors` carries one entry per missing dependency. */
   | "incompleteClosure"
   /** 500 — no download target is registered, or one answered with a non-inline delivery: engine composition, not a workflow problem. */
   | "engineMisconfigured"
@@ -56,12 +119,16 @@ export interface WorkflowExecutableExportFailure {
   /** The server's own summary message (problem-detail `detail`/`title`, or the thrown message). */
   message: string;
   /**
-   * The unresolved dependency artifact ids for the `incompleteClosure` kind. The server reports them as
-   * one entry per id in the standard FastEndpoints error collection (an `AddError` per missing id), so
-   * they are read out of that collection rather than from a bespoke field.
+   * Best-effort ids for the `incompleteClosure` kind, recovered from the wording of the error entries.
+   * There is no structured field on the wire — the server adds one problem-detail entry per missing
+   * dependency and the id lives inside its `reason` — so this is a classification aid only. Anything
+   * user-facing should render {@link serverErrors}, which is what the server actually said.
    */
   missingArtifactIds: string[];
-  /** Every error entry the server returned, verbatim, for callers that render the raw list. */
+  /**
+   * Every problem-detail error entry the server returned, verbatim and in order. For an incomplete
+   * closure this is the list of missing dependencies (plus the summary entry the server appends).
+   */
   serverErrors: string[];
 }
 
@@ -85,7 +152,7 @@ export function describeWorkflowExecutableExportFailure(error: unknown): Workflo
   const missingArtifactIds = readMissingArtifactIds(serverErrors, message);
 
   return {
-    kind: classify(status, missingArtifactIds, [message, ...serverErrors].join(" ")),
+    kind: classify(status, missingArtifactIds, [message, ...serverErrors].join(" "), !!payload || !!serverErrors.length),
     ...(status === undefined ? {} : { status }),
     message,
     missingArtifactIds,
@@ -96,9 +163,12 @@ export function describeWorkflowExecutableExportFailure(error: unknown): Workflo
 function classify(
   status: number | undefined,
   missingArtifactIds: string[],
-  text: string
+  text: string,
+  hasProblemDetail: boolean
 ): WorkflowExecutableExportFailureKind {
-  if (status === 404) return "notFound";
+  // The endpoint always answers a 404 with a problem detail. A bodyless one means the advertised route
+  // is not mapped on this host, which is a different conversation from "this version has nothing".
+  if (status === 404) return hasProblemDetail ? "notFound" : "endpointUnavailable";
   if (status === 409) {
     // Only two 409s are contracted. An incomplete closure is recognised by its per-id error entries (or,
     // failing that, by the summary phrasing); every other 409 is the never-published refusal.
