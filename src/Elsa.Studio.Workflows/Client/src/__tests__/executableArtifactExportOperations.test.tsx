@@ -125,10 +125,38 @@ describe("executable artifact export operation", () => {
     expect(downloads).toHaveLength(1);
     expect(downloads[0].name).toBe("definition-1-1.0.0-closure.json");
     expect(JSON.parse(await readBlobText(downloads[0].blob))).toEqual(closurePayload);
-    expect(fixture.setStatus).toHaveBeenLastCalledWith("Exported executable artifact.");
+    expect(fixture.setStatus).toHaveBeenLastCalledWith("Exported executable artifact as definition-1-1.0.0-closure.json.");
     expect(fixture.setError.mock.calls.map(([value]) => value)).toEqual([""]);
     // Nothing is saved, promoted, or published by an export.
     expect(fixture.saveDraft).not.toHaveBeenCalled();
+  });
+
+  it("saves under the name the server chose when Content-Disposition is readable", async () => {
+    const fixture = renderOperations({ contentDisposition: 'attachment; filename="definition-1-2.1.0-closure.json"' });
+
+    await fixture.current().exportExecutableArtifact();
+    await flushUpdates();
+
+    // The published slot says 1.0.0; the server's header wins over the reconstruction.
+    expect(downloads[0].name).toBe("definition-1-2.1.0-closure.json");
+  });
+
+  it("says so when the exported artifact carried no identity to name the file from", async () => {
+    const fixture = renderOperations({
+      publishedExecutable: {
+        versionId: "version-1",
+        definitionId: "",
+        artifactVersion: null,
+        artifactId: null,
+        slotName: "default"
+      }
+    });
+
+    await fixture.current().exportExecutableArtifact();
+    await flushUpdates();
+
+    expect(downloads[0].name).toBe("workflow-unversioned-closure.json");
+    expect(fixture.setStatus.mock.calls.at(-1)?.[0]).toContain("carried no definition id or version");
   });
 
   it("asks for a publish instead of calling the endpoint when nothing is published", async () => {
@@ -179,8 +207,10 @@ describe("executable artifact export operation", () => {
 
     expect(downloads).toEqual([]);
     const error = fixture.setError.mock.calls.at(-1)?.[0];
-    expect(error.message).toContain("2 dependency artifacts are missing");
-    expect(error.detail).toContain("Missing dependency artifacts: artifact-child-1, artifact-child-2");
+    expect(error.message).toContain("dependency closure is incomplete");
+    // The server's own per-dependency entries are the list; they are shown as they arrived.
+    expect(error.detail).toContain("Dependency artifact 'artifact-child-1' is missing from the executable store.");
+    expect(error.detail).toContain("Dependency artifact 'artifact-child-2' is missing from the executable store.");
   });
 
   it("reports an unknown version without downloading anything", async () => {
@@ -194,7 +224,7 @@ describe("executable artifact export operation", () => {
     expect(downloads).toEqual([]);
     expect(fixture.setError.mock.calls.at(-1)?.[0]).toMatchObject({
       status: 404,
-      message: expect.stringContaining("no exportable executable")
+      message: expect.stringContaining("nothing to export for this workflow version")
     });
   });
 
@@ -323,6 +353,7 @@ function renderAvailability(options: { advertiseExport?: boolean; slots?: unknow
 
 function renderOperations(options: {
   busy?: boolean;
+  contentDisposition?: string;
   publishedExecutable?: { versionId: string; definitionId: string; artifactVersion: string | null; artifactId: string | null; slotName: string } | null;
   failWith?: Record<string, unknown>;
 } = {}) {
@@ -340,9 +371,16 @@ function renderOperations(options: {
     }
     throw new Error(`Unexpected GET ${url}`);
   });
+  const getJsonWithHeaders = options.contentDisposition
+    ? vi.fn(async (url: string) => ({
+      value: await getJson(url),
+      status: 200,
+      headers: new Headers({ "content-disposition": options.contentDisposition! })
+    }))
+    : undefined;
   const context = {
     baseUrl: `test://export-operation-${Math.random()}`,
-    http: { getJson, postJson: vi.fn() }
+    http: { getJson, postJson: vi.fn(), ...(getJsonWithHeaders ? { getJsonWithHeaders } : {}) }
   } as unknown as StudioEndpointContext;
   const saveDraft = vi.fn(async (snapshot: WorkflowDraft) => snapshot);
   const callbacks = {

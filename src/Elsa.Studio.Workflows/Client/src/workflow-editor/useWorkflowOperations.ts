@@ -125,10 +125,18 @@ export function useWorkflowOperations({
     setStatus("Exporting executable artifact...");
     setError("");
     try {
-      const closure = await exportWorkflowExecutableClosure(context, publishedExecutable.versionId);
+      const exported = await exportWorkflowExecutableClosure(context, publishedExecutable.versionId);
+      // The server names the download. When its Content-Disposition is unreadable (an API host that
+      // does not expose the header through CORS) the same name is rebuilt from the published artifact's
+      // identity, so the file does not change name depending on how it was fetched.
+      const fileName = exported.fileName ?? buildExecutableArtifactFileName(publishedExecutable);
       // Only reached on 200, so a failed export never leaves a partial or empty file behind.
-      downloadExecutableArtifactJson(closure, buildExecutableArtifactFileName(publishedExecutable));
-      setStatus("Exported executable artifact.");
+      downloadExecutableArtifactJson(exported.closure, fileName);
+      // Both name segments come from the root artifact's identity; the double fallback means it carried
+      // none, which is worth saying rather than shipping an anonymous file as if it were normal.
+      setStatus(fileName === anonymousArtifactFileName
+        ? `Exported ${fileName} — the artifact carried no definition id or version.`
+        : `Exported executable artifact as ${fileName}.`);
     } catch (e) {
       setStatus("");
       setError(describeExecutableArtifactExportFailure(e));
@@ -557,6 +565,9 @@ export function useWorkflowOperations({
 export const publishFirstMessage =
   "Publish this workflow before exporting its executable artifact. Only a published version has a compiled runtime artifact.";
 
+/** The name both identity segments fall back to: the exported artifact carried no identity at all. */
+export const anonymousArtifactFileName = "workflow-unversioned-closure.json";
+
 /**
  * Turns an export failure into editor copy that matches the endpoint's contracted responses: the two
  * 409s get their own affordance (publish first, and the named missing dependencies), and the engine
@@ -577,15 +588,13 @@ export function describeExecutableArtifactExportFailure(error: unknown): Workflo
     case "notPublished":
       return withDetail(publishFirstMessage);
     case "incompleteClosure":
-      return withDetail(
-        failure.missingArtifactIds.length
-          ? `The executable artifact was not exported: ${failure.missingArtifactIds.length} dependency artifact${failure.missingArtifactIds.length === 1 ? "" : "s"} ${failure.missingArtifactIds.length === 1 ? "is" : "are"} missing from the server's executable store. Republish the workflow so its dependencies are compiled again.`
-          : "The executable artifact was not exported because its dependency closure is incomplete on the server. Republish the workflow so its dependencies are compiled again.",
-        failure.missingArtifactIds.length
-          ? [`Missing dependency artifacts: ${failure.missingArtifactIds.join(", ")}`]
-          : []);
+      // The server reports the gaps as one problem-detail error entry per missing dependency; those
+      // entries are the list, rendered verbatim rather than re-assembled from ids parsed back out.
+      return withDetail("The executable artifact was not exported: its dependency closure is incomplete on the server. Republish the workflow so its dependencies are compiled again.");
     case "notFound":
-      return withDetail("The server has no exportable executable for this workflow version. Publish the workflow again, then export.");
+      return withDetail("There is nothing to export for this workflow version: the server holds no executable for it. Publish the workflow again, then export.");
+    case "endpointUnavailable":
+      return withDetail("This server advertises artifact export, but its export endpoint did not answer. The API host may be older than the capability it advertises.");
     case "engineMisconfigured":
       return withDetail("This engine cannot export executable artifacts: it has no export delivery configured. Ask an operator to check the server composition.");
     case "engineFault":
