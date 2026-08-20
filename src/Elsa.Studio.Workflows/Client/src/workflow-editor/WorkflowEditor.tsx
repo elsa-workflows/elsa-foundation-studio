@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { Boxes, Check, ChevronRight, Code2, Download, GitBranch, ListTree, Network, Package, Play, Plus, Redo2, Save, SlidersHorizontal, Sparkles, Undo2, Upload, Workflow as WorkflowIcon } from "lucide-react";
+import { Boxes, Check, ChevronRight, Code2, Download, GitBranch, ListTree, Network, Package, PackageOpen, Play, Plus, Redo2, Save, SlidersHorizontal, Sparkles, Undo2, Upload, Workflow as WorkflowIcon } from "lucide-react";
 import { authSessionEndedEvent, authSessionStartedEvent, expressionEditorSessionEndedEvent, type StudioActivityPropertyEditorContribution, type StudioAiContributionApi, type StudioEndpointContext, type StudioExpressionEditorContribution, type StudioExpressionToolingClient, type StudioWorkflowDesignerPanelContribution, type StudioWorkflowRunInputEditorContribution } from "@elsa-workflows/studio-sdk";
 import type { ActivityCatalogItem, ActivityNode, WorkflowDraft } from "../workflowTypes";
 import {
   collectActivityNodeIds,
   createActivityNode,
+  readFlowchartStartNodeId,
+  setFlowchartStartNode,
   findActivityNode,
   findNodeScopePath,
   getActivityDisplay,
@@ -42,6 +44,7 @@ import { PanelTabList, compareWorkflowPanelTabs } from "./PanelTabList";
 import { ScopeBreadcrumb } from "./ScopeBreadcrumb";
 import { ValidationPanel, TestRunStatus, WorkflowRuntimePanel } from "./editorPanels";
 import { useDraftValidations } from "./useDraftValidations";
+import { useExecutableArtifactExport } from "./useExecutableArtifactExport";
 import { combineValidationErrors, detectStructuralValidationErrors } from "../draftValidation";
 import { WorkflowArtifactsPanel } from "./WorkflowExecutables";
 import { WorkflowRunInputDialog } from "./WorkflowRunInputDialog";
@@ -286,6 +289,12 @@ export function WorkflowEditor({
   // backend advertises the relation), and combine them with the draft's reconciled errors and
   // designer-side structural checks so the editor panel agrees with the promotion gate.
   const draftValidations = useDraftValidations({ context, draft });
+
+  // Executable-artifact export (#493, foundation #1304): available only when the workflow has a
+  // published version and the server advertises the export relation, so a runtime-less or older server
+  // simply renders no button.
+  const executableArtifactExport = useExecutableArtifactExport({ context, definitionId, publishedArtifactId });
+  const publishedExecutable = executableArtifactExport.target;
   const structuralValidationErrors = useMemo(
     () => detectStructuralValidationErrors(draft?.state),
     [draft?.state]);
@@ -448,6 +457,7 @@ export function WorkflowEditor({
   // Async toolbar commands (export / save / promote+publish / test run) live in a dedicated hook.
   const {
     exportJson,
+    exportExecutableArtifact,
     save,
     preparePublication,
     publicationReview,
@@ -468,6 +478,7 @@ export function WorkflowEditor({
     details,
     catalog,
     busy,
+    publishedExecutable,
     saveDraft,
     flushPendingSave,
     reload,
@@ -606,6 +617,33 @@ export function WorkflowEditor({
       };
     });
   }, [catalogByVersion, editDraft, scopeOwner?.nodeId]);
+
+  // A start node is a Flowchart concept; a Sequence runs in authored order and has none.
+  const isFlowchartScope = scope?.slot.mode === "flowchart";
+  // The Flowchart start node is authored, not positional: this is the only writer besides the
+  // normalizer's auto-assignment, so an operator can move the start (e.g. onto a trigger added later)
+  // instead of being told at publish time that a node is unreachable.
+  const flowchartStartNodeId = isFlowchartScope ? readFlowchartStartNodeId(scopeOwner) : null;
+  const setStartNode = useCallback((nodeId: string) => {
+    const ownerNodeId = scopeOwner?.nodeId;
+    if (!ownerNodeId || !isFlowchartScope) return;
+    editDraft(({ draft: current }) => {
+      const rootActivity = current?.state.rootActivity;
+      if (!current || !rootActivity) return null;
+      return {
+        ...current,
+        state: {
+          ...current.state,
+          rootActivity: updateActivity(
+            rootActivity,
+            ownerNodeId,
+            owner => setFlowchartStartNode(owner, nodeId),
+            catalogByVersion)
+        }
+      };
+    });
+    setStatus("Start node updated.");
+  }, [catalogByVersion, editDraft, isFlowchartScope, scopeOwner?.nodeId, setStatus]);
 
   const updateSelectedBpmnElement = useCallback((elementId: string, patch: Partial<BpmnElement>) =>
     updateScopeOwnerBpmnPayload(owner => updateBpmnElement(owner, elementId, patch)), [updateScopeOwnerBpmnPayload]);
@@ -894,6 +932,8 @@ export function WorkflowEditor({
           onChangeReusableVersion={openVersionChange}
           onEnterSlot={enterSlotScope}
           onReplaceSlotActivity={replaceSlotActivity}
+          isStartNode={isFlowchartScope && inspectedNode ? inspectedNode.nodeId === flowchartStartNodeId : undefined}
+          onSetAsStartNode={isFlowchartScope ? setStartNode : undefined}
         />
       )
     },
@@ -1012,6 +1052,17 @@ export function WorkflowEditor({
             </>
           ) : null}
           <button type="button" title="Export workflow as JSON" onClick={exportJson}><Download size={15} /> Export</button>
+          {executableArtifactExport.supported ? (
+            <button
+              type="button"
+              disabled={busy || !publishedExecutable}
+              title={publishedExecutable
+                ? "Download the compiled executable artifact for a runtime engine"
+                : "Publish this workflow first: only a published version has a compiled executable artifact"}
+              onClick={() => void exportExecutableArtifact()}>
+              <PackageOpen size={15} /> {operation === "exportingArtifact" ? "Exporting…" : "Export artifact"}
+            </button>
+          ) : null}
           <button type="button" disabled={busy} onClick={() => void save()}><Save size={15} /> Save</button>
           <button
             type="button"
@@ -1195,6 +1246,7 @@ export function WorkflowEditor({
             errors={combinedValidationErrors}
             onRepair={repairVariableReference}
             onSelectNode={repairVariableReference}
+            onSetAsStartNode={isFlowchartScope ? setStartNode : undefined}
             unavailable={draftValidations.available === false}
           />
           </>

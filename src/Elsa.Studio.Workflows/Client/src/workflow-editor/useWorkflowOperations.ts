@@ -28,6 +28,13 @@ import {
 } from "./editorHelpers";
 import type { WorkflowEditorOperation, WorkflowErrorInput, WorkflowTestRunState } from "./editorTypes";
 import {
+  anonymousArtifactFileName,
+  describeExecutableArtifactExportFailure,
+  downloadExecutableArtifact,
+  publishFirstMessage,
+  type PublishedExecutableTarget
+} from "./useExecutableArtifactExport";
+import {
   createPublicationReview,
   publicationIntentFor,
   publicationPreflightMatchesIntent,
@@ -41,6 +48,11 @@ interface WorkflowOperationsParams {
   details: WorkflowDefinitionDetails | null;
   catalog: ActivityCatalogItem[];
   busy: boolean;
+  /**
+   * The published version whose compiled artifact can be exported (foundation #1304), or null when the
+   * workflow has no published version or the server does not advertise the export relation.
+   */
+  publishedExecutable?: PublishedExecutableTarget | null;
   saveDraft(draft: WorkflowDraft, savedStatus: string): Promise<WorkflowDraft>;
   flushPendingSave(): Promise<void>;
   reload(): Promise<void>;
@@ -63,6 +75,7 @@ export function useWorkflowOperations({
   details,
   catalog,
   busy,
+  publishedExecutable = null,
   saveDraft,
   flushPendingSave,
   reload,
@@ -93,6 +106,33 @@ export function useWorkflowOperations({
     downloadWorkflowJson(buildExportPayload(draft, name), name);
     setStatus("Exported workflow as JSON.");
   }, [draft, details, setStatus]);
+
+  // Distinct from `exportJson` above: that serializes the design draft, this downloads the *compiled*
+  // artifact closure the server produced for the published version (foundation #1304). The payload is
+  // saved exactly as it arrived — Studio never assembles or reshapes a closure (FR-C-004).
+  const exportExecutableArtifact = useCallback(async () => {
+    if (busy) return;
+    if (!publishedExecutable) {
+      setError({ message: publishFirstMessage });
+      return;
+    }
+    setOperation("exportingArtifact");
+    setStatus("Exporting executable artifact...");
+    setError("");
+    try {
+      const fileName = await downloadExecutableArtifact(context, publishedExecutable);
+      // Both name segments come from the root artifact's identity; the double fallback means it carried
+      // none, which is worth saying rather than shipping an anonymous file as if it were normal.
+      setStatus(fileName === anonymousArtifactFileName
+        ? `Exported ${fileName} — the artifact carried no definition id or version.`
+        : `Exported executable artifact as ${fileName}.`);
+    } catch (e) {
+      setStatus("");
+      setError(describeExecutableArtifactExportFailure(e));
+    } finally {
+      setOperation("idle");
+    }
+  }, [busy, context, publishedExecutable, setError, setOperation, setStatus]);
 
   const save = useCallback(async () => {
     if (!draft || busy) return;
@@ -126,15 +166,18 @@ export function useWorkflowOperations({
         listPublicationSlots(context, draftSnapshot.definitionId),
         getWorkflowPromotionVersionCapabilities(context)
       ]);
-      const occupiedSlots = slots.filter(slot => slot.activePublicationId || slot.publication);
-      const incompleteSlot = occupiedSlots.find(slot => !slot.publication?.versionId);
-      if (incompleteSlot) throw new Error(`Publication slot '${incompleteSlot.slotName}' did not include its active version.`);
+      // A slot can be occupied with no publication record, and that is a normal answer rather than
+      // missing data (foundation T116/T117): an import-owned activation has no publication, and the
+      // runtime activation listing carries none for any owner. Those slots simply have no published
+      // version to compare the draft against — the review still shows policy, conflicts and the
+      // authoritative server preflight, which is what actually gates publishing.
+      const comparableSlots = slots.filter(slot => !!slot.publication?.versionId);
       const versionsById = new Map<string, Awaited<ReturnType<typeof getWorkflowDefinitionVersion>>>();
-      await Promise.all(occupiedSlots.map(async slot => {
+      await Promise.all(comparableSlots.map(async slot => {
         const versionId = slot.publication!.versionId;
         if (!versionsById.has(versionId)) versionsById.set(versionId, await getWorkflowDefinitionVersion(context, versionId));
       }));
-      const slotVersions = Object.fromEntries(occupiedSlots.map(slot => [slot.slotName, versionsById.get(slot.publication!.versionId)!]));
+      const slotVersions = Object.fromEntries(comparableSlots.map(slot => [slot.slotName, versionsById.get(slot.publication!.versionId)!]));
       const review = createPublicationReview({
         draft: draftSnapshot,
         details,
@@ -489,6 +532,7 @@ export function useWorkflowOperations({
 
   return {
     exportJson,
+    exportExecutableArtifact,
     save,
     preparePublication,
     publicationReview,

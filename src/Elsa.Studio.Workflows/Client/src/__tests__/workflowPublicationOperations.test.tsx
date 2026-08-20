@@ -42,6 +42,24 @@ describe("workflow publication operations", () => {
     });
   });
 
+  it("prepares the review from the runtime activation slots when publishing retired its slots relation", async () => {
+    // foundation #1330 / T117: `publication-slots` is gone from the publishing capability, and the
+    // activation listing that replaced it carries no publication. The review must still prepare — the
+    // missing comparison is a normal answer, not a "does not advertise" failure.
+    const fixture = renderOperations({ activationSlotsOnly: true });
+
+    await prepare(fixture);
+
+    expect(fixture.getJson.mock.calls.map(([url]) => url)).toContain("/runtime/workflows/activation-slots/definition-1");
+    expect(fixture.setError.mock.calls.every(([value]) => !String(value).includes("does not advertise"))).toBe(true);
+    expect(fixture.current().publicationReview).toMatchObject({
+      phase: "review",
+      preflight: { canActivate: true, slotName: "default" }
+    });
+    // No published version to diff against, so the slot contributes no baseline.
+    expect(fixture.current().publicationReview?.slotVersions).toEqual({});
+  });
+
   it("fails closed when authoritative review data cannot be loaded", async () => {
     const fixture = renderOperations({ failPolicyLoad: true });
 
@@ -476,6 +494,8 @@ function renderOperations(options: {
   delayExactVersion?: string;
   saveDelayMs?: number;
   resolveSideBySideAsReplace?: boolean;
+  /** Serve the T117 server: activation slots on the runtime capability, `publication-slots` retired. */
+  activationSlotsOnly?: boolean;
 } = {}) {
   const sourceDraft = options.draft ?? draft();
   const mutationOrder: string[] = [];
@@ -484,7 +504,23 @@ function renderOperations(options: {
   let snapshotPreflightAttempts = 0;
   let failNextVersionPreflight = false;
   const getJson = vi.fn(async (url: string) => {
-    if (url === "/capabilities") return capabilitiesFor(options.exactVersionSupport ?? false);
+    if (url === "/capabilities") return capabilitiesFor(options.exactVersionSupport ?? false, options.activationSlotsOnly ?? false);
+    if (url === "/runtime/workflows/activation-slots/definition-1") {
+      // The runtime activation listing (foundation T117): the slot names its live activation and owner,
+      // and carries no publication — a publication is a publishing fact, not part of the slot.
+      return {
+        items: [{
+          slotId: "activation-slot:definition-1:default",
+          definitionId: "definition-1",
+          slotName: "default",
+          activeActivationId: "publication-1",
+          sourceKind: "publishing",
+          sourceId: "publication-1",
+          revision: 1,
+          updatedAt: "2026-08-01T00:00:00Z"
+        }]
+      };
+    }
     if (url === "/publishing/workflows/definition-1/policy") {
       if (options.failPolicyLoad) throw new Error("policy unavailable");
       return { defaultAction: "replace", defaultSlotName: "default", source: "host" };
@@ -687,7 +723,7 @@ function slot() {
   };
 }
 
-function capabilitiesFor(exactVersionSupport: boolean) {
+function capabilitiesFor(exactVersionSupport: boolean, activationSlotsOnly = false) {
   return {
     capabilities: [
     {
@@ -715,12 +751,23 @@ function capabilitiesFor(exactVersionSupport: boolean) {
       contractVersion: "1",
       links: [
         { rel: "publication-policy", href: "publishing/workflows/{definitionId}/policy", templated: true },
-        { rel: "publication-slots", href: "publishing/workflows/{definitionId}/slots", templated: true },
+        ...(activationSlotsOnly
+          ? []
+          : [{ rel: "publication-slots", href: "publishing/workflows/{definitionId}/slots", templated: true }]),
         { rel: "publication-snapshot-preflight", href: "publishing/workflows/preflight" },
         { rel: "publication-preflight", href: "publishing/workflows/{versionId}/preflight", templated: true },
         { rel: "workflow-publish", href: "publishing/workflows/{versionId}/publish", templated: true }
       ]
-    }
+    },
+    ...(activationSlotsOnly
+      ? [{
+        id: "elsa.api.runtime",
+        contractVersion: "1",
+        links: [
+          { rel: "workflow-activation-slots", href: "runtime/workflows/activation-slots/{definitionId}", templated: true }
+        ]
+      }]
+      : [])
     ]
   };
 }

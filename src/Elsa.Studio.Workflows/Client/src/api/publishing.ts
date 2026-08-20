@@ -9,7 +9,12 @@ import type {
   WorkflowDefinitionState,
   WorkflowTestRunView
 } from "../workflowTypes";
-import { capabilityIds, resolveCapabilityLink } from "./capabilities";
+import {
+  ApiCapabilityUnavailableError,
+  ApiCapabilityVersionMismatchError,
+  capabilityIds,
+  resolveCapabilityLink
+} from "./capabilities";
 import { createWorkflowExecutionRequestInit } from "../workflowRunInputs";
 
 export interface PublicationIntent {
@@ -296,6 +301,17 @@ export interface PublicationSlot {
   updatedAt?: string;
   status: PublicationStatus | null;
   publication?: Publication | null;
+  /**
+   * The live activation on the slot, from the runtime activation listing (foundation #1330 / T117). It is
+   * an *activation* id, not an artifact id, and it is present whichever source owns the slot.
+   */
+  activeActivationId?: string | null;
+  /**
+   * Which source owns the activation — `"publishing"` for an operator publish, an import kind for a
+   * reconciled mount. Reported by the runtime; never inferred here from the shape of an id.
+   */
+  sourceKind?: string | null;
+  sourceId?: string | null;
 }
 
 export interface PublicationPolicy {
@@ -433,34 +449,107 @@ export async function cancelActivityDraftTestRun(
   return context.http.postJson<ActivityDraftTestRunView>(path, {});
 }
 
-async function publicationSlotsPath(context: StudioEndpointContext, definitionId: string) {
-  return resolveCapabilityLink(
-    context,
-    capabilityIds.publishing,
-    "publication-slots",
-    { definitionId });
+// Slot reads moved to the runtime capability (foundation #1330 / T117): the activation slot is
+// runtime-owned data, so `elsa.api.runtime` now advertises `workflow-activation-slots` and the publishing
+// capability retired `publication-slots`. The retired rel is still accepted, preferred second, so Studio
+// keeps working against a server from before the split.
+const activationSlotsRelation = "workflow-activation-slots";
+const activationSlotRelation = "workflow-activation-slot";
+const retiredPublicationSlotsRelation = "publication-slots";
+
+/** The route the publishing feature serves the slot lifecycle *commands* on (see below). */
+const publicationSlotCommandRoute = "/publishing/workflows";
+
+function isCapabilityMissing(error: unknown) {
+  return error instanceof ApiCapabilityUnavailableError || error instanceof ApiCapabilityVersionMismatchError;
 }
 
+async function activationSlotsPath(context: StudioEndpointContext, definitionId: string) {
+  try {
+    return await resolveCapabilityLink(context, capabilityIds.runtime, activationSlotsRelation, { definitionId });
+  } catch (error) {
+    if (!isCapabilityMissing(error)) throw error;
+    return resolveCapabilityLink(context, capabilityIds.publishing, retiredPublicationSlotsRelation, { definitionId });
+  }
+}
+
+/**
+ * Lists a definition's activation slots.
+ *
+ * Two response shapes are accepted, because the read moved between capabilities: the runtime activation
+ * view (`activeActivationId` plus the owning source, and deliberately *no* publication — a publication is
+ * one possible reason a slot is occupied, not part of the slot) and the retired publishing view, which
+ * carried the joined `publication`. Callers therefore have to treat an absent publication as a normal
+ * answer rather than as missing data.
+ */
 export async function listPublicationSlots(context: StudioEndpointContext, definitionId: string) {
-  const response = await context.http.getJson<{ items: PublicationSlot[] }>(
-    await publicationSlotsPath(context, definitionId));
-  return response.items ?? [];
+  const response = await context.http.getJson<{ items?: unknown[] }>(
+    await activationSlotsPath(context, definitionId));
+  return Array.isArray(response?.items) ? response.items.map(normalizePublicationSlot) : [];
+}
+
+function normalizePublicationSlot(value: unknown): PublicationSlot {
+  const slot = (value ?? {}) as Record<string, unknown> & Partial<PublicationSlot>;
+  const activeActivationId = typeof slot.activeActivationId === "string" ? slot.activeActivationId : null;
+  const publication = (slot.publication ?? null) as Publication | null;
+  const sourceKind = typeof slot.sourceKind === "string" ? slot.sourceKind : null;
+  return {
+    ...slot,
+    definitionId: typeof slot.definitionId === "string" ? slot.definitionId : "",
+    slotName: typeof slot.slotName === "string" ? slot.slotName : "",
+    activeActivationId,
+    sourceKind,
+    sourceId: typeof slot.sourceId === "string" ? slot.sourceId : null,
+    publication,
+    // The activation view reports ownership explicitly; a publishing-owned activation *is* the
+    // publication, so it can fill `activePublicationId` — for any other owner there is no publication id.
+    activePublicationId: typeof slot.activePublicationId === "string"
+      ? slot.activePublicationId
+      : sourceKind === "publishing" ? activeActivationId : null,
+    status: (slot.status ?? publication?.status ?? (activeActivationId ? "active" : null)) as PublicationStatus | null
+  };
 }
 
 export async function getPublicationSlot(context: StudioEndpointContext, definitionId: string, slotName: string) {
-  return context.http.getJson<PublicationSlot>(
-    `${await publicationSlotsPath(context, definitionId)}/${encodeURIComponent(slotName)}`);
+  let path: string;
+  try {
+    path = await resolveCapabilityLink(context, capabilityIds.runtime, activationSlotRelation, { definitionId, slotName });
+  } catch (error) {
+    if (!isCapabilityMissing(error)) throw error;
+    path = `${await resolveCapabilityLink(context, capabilityIds.publishing, retiredPublicationSlotsRelation, { definitionId })}/${encodeURIComponent(slotName)}`;
+  }
+  return normalizePublicationSlot(await context.http.getJson<unknown>(path));
+}
+
+/**
+ * Unpublishing and restoring stayed in the publishing feature when the reads moved (T117): retracting or
+ * reinstating a publication is a publishing command that asks the runtime to change the ledger. The rel
+ * the paths used to be derived from went away with the reads, though, and nothing advertises the commands
+ * yet — so the published route is used directly once the rel is gone. One place to follow if it moves.
+ */
+async function publicationSlotCommandPath(context: StudioEndpointContext, definitionId: string, slotName: string) {
+  try {
+    const base = await resolveCapabilityLink(
+      context,
+      capabilityIds.publishing,
+      retiredPublicationSlotsRelation,
+      { definitionId });
+    return `${base}/${encodeURIComponent(slotName)}`;
+  } catch (error) {
+    if (!isCapabilityMissing(error)) throw error;
+    return `${publicationSlotCommandRoute}/${encodeURIComponent(definitionId)}/slots/${encodeURIComponent(slotName)}`;
+  }
 }
 
 export async function unpublishSlot(context: StudioEndpointContext, definitionId: string, slotName: string) {
-  return context.http.deleteJson<PublicationSlot>(
-    `${await publicationSlotsPath(context, definitionId)}/${encodeURIComponent(slotName)}`);
+  return normalizePublicationSlot(await context.http.deleteJson<unknown>(
+    await publicationSlotCommandPath(context, definitionId, slotName)));
 }
 
 export async function restorePublicationSlot(context: StudioEndpointContext, definitionId: string, slotName: string) {
-  return context.http.postJson<PublicationSlot>(
-    `${await publicationSlotsPath(context, definitionId)}/${encodeURIComponent(slotName)}/restore`,
-    {});
+  return normalizePublicationSlot(await context.http.postJson<unknown>(
+    `${await publicationSlotCommandPath(context, definitionId, slotName)}/restore`,
+    {}));
 }
 
 export async function getPublicationPolicy(context: StudioEndpointContext, definitionId: string) {
