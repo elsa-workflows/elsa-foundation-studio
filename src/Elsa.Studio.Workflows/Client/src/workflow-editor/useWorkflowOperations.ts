@@ -15,17 +15,8 @@ import {
   startWorkflowDraftTestRun,
   type PublicationIntent
 } from "../api/publishing";
-import {
-  describeWorkflowExecutableExportFailure,
-  exportWorkflowExecutableClosure
-} from "../api/executableArtifactExport";
 import { decorateConversionDiagnostic } from "../conversionSettings";
-import {
-  buildExecutableArtifactFileName,
-  buildExportPayload,
-  downloadExecutableArtifactJson,
-  downloadWorkflowJson
-} from "../workflowSerialization";
+import { buildExportPayload, downloadWorkflowJson } from "../workflowSerialization";
 import { readWorkflowInputs } from "../workflowReferenceAuthoring";
 import {
   createDraftSnapshotId,
@@ -35,8 +26,14 @@ import {
   isRejectedTestRun,
   readWorkflowErrorPayload
 } from "./editorHelpers";
-import type { WorkflowEditorError, WorkflowEditorOperation, WorkflowErrorInput, WorkflowTestRunState } from "./editorTypes";
-import type { PublishedExecutableTarget } from "./useExecutableArtifactExport";
+import type { WorkflowEditorOperation, WorkflowErrorInput, WorkflowTestRunState } from "./editorTypes";
+import {
+  anonymousArtifactFileName,
+  describeExecutableArtifactExportFailure,
+  downloadExecutableArtifact,
+  publishFirstMessage,
+  type PublishedExecutableTarget
+} from "./useExecutableArtifactExport";
 import {
   createPublicationReview,
   publicationIntentFor,
@@ -123,13 +120,7 @@ export function useWorkflowOperations({
     setStatus("Exporting executable artifact...");
     setError("");
     try {
-      const exported = await exportWorkflowExecutableClosure(context, publishedExecutable.versionId);
-      // The server names the download. When its Content-Disposition is unreadable (an API host that
-      // does not expose the header through CORS) the same name is rebuilt from the published artifact's
-      // identity, so the file does not change name depending on how it was fetched.
-      const fileName = exported.fileName ?? buildExecutableArtifactFileName(publishedExecutable);
-      // Only reached on 200, so a failed export never leaves a partial or empty file behind.
-      downloadExecutableArtifactJson(exported.closure, fileName);
+      const fileName = await downloadExecutableArtifact(context, publishedExecutable);
       // Both name segments come from the root artifact's identity; the double fallback means it carried
       // none, which is worth saying rather than shipping an anonymous file as if it were normal.
       setStatus(fileName === anonymousArtifactFileName
@@ -175,15 +166,18 @@ export function useWorkflowOperations({
         listPublicationSlots(context, draftSnapshot.definitionId),
         getWorkflowPromotionVersionCapabilities(context)
       ]);
-      const occupiedSlots = slots.filter(slot => slot.activePublicationId || slot.publication);
-      const incompleteSlot = occupiedSlots.find(slot => !slot.publication?.versionId);
-      if (incompleteSlot) throw new Error(`Publication slot '${incompleteSlot.slotName}' did not include its active version.`);
+      // A slot can be occupied with no publication record, and that is a normal answer rather than
+      // missing data (foundation T116/T117): an import-owned activation has no publication, and the
+      // runtime activation listing carries none for any owner. Those slots simply have no published
+      // version to compare the draft against — the review still shows policy, conflicts and the
+      // authoritative server preflight, which is what actually gates publishing.
+      const comparableSlots = slots.filter(slot => !!slot.publication?.versionId);
       const versionsById = new Map<string, Awaited<ReturnType<typeof getWorkflowDefinitionVersion>>>();
-      await Promise.all(occupiedSlots.map(async slot => {
+      await Promise.all(comparableSlots.map(async slot => {
         const versionId = slot.publication!.versionId;
         if (!versionsById.has(versionId)) versionsById.set(versionId, await getWorkflowDefinitionVersion(context, versionId));
       }));
-      const slotVersions = Object.fromEntries(occupiedSlots.map(slot => [slot.slotName, versionsById.get(slot.publication!.versionId)!]));
+      const slotVersions = Object.fromEntries(comparableSlots.map(slot => [slot.slotName, versionsById.get(slot.publication!.versionId)!]));
       const review = createPublicationReview({
         draft: draftSnapshot,
         details,
@@ -554,48 +548,6 @@ export function useWorkflowOperations({
     cancelUnavailableExpressionValidation,
     run
   };
-}
-
-export const publishFirstMessage =
-  "Publish this workflow before exporting its executable artifact. Only a published version has a compiled runtime artifact.";
-
-/** The name both identity segments fall back to: the exported artifact carried no identity at all. */
-export const anonymousArtifactFileName = "workflow-unversioned-closure.json";
-
-/**
- * Turns an export failure into editor copy that matches the endpoint's contracted responses: the two
- * 409s get their own affordance (publish first, and the named missing dependencies), and the engine
- * faults say they are about the server rather than the workflow. The server's own message is kept as
- * the alert detail so an operator can still see it verbatim.
- */
-export function describeExecutableArtifactExportFailure(error: unknown): WorkflowEditorError {
-  const failure = describeWorkflowExecutableExportFailure(error);
-  const base = failure.status === undefined ? {} : { status: failure.status };
-  const withDetail = (message: string, extraDetail: string[] = []): WorkflowEditorError => {
-    const detail = [...extraDetail, ...failure.serverErrors, failure.message]
-      .filter((line, index, lines) => !!line && line !== message && lines.indexOf(line) === index)
-      .join("\n");
-    return { ...base, message, ...(detail ? { detail } : {}) };
-  };
-
-  switch (failure.kind) {
-    case "notPublished":
-      return withDetail(publishFirstMessage);
-    case "incompleteClosure":
-      // The server reports the gaps as one problem-detail error entry per missing dependency; those
-      // entries are the list, rendered verbatim rather than re-assembled from ids parsed back out.
-      return withDetail("The executable artifact was not exported: its dependency closure is incomplete on the server. Republish the workflow so its dependencies are compiled again.");
-    case "notFound":
-      return withDetail("There is nothing to export for this workflow version: the server holds no executable for it. Publish the workflow again, then export.");
-    case "endpointUnavailable":
-      return withDetail("This server advertises artifact export, but its export endpoint did not answer. The API host may be older than the capability it advertises.");
-    case "engineMisconfigured":
-      return withDetail("This engine cannot export executable artifacts: it has no export delivery configured. Ask an operator to check the server composition.");
-    case "engineFault":
-      return withDetail("The server could not produce the executable artifact, so nothing was downloaded.");
-    default:
-      return withDetail(failure.message || "The executable artifact export failed, so nothing was downloaded.");
-  }
 }
 
 function isExpressionValidationUnavailable(testRun: { status: string; reason?: string | null }) {

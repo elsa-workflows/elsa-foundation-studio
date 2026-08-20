@@ -9,6 +9,7 @@ import type { WorkflowDefinitionDetails, WorkflowDraft } from "../workflowTypes"
 import { useWorkflowOperations } from "../workflow-editor/useWorkflowOperations";
 import {
   selectPublishedExecutable,
+  useExecutableArtifactDownload,
   useExecutableArtifactExport,
   type ExecutableArtifactExportState
 } from "../workflow-editor/useExecutableArtifactExport";
@@ -51,7 +52,7 @@ afterEach(() => {
 });
 
 describe("executable artifact export availability", () => {
-  it("offers the published default slot as the export target", async () => {
+  it("offers the definition's published artifact as the export target", async () => {
     const fixture = renderAvailability();
     await flushUpdates();
 
@@ -62,7 +63,7 @@ describe("executable artifact export availability", () => {
         versionId: "version-1",
         definitionId: "definition-1",
         artifactVersion: "1.0.0",
-        slotName: "default"
+        artifactId: "artifact-1"
       }
     });
   });
@@ -72,42 +73,35 @@ describe("executable artifact export availability", () => {
     await flushUpdates();
 
     expect(fixture.current()).toEqual({ status: "unavailable", supported: false, target: null });
-    // Slots are never listed once the relation is known to be absent.
+    // Executables are never listed once the relation is known to be absent.
     expect(fixture.getJson.mock.calls.map(([url]) => url)).toEqual(["/capabilities"]);
   });
 
   it("reports no target for a workflow that was never published", async () => {
-    const fixture = renderAvailability({ slots: [] });
+    const fixture = renderAvailability({ executables: [] });
     await flushUpdates();
 
     expect(fixture.current()).toMatchObject({ status: "ready", supported: true, target: null });
   });
 
   it("hides the action rather than erroring when the probe fails", async () => {
-    const fixture = renderAvailability({ failSlots: true });
+    const fixture = renderAvailability({ failExecutables: true });
     await flushUpdates();
 
     expect(fixture.current()).toEqual({ status: "unavailable", supported: false, target: null });
   });
 
-  it("prefers an active default slot, then any active slot, then any remaining publication", () => {
-    expect(selectPublishedExecutable([
-      publicationSlot({ slotName: "blue", status: "active", versionId: "version-blue" }),
-      publicationSlot({ slotName: "default", status: "active", versionId: "version-default" })
-    ])?.versionId).toBe("version-default");
+  it("exports this definition's most recently published artifact", () => {
+    const executables = [
+      publishedExecutable({ artifactId: "artifact-old", versionId: "version-old", artifactVersion: "1.0.0", publishedAt: "2026-07-01T00:00:00Z" }),
+      publishedExecutable({ artifactId: "artifact-new", versionId: "version-new", artifactVersion: "2.0.0", publishedAt: "2026-08-01T00:00:00Z" }),
+      publishedExecutable({ artifactId: "artifact-other", versionId: "version-other", artifactVersion: "9.0.0", publishedAt: "2026-09-01T00:00:00Z", definitionId: "definition-2" })
+    ];
 
-    expect(selectPublishedExecutable([
-      publicationSlot({ slotName: "green", status: "retired", versionId: "version-green" }),
-      publicationSlot({ slotName: "blue", status: "active", versionId: "version-blue" })
-    ])?.versionId).toBe("version-blue");
-
-    expect(selectPublishedExecutable([
-      publicationSlot({ slotName: "green", status: "retiring", versionId: "version-green" })
-    ])?.versionId).toBe("version-green");
-
-    // A slot whose publication carries no version id cannot address the endpoint.
-    expect(selectPublishedExecutable([{ definitionId: "definition-1", slotName: "default", status: "active" }]))
-      .toBeNull();
+    // Newest publish of this definition wins; another definition's newer artifact is not a candidate.
+    expect(selectPublishedExecutable(executables, "definition-1")?.versionId).toBe("version-new");
+    expect(selectPublishedExecutable(executables, "definition-3")).toBeNull();
+    expect(selectPublishedExecutable([], "definition-1")).toBeNull();
   });
 });
 
@@ -137,7 +131,7 @@ describe("executable artifact export operation", () => {
     await fixture.current().exportExecutableArtifact();
     await flushUpdates();
 
-    // The published slot says 1.0.0; the server's header wins over the reconstruction.
+    // The published artifact says 1.0.0; the server's header wins over the reconstruction.
     expect(downloads[0].name).toBe("definition-1-2.1.0-closure.json");
   });
 
@@ -147,8 +141,7 @@ describe("executable artifact export operation", () => {
         versionId: "version-1",
         definitionId: "",
         artifactVersion: null,
-        artifactId: null,
-        slotName: "default"
+        artifactId: null
       }
     });
 
@@ -269,6 +262,120 @@ describe("executable artifact export operation", () => {
   });
 });
 
+describe("artifact list export action", () => {
+  it("exports the clicked artifact's own definition version", async () => {
+    const fixture = renderArtifactDownload();
+    await flushUpdates();
+
+    expect(fixture.current().supported).toBe(true);
+
+    await fixture.current().exportArtifact(artifactRow("artifact-2", "version-2", "2.0.0"));
+    await flushUpdates();
+
+    // The row's version id addresses the endpoint — no slot lookup stands between the click and the call.
+    expect(fixture.getJson.mock.calls.map(([url]) => url)).toContain("/publishing/workflows/version-2/executable-export");
+    expect(downloads).toHaveLength(1);
+    expect(downloads[0].name).toBe("definition-1-2.0.0-closure.json");
+    expect(fixture.onExported.mock.calls.at(-1)?.[0]).toBe("definition-1-2.0.0-closure.json");
+    expect(fixture.onFailed).not.toHaveBeenCalled();
+  });
+
+  it("reports the in-flight artifact so the list can disable its rows", async () => {
+    const fixture = renderArtifactDownload({ hold: true });
+    await flushUpdates();
+
+    const inFlight = fixture.current().exportArtifact(artifactRow("artifact-2", "version-2", "2.0.0"));
+    await flushUpdates();
+    expect(fixture.current().exportingArtifactId).toBe("artifact-2");
+
+    // A second click while one export is in flight is ignored rather than queued.
+    await fixture.current().exportArtifact(artifactRow("artifact-3", "version-3", "3.0.0"));
+    expect(fixture.getJson.mock.calls.filter(([url]) => url.endsWith("/executable-export"))).toHaveLength(1);
+
+    fixture.release();
+    await inFlight;
+    await flushUpdates();
+    expect(fixture.current().exportingArtifactId).toBeNull();
+  });
+
+  it("renders no action at all when the server does not advertise the relation", async () => {
+    const fixture = renderArtifactDownload({ advertiseExport: false });
+    await flushUpdates();
+
+    expect(fixture.current().supported).toBe(false);
+  });
+
+  it("hands the list a flattened failure message and downloads nothing", async () => {
+    const fixture = renderArtifactDownload({
+      failWith: {
+        status: 409,
+        detail: "Cannot export workflow definition version 'version-2': the closure rooted at 'artifact-2' is incomplete.",
+        errors: [{ name: "generalErrors", reason: "Dependency artifact 'artifact-child-1' is missing from the executable store." }]
+      }
+    });
+    await flushUpdates();
+
+    await fixture.current().exportArtifact(artifactRow("artifact-2", "version-2", "2.0.0"));
+    await flushUpdates();
+
+    expect(downloads).toEqual([]);
+    expect(fixture.onExported).not.toHaveBeenCalled();
+    const message = fixture.onFailed.mock.calls.at(-1)?.[0] as string;
+    expect(message).toContain("dependency closure is incomplete");
+    expect(message).toContain("Dependency artifact 'artifact-child-1' is missing from the executable store.");
+  });
+});
+
+function artifactRow(artifactId: string, versionId: string, artifactVersion: string) {
+  return publishedExecutable({
+    artifactId,
+    versionId,
+    artifactVersion,
+    publishedAt: "2026-08-01T00:00:00Z"
+  }) as unknown as import("../workflowTypes").WorkflowExecutableSummary;
+}
+
+function renderArtifactDownload(options: {
+  advertiseExport?: boolean;
+  failWith?: Record<string, unknown>;
+  hold?: boolean;
+} = {}) {
+  let release = () => undefined as void;
+  const held = new Promise<void>(resolve => { release = () => resolve(); });
+  const getJson = vi.fn(async (url: string) => {
+    if (url === "/capabilities") return capabilities(options.advertiseExport ?? true);
+    if (url.endsWith("/executable-export")) {
+      if (options.hold) await held;
+      if (options.failWith) {
+        throw Object.assign(new Error(String(options.failWith.detail)), {
+          status: options.failWith.status as number,
+          payload: options.failWith
+        });
+      }
+      return closurePayload;
+    }
+    throw new Error(`Unexpected GET ${url}`);
+  });
+  const context = {
+    baseUrl: `test://artifact-download-${Math.random()}`,
+    http: { getJson }
+  } as unknown as StudioEndpointContext;
+  const onExported = vi.fn();
+  const onFailed = vi.fn();
+
+  let current: ReturnType<typeof useExecutableArtifactDownload> | null = null;
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  mounted = { root, container };
+  const Harness = () => {
+    current = useExecutableArtifactDownload({ context, onExported, onFailed });
+    return null;
+  };
+  flushSync(() => root.render(<Harness />));
+  return { current: () => current!, getJson, onExported, onFailed, release: () => release() };
+}
+
 const closurePayload = {
   formatVersion: "1.0.0",
   rootArtifactId: "artifact-1",
@@ -292,44 +399,58 @@ async function flushUpdates() {
 
 function capabilities(advertiseExport: boolean) {
   return {
-    capabilities: [{
-      id: "elsa.api.publishing",
-      contractVersion: "1",
-      links: [
-        { rel: "publication-slots", href: "publishing/workflows/{definitionId}/slots", templated: true },
-        ...(advertiseExport
-          ? [{ rel: workflowExecutableExportRelation, href: "publishing/workflows/{versionId}/executable-export", templated: true }]
-          : [])
-      ]
-    }]
+    capabilities: [
+      {
+        id: "elsa.api.publishing",
+        contractVersion: "1",
+        links: [
+          ...(advertiseExport
+            ? [{ rel: workflowExecutableExportRelation, href: "publishing/workflows/{versionId}/executable-export", templated: true }]
+            : [])
+        ]
+      },
+      {
+        id: "elsa.api.runtime",
+        contractVersion: "1",
+        links: [
+          { rel: "workflow-executables", href: "runtime/workflows/executables" },
+          { rel: "workflow-activation-slots", href: "runtime/workflows/activation-slots/{definitionId}", templated: true }
+        ]
+      }
+    ]
   };
 }
 
-function publicationSlot(options: { slotName: string; status: string; versionId: string }) {
+function publishedExecutable(options: { artifactId: string; versionId: string; artifactVersion: string; publishedAt: string; definitionId?: string }) {
   return {
-    definitionId: "definition-1",
-    slotName: options.slotName,
-    status: options.status,
-    activePublicationId: options.status === "active" ? `publication-${options.slotName}` : null,
-    publication: {
-      publicationId: `publication-${options.slotName}`,
-      definitionId: "definition-1",
-      versionId: options.versionId,
-      artifactId: "artifact-1",
-      artifactVersion: "1.0.0",
-      slotName: options.slotName,
-      sourceReferenceId: "reference-1",
-      status: options.status
-    }
+    artifactId: options.artifactId,
+    artifactVersion: options.artifactVersion,
+    artifactHash: `hash-${options.artifactId}`,
+    definitionId: options.definitionId ?? "definition-1",
+    definitionVersionId: options.versionId,
+    createdAt: options.publishedAt,
+    publishedAt: options.publishedAt,
+    rootActivityType: "Elsa.Activities.Flowchart.Activities.Flowchart",
+    rootActivityVersion: "1.0.0",
+    nodeCount: 1,
+    resumeTargetCount: 0
   } as never;
 }
 
-function renderAvailability(options: { advertiseExport?: boolean; slots?: unknown[]; failSlots?: boolean } = {}) {
+
+function renderAvailability(options: { advertiseExport?: boolean; executables?: unknown[]; failExecutables?: boolean } = {}) {
   const getJson = vi.fn(async (url: string) => {
     if (url === "/capabilities") return capabilities(options.advertiseExport ?? true);
-    if (url === "/publishing/workflows/definition-1/slots") {
-      if (options.failSlots) throw new Error("slots unavailable");
-      return { items: options.slots ?? [publicationSlot({ slotName: "default", status: "active", versionId: "version-1" })] };
+    if (url.startsWith("/runtime/workflows/executables")) {
+      if (options.failExecutables) throw new Error("executables unavailable");
+      return {
+        items: options.executables ?? [publishedExecutable({
+          artifactId: "artifact-1",
+          versionId: "version-1",
+          artifactVersion: "1.0.0",
+          publishedAt: "2026-08-01T00:00:00Z"
+        })]
+      };
     }
     throw new Error(`Unexpected GET ${url}`);
   });
@@ -354,7 +475,7 @@ function renderAvailability(options: { advertiseExport?: boolean; slots?: unknow
 function renderOperations(options: {
   busy?: boolean;
   contentDisposition?: string;
-  publishedExecutable?: { versionId: string; definitionId: string; artifactVersion: string | null; artifactId: string | null; slotName: string } | null;
+  publishedExecutable?: { versionId: string; definitionId: string; artifactVersion: string | null; artifactId: string | null } | null;
   failWith?: Record<string, unknown>;
 } = {}) {
   const getJson = vi.fn(async (url: string) => {
@@ -414,8 +535,7 @@ function renderOperations(options: {
           versionId: "version-1",
           definitionId: "definition-1",
           artifactVersion: "1.0.0",
-          artifactId: "artifact-1",
-          slotName: "default"
+          artifactId: "artifact-1"
         }
         : options.publishedExecutable,
       saveDraft,
