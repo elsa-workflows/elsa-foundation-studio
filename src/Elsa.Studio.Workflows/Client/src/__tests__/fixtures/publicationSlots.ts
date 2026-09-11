@@ -18,6 +18,15 @@ export function activationSlot(slotName: string, overrides: Partial<WorkflowActi
   };
 }
 
+/**
+ * A slot that was activated and later deactivated. Both activation authorities clear the source on
+ * deactivation (`ActiveActivationId = null, Source = null`) and bump the revision, so a deactivated
+ * slot can never be told apart from "never activated" by anything other than its revision.
+ */
+export function deactivatedActivationSlot(slotName: string, overrides: Partial<WorkflowActivationSlot> = {}): WorkflowActivationSlot {
+  return activationSlot(slotName, { revision: 2, ...overrides });
+}
+
 /** A slot occupied by an imported artifact: it has an active activation but no publication record. */
 export function importedActivationSlot(): WorkflowActivationSlot {
   return activationSlot("imported", {

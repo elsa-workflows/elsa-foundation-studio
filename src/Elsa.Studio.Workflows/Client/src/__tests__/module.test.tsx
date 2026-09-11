@@ -8,7 +8,7 @@ import { register, type WorkflowDesignerPanelContext } from "../module";
 import { clearApiCapabilityCache } from "../api/capabilities";
 import { activationSlotReadsUnavailableReason, type Publication } from "../api/publishing";
 import type { WorkflowActivationSlot } from "../api/runtime";
-import { activationSlot, importedActivationSlot, publicationRecord } from "./fixtures/publicationSlots";
+import { activationSlot, deactivatedActivationSlot, importedActivationSlot, publicationRecord } from "./fixtures/publicationSlots";
 import { createEnumWorkflowRunInputEditorContribution } from "../workflowRunInputEditorContributions";
 import { isConnectEndOverExistingWorkflowNode, resolveConnectEndSource } from "../workflow-editor/connectEndHelpers";
 import { workflowInspectorCollapsedStorageKey, workflowInspectorWidthStorageKey, workflowSidePanelMaximizedStorageKey } from "../workflow-editor/constants";
@@ -1416,7 +1416,7 @@ describe("workflows module", () => {
 
   it("restores an inactive publication slot through the advertised restore relation", async () => {
     const { container, fetchMock, unmount } = await renderArtifactsPanel(
-      [{ view: activationSlot("default") }],
+      [{ view: deactivatedActivationSlot("default") }],
       publicationSlotLifecycleCapabilities());
 
     await waitForText(container, "No active publication");
@@ -1428,6 +1428,25 @@ describe("workflows module", () => {
       "https://server.example/publishing/workflows/definition-1/slots/default/restore",
       expect.objectContaining({ method: "POST" })
     );
+
+    await unmount();
+  });
+
+  it("surfaces the backend's 404 when a deactivated slot has no retired publication to restore", async () => {
+    const { container, fetchMock, unmount } = await renderArtifactsPanel(
+      [{ view: deactivatedActivationSlot("default") }],
+      publicationSlotLifecycleCapabilities());
+
+    await waitForText(container, "No active publication");
+    fetchMock.mockImplementationOnce(async () => response(
+      { title: "No retired publication", detail: "Slot 'default' has no retired publication to restore.", status: 404 },
+      404
+    ));
+    await click(buttonByLabel(container, "Restore publication slot default"));
+    await flushPromises();
+
+    await waitForText(container, "Slot 'default' has no retired publication to restore.");
+    expect(container.textContent).not.toContain("Restored default");
 
     await unmount();
   });

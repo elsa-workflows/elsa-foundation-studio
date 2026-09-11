@@ -416,6 +416,10 @@ export function WorkflowArtifactsPanel({ context, ai, runInputEditors, definitio
                 <p className="wf-muted">No active publication</p>
               )}
               <div className="wf-row-actions">
+                {/* Restore is offered for every inactive slot, not just ones known to have been published: Runtime
+                    clears the activation source on deactivation, so Studio cannot tell which owner last held the
+                    slot. The backend answers with a 404 (surfaced above as an error) when there is nothing to
+                    restore. */}
                 {!slot.activeActivationId ? (
                   <button type="button" aria-label={`Restore publication slot ${slot.slotName}`} disabled={!lifecycleSupport.restore} onClick={() => void restore(slot)}><RotateCcw size={13} /> Restore</button>
                 ) : slot.publication ? (
