@@ -135,18 +135,31 @@ describe("publication review model", () => {
       details: null,
       slotVersions: {},
       policy: { defaultAction: "replace", defaultSlotName: "default", source: "host" },
-      slots: [publishedSlot("default", { publicationId: "publication-1", versionId: "version-1", artifactVersion: "1.0.0" })],
+      slots: [publishedSlot("default", { publicationId: "publication-1", versionId: "version-1" })],
       catalog: []
     });
 
     expect(review.phase).toBe("validationBlocked");
     expect(review.validationErrors).toEqual(["Workflow has no root activity."]);
-    expect(review.currentVersion).toBe("1.0.0");
+    expect(review.currentVersion).toBe("version-1");
     expect(publicationIntentFor(review, "replace", "default")).toEqual({
       action: "replace",
       slotName: "default",
       expectedPublicationId: "publication-1"
     });
+  });
+
+  it("prefers the fetched design version's label over the publication's version id", () => {
+    const review = createPublicationReview({
+      draft: draft(),
+      details: null,
+      slotVersions: { default: version("version-1", {}) },
+      policy: { defaultAction: "replace", defaultSlotName: "default", source: "host" },
+      slots: [publishedSlot("default", { publicationId: "publication-1", versionId: "version-1" })],
+      catalog: []
+    });
+
+    expect(review.currentVersion).toBe("1.0.0");
   });
 
   it("captures an immutable snapshot before publication", () => {
@@ -224,7 +237,7 @@ describe("publication review model", () => {
       details: null,
       slotVersions: { blue: version("version-blue", {}) },
       policy: { defaultAction: "replace", defaultSlotName: "default", source: "host" },
-      slots: [publishedSlot("blue", { artifactVersion: "1.4.0" })],
+      slots: [publishedSlot("blue")],
       catalog: []
     });
 
@@ -237,8 +250,21 @@ describe("publication review model", () => {
       action: "sideBySide",
       slotName: "canary"
     });
-    expect(publicationBaselineFor(review, "blue")).toBe("blue · 1.4.0");
+    expect(publicationBaselineFor(review, "blue")).toBe("blue · 1.0.0");
     expect(publicationBaselineFor(review, "canary")).toBe("New channel · canary · no previous publication");
+  });
+
+  it("falls back to the publication's version id when no design version detail was fetched for the slot", () => {
+    const review = createPublicationReview({
+      draft: draft(),
+      details: null,
+      slotVersions: {},
+      policy: { defaultAction: "replace", defaultSlotName: "default", source: "host" },
+      slots: [publishedSlot("blue")],
+      catalog: []
+    });
+
+    expect(publicationBaselineFor(review, "blue")).toBe("blue · version-blue");
   });
 
   it("recomputes changes against the selected occupied slot", () => {

@@ -10,7 +10,7 @@ import {
   type PublicationReviewState,
   type PublicationVersionSelection
 } from "../workflow-editor/publicationReview";
-import type { WorkflowDraft } from "../workflowTypes";
+import type { WorkflowDefinitionVersionDetails, WorkflowDraft } from "../workflowTypes";
 import {
   foreignSlotOwner,
   importedActivationSlot,
@@ -89,6 +89,22 @@ describe("publication channel UX", () => {
       expect.anything(),
       { action: "replace", slotName: "blue", expectedPublicationId: "publication-blue" },
       { mode: "automatic" });
+  });
+
+  it("shows the fetched design version's label in the baseline, falling back to the publication's version id", () => {
+    const onReview = vi.fn(async () => undefined);
+    const withLabel = render(review({
+      slots: [occupiedBlue()],
+      slotVersions: { blue: versionDetail("version-blue", "1.4.0") }
+    }), { onReview });
+    changeSelect(withLabel.querySelector<HTMLSelectElement>("select[aria-label='Publication channel']")!, "blue");
+
+    expect(text(withLabel)).toContain("Baseline: blue · 1.4.0");
+
+    const withoutLabel = render(review({ slots: [occupiedBlue()] }), { onReview });
+    changeSelect(withoutLabel.querySelector<HTMLSelectElement>("select[aria-label='Publication channel']")!, "blue");
+
+    expect(text(withoutLabel)).toContain("Baseline: blue · version-blue");
   });
 
   it("names the source of a channel occupied by another activation source instead of a publication", () => {
@@ -373,7 +389,17 @@ function draft(): WorkflowDraft {
 const preflight = publicationPreflight;
 
 function occupiedBlue() {
-  return publishedSlot("blue", { artifactVersion: "1.4.0" });
+  return publishedSlot("blue");
+}
+
+function versionDetail(id: string, version: string): WorkflowDefinitionVersionDetails {
+  return {
+    id,
+    version,
+    definition: { id: "definition-1", name: "Orders", createdAt: "2026-07-01T00:00:00Z", lastModifiedAt: "2026-07-01T00:00:00Z" },
+    state: { rootActivity: null },
+    layout: []
+  };
 }
 
 function button(container: HTMLElement, label: string) {
