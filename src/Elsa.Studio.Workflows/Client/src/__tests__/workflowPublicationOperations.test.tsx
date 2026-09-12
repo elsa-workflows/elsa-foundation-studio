@@ -313,8 +313,9 @@ describe("workflow publication operations", () => {
 
   it("names no cause when an older host blocks with empty conflicts and no owner", async () => {
     const fixture = renderOperations({
-      // targetSlotOwner intentionally omitted, matching a host predating elsa-foundation#1659.
-      snapshotPreflightOverrides: { canActivate: false }
+      // targetSlotOwner: undefined deletes the key from the fixture, matching a host predating
+      // elsa-foundation#1659 whose payload never carries the field at all.
+      snapshotPreflightOverrides: { canActivate: false, targetSlotOwner: undefined }
     });
     await prepare(fixture);
     const intent: PublicationIntent = { action: "replace", slotName: "default", expectedPublicationId: "publication-1" };

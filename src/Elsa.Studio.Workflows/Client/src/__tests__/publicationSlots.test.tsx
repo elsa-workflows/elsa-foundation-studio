@@ -4,7 +4,12 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PublicationReviewDialog } from "../workflow-editor/WorkflowEditor";
 import { activationSlotReadsUnavailableReason, type PublicationIntent } from "../api/publishing";
-import { createPublicationReview, type PublicationReviewState, type PublicationVersionSelection } from "../workflow-editor/publicationReview";
+import {
+  createPublicationReview,
+  publicationBlockedMessage,
+  type PublicationReviewState,
+  type PublicationVersionSelection
+} from "../workflow-editor/publicationReview";
 import type { WorkflowDraft } from "../workflowTypes";
 import {
   foreignSlotOwner,
@@ -127,6 +132,16 @@ describe("publication channel UX", () => {
     expect(text(container)).toContain("Conflict with default: http:orders");
     expect(text(container)).not.toContain("owned by another activation source");
     expect(text(container)).toContain("Not ready");
+    expect(button(container, "Publish").disabled).toBe(true);
+  });
+
+  it("shows the cause-neutral message when an older host blocks with empty conflicts and no owner", () => {
+    const blockedPreflight = preflight({ canActivate: false, targetSlotOwner: undefined });
+    const container = render(review({ preflight: blockedPreflight }));
+
+    expect(text(container)).toContain(publicationBlockedMessage(blockedPreflight));
+    expect(text(container)).not.toContain("owned by another activation source");
+    expect(text(container)).not.toContain("Publication channel conflicts");
     expect(button(container, "Publish").disabled).toBe(true);
   });
 

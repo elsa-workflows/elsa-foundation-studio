@@ -66,9 +66,15 @@ export function withoutPublication(slot: WorkflowActivationSlot): PublicationSlo
   return { ...slot, publication: null };
 }
 
-/** An authoritative snapshot/version preflight, as elsa-foundation serves it for a clean, activatable target. */
+/**
+ * An authoritative snapshot/version preflight, as elsa-foundation serves it for a clean, activatable target.
+ *
+ * `targetSlotOwner` defaults to `null` (the field present, unowned). To model a host predating
+ * elsa-foundation#1659 — where the field is absent from the payload entirely, not merely `null` — pass
+ * `targetSlotOwner: undefined` explicitly; this deletes the key rather than leaving it `undefined` in place.
+ */
 export function publicationPreflight(overrides: Partial<PublicationPreflight> = {}): PublicationPreflight {
-  return {
+  const preflight: PublicationPreflight = {
     preflightToken: "preflight-token-1",
     candidateHash: "candidate-hash-1",
     definitionId: "definition-1",
@@ -83,6 +89,8 @@ export function publicationPreflight(overrides: Partial<PublicationPreflight> = 
     targetSlotOwner: null,
     ...overrides
   };
+  if ("targetSlotOwner" in overrides && overrides.targetSlotOwner === undefined) delete preflight.targetSlotOwner;
+  return preflight;
 }
 
 /**
