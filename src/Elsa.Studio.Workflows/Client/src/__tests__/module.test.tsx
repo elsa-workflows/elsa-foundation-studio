@@ -170,6 +170,9 @@ describe("workflows module", () => {
     const { container } = await renderRegisteredRoute();
 
     // Stands in for a test that fails before its own `await unmount()`.
+    // Relies on vitest 2.1.9 running `onTestFinished` callbacks after `afterEach` hooks
+    // (@vitest/runner's `runTest`); if a future vitest reorders that, this canary would
+    // pass vacuously or fail without explanation.
     onTestFinished(() => expect(container.isConnected).toBe(false));
   });
 
