@@ -324,6 +324,18 @@ export function PublicationReviewDialog({
                   </div>
                 ) : null}
 
+                {reviewedPreflight?.targetSlotOwner ? (
+                  <div className="wf-publication-risks" role="alert">
+                    <strong>Publication channel is owned by another activation source</strong>
+                    <p>
+                      {selectedChannel || reviewedPreflight.slotName} is occupied by an activation
+                      from {describeActivationSource(reviewedPreflight.targetSlotOwner)}. Taking over a
+                      slot another source owns is an operator action, so this cannot be resolved from
+                      this review. Publish side by side into another channel instead.
+                    </p>
+                  </div>
+                ) : null}
+
                 {reviewedPreflight?.conflicts.length ? (
                   <div className="wf-publication-risks" role="alert">
                     <strong>Publication channel conflicts</strong>
