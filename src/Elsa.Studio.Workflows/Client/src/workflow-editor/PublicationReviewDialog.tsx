@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { describeActivationSource, type PublicationIntent } from "../api/publishing";
 import {
   publicationBaselineFor,
+  publicationBlockCause,
   publicationBlockedMessage,
   publicationChangesFor,
   publicationChannelOccupancy,
@@ -106,10 +107,8 @@ export function PublicationReviewDialog({
   // A host predating elsa-foundation#1659 can still block without reporting why: no targetSlotOwner
   // and no conflicts. Say so honestly instead of rendering neither blocker and leaving the author
   // pointed at nothing.
-  const causeNeutralBlockMessage = reviewedPreflight
-    && !reviewedPreflight.canActivate
-    && !reviewedPreflight.targetSlotOwner
-    && reviewedPreflight.conflicts.length === 0
+  const blockCause = reviewedPreflight ? publicationBlockCause(reviewedPreflight) : null;
+  const causeNeutralBlockMessage = reviewedPreflight && blockCause === "unknown"
     ? publicationBlockedMessage(reviewedPreflight)
     : undefined;
   const blocked = review.validationErrors.length > 0
