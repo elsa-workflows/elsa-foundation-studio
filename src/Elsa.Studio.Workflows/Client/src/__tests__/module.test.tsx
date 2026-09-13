@@ -4247,7 +4247,6 @@ describe("workflows module", () => {
     const descendant = { id: "folder-descendant", parentId: selected.id, name: "Private descendant", normalizedName: "private descendant", createdAt: "", lastModifiedAt: "" };
     let moveRequest: unknown;
     let detailRequests = 0;
-    let ancestorChildRequests = 0;
     let resolveAncestorChildren: (() => void) | null = null;
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -4265,13 +4264,12 @@ describe("workflows module", () => {
       }
       if (url.includes("/folders?pageSize=100&parentId=folder-ancestor")) {
         const items = selected.parentId === ancestor.id ? [selected] : [];
-        ancestorChildRequests += 1;
         // Held pending on the first call only, until the test resolves it explicitly below. That lets
         // the test prove the ambiguity a scoped wait guards against is real: the definitions table's
         // "Operations workflow" row (which renders independently of the folder tree) is on the page
         // well before this folder row is. A wait that isn't scoped to the folder tree would match that
         // row and let the click below run before the folder row exists.
-        if (ancestorChildRequests === 1) {
+        if (!resolveAncestorChildren) {
           return new Promise<Response>(resolve => {
             resolveAncestorChildren = () => resolve(response({ items, nextContinuationToken: null }));
           });
@@ -4999,7 +4997,7 @@ function workflowDraft(overrides: Partial<Record<string, unknown>> = {}) {
   };
 }
 
-function activityDefinitionRecoveryDraft(overrides: Partial<Record<string, unknown>> = {}) {
+function activityDefinitionRecoveryDraft() {
   return {
     draftId: "draft-1",
     definitionId: "definition-1",
@@ -5013,8 +5011,7 @@ function activityDefinitionRecoveryDraft(overrides: Partial<Record<string, unkno
     validation: null,
     createdAt: "2026-07-17T10:00:00Z",
     updatedAt: "2026-07-17T10:00:00Z",
-    presentationLabel: null,
-    ...overrides
+    presentationLabel: null
   };
 }
 
