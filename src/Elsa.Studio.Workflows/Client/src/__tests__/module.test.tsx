@@ -12,6 +12,8 @@ import { isConnectEndOverExistingWorkflowNode, resolveConnectEndSource } from ".
 import { createDraftSnapshotId, insertSequenceNodeAfter } from "../workflow-editor/editorHelpers";
 import { ValidationPanel } from "../workflow-editor/editorPanels";
 import { WorkflowLazyBoundary } from "../WorkflowLazyBoundary";
+import { setDialogs } from "../workflow-editor/dialogs";
+import { WorkflowFolderNavigation, type WorkflowFolderSelection } from "../workflow-editor/WorkflowFolderNavigation";
 import { createActivityDefinitionRecoveryStore } from "../activityDefinitionRecovery";
 import { capabilityDocument, definition, renderRegisteredRoute, response, runJavaScriptTypeKey, testApi } from "./routeRenderingHelpers";
 
@@ -116,27 +118,35 @@ describe("workflows module", () => {
     const api = testApi();
     api.runtime.identity = { tenantId: "tenant-1", subject: "author-1" };
     const store = createActivityDefinitionRecoveryStore({ enabled: true }, api.runtime.identity)!;
-    store.write({
-      draftId: "draft-1",
-      definitionId: "definition-1",
-      tenantId: "tenant-1",
-      revision: 2,
-      sourceVersionId: null,
-      status: "active",
-      contract: { contractSchemaVersion: "1", inputs: [], outputs: [], outcomes: [] },
-      provider: { providerKey: "elsa.activity-graph", schemaVersion: "1", manifestFingerprint: "sha256:test", payload: { local: true } },
-      layout: [],
-      validation: null,
-      createdAt: "2026-07-17T10:00:00Z",
-      updatedAt: "2026-07-17T10:00:00Z",
-      presentationLabel: null
-    });
+    store.write(activityDefinitionRecoveryDraft());
 
     register(api);
     expect(window.localStorage.length).toBe(1);
     window.dispatchEvent(new Event(authSessionEndedEvent));
 
     expect(window.localStorage.length).toBe(0);
+  });
+
+  it("reacts on behalf of only the latest registration when register() runs more than once, instead of stacking a listener per call", () => {
+    const firstApi = testApi();
+    firstApi.runtime.identity = { tenantId: "tenant-1", subject: "author-1" };
+    const firstStore = createActivityDefinitionRecoveryStore({ enabled: true }, firstApi.runtime.identity)!;
+    firstStore.write(activityDefinitionRecoveryDraft());
+
+    const secondApi = testApi();
+    secondApi.runtime.identity = { tenantId: "tenant-2", subject: "author-2" };
+    const secondStore = createActivityDefinitionRecoveryStore({ enabled: true }, secondApi.runtime.identity)!;
+    secondStore.write(activityDefinitionRecoveryDraft());
+
+    register(firstApi);
+    register(secondApi);
+    expect(window.localStorage.length).toBe(2);
+    window.dispatchEvent(new Event(authSessionEndedEvent));
+
+    // A listener stacked per register() call would also react on firstApi's now-stale closure and
+    // clear its recovery entry too. Only one listener should be live, bound to the latest registration.
+    expect(secondStore.read(activityDefinitionRecoveryDraft())).toBeNull();
+    expect(firstStore.read(activityDefinitionRecoveryDraft())).not.toBeNull();
   });
 
   it("tears down a route host its test never unmounted before the next test starts", async () => {
@@ -4250,6 +4260,7 @@ describe("workflows module", () => {
     const descendant = { id: "folder-descendant", parentId: selected.id, name: "Private descendant", normalizedName: "private descendant", createdAt: "", lastModifiedAt: "" };
     let moveRequest: unknown;
     let detailRequests = 0;
+    let ancestorChildRequests = 0;
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/folders/folder-edit/move") && init?.method === "POST") {
@@ -4264,7 +4275,16 @@ describe("workflows module", () => {
         if (url.includes("/folders/folder-destination")) return response({ folder: destination, ancestors: [] });
         if (url.includes("/folders/folder-descendant")) return response({ folder: descendant, ancestors: [ancestor, selected] });
       }
-      if (url.includes("/folders?pageSize=100&parentId=folder-ancestor")) return response({ items: selected.parentId === ancestor.id ? [selected] : [], nextContinuationToken: null });
+      if (url.includes("/folders?pageSize=100&parentId=folder-ancestor")) {
+        const items = selected.parentId === ancestor.id ? [selected] : [];
+        ancestorChildRequests += 1;
+        // Deferred on the first call only, so the definitions table's "Operations workflow" row (which
+        // renders independently of the folder tree) is on the page well before this folder row is. A
+        // wait that isn't scoped to the folder tree would match that row and let the click below run
+        // before the folder row exists.
+        if (ancestorChildRequests === 1) return new Promise<Response>(resolve => setTimeout(() => resolve(response({ items, nextContinuationToken: null })), 50));
+        return response({ items, nextContinuationToken: null });
+      }
       if (url.includes("/folders?pageSize=100&parentId=folder-destination")) return response({ items: selected.parentId === destination.id ? [selected] : [], nextContinuationToken: null });
       if (url.includes("/folders?pageSize=100")) return response({
         items: [ancestor, destination],
@@ -4275,10 +4295,12 @@ describe("workflows module", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     const { container, unmount } = await renderRegisteredRoute("/workflows/definitions", undefined, false, workflowFolderMutationCapabilities());
+    const folderTree = () => container.querySelector<HTMLElement>(".wf-folder-nav")!;
 
     await waitForText(container, ancestor.name);
+    await waitForText(container, "Operations workflow");
     await click(buttonByLabel(container, `Expand ${ancestor.name}`));
-    await waitForText(container, selected.name);
+    await waitForText(folderTree(), selected.name);
     await click([...container.querySelectorAll<HTMLElement>("[data-folder-id]")].find(item => item.dataset.folderId === selected.id) ?? null);
     await vi.waitFor(() => expect(container.querySelector(".wf-folder-breadcrumb")?.textContent).toContain(selected.name));
     const detailRequestsBeforeDialog = detailRequests;
@@ -4370,6 +4392,58 @@ describe("workflows module", () => {
     expect(container.querySelector("[data-folder-id='folder-parent']")?.getAttribute("aria-selected")).toBe("true");
     await vi.waitFor(() => expect(document.activeElement?.getAttribute("data-folder-id")).toBe("folder-parent"));
     await unmount();
+  });
+
+  it("restores delete-focus within the navigation that performed the delete, not the first .wf-folder-nav in the document", async () => {
+    const parent = { id: "folder-parent", parentId: null, name: "Platform", normalizedName: "platform", createdAt: "", lastModifiedAt: "" };
+    const child = { id: "folder-child", parentId: parent.id, name: "Operations", normalizedName: "operations", createdAt: "", lastModifiedAt: "" };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/capabilities")) return response(workflowFolderMutationCapabilities());
+      if (url.endsWith("/folders/folder-child") && init?.method === "DELETE") {
+        return new Response(null, { status: 204 });
+      }
+      if (url.includes("/folders/folder-child")) return response({ folder: child, ancestors: [parent] });
+      if (url.includes("/folders/folder-parent")) return response({ folder: parent, ancestors: [] });
+      if (url.includes("/folders?pageSize=100")) return response({ items: [parent], nextContinuationToken: null });
+      throw new Error(`Unexpected request ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    setDialogs({ confirm: vi.fn(async () => true), prompt: vi.fn(async () => null), alert: vi.fn(async () => undefined) });
+    const context = testApi().backend;
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    // Second navigation is the one performing the delete. Old code targeted `document.querySelector(".wf-folder-nav")`,
+    // which always resolves to the first navigation in DOM order regardless of which one is acting. Each
+    // navigation is wrapped in its own host div so its tree and action bar (siblings, not nested) can be
+    // queried together without ambiguity against the other navigation's identical folder markup.
+    function TwoNavigations() {
+      const [secondSelection, setSecondSelection] = React.useState<WorkflowFolderSelection>({ id: child.id });
+      return <>
+        <div data-testid="first-host"><WorkflowFolderNavigation context={context} selection="all" onSelect={() => {}} onAvailable={() => {}} /></div>
+        <div data-testid="second-host"><WorkflowFolderNavigation context={context} selection={secondSelection} onSelect={setSecondSelection} onAvailable={() => {}} /></div>
+      </>;
+    }
+
+    try {
+      flushSync(() => root.render(<TwoNavigations />));
+      await waitForText(container, "Platform");
+      const firstHost = container.querySelector<HTMLElement>('[data-testid="first-host"]')!;
+      const secondHost = container.querySelector<HTMLElement>('[data-testid="second-host"]')!;
+      expect(container.querySelectorAll(".wf-folder-nav")).toHaveLength(2);
+
+      await waitForButtonByText(secondHost, "Delete");
+      await click(buttonByText(secondHost, "Delete"));
+
+      await vi.waitFor(() => expect(document.activeElement?.getAttribute("data-folder-id")).toBe(parent.id));
+      expect(secondHost.contains(document.activeElement)).toBe(true);
+      expect(firstHost.contains(document.activeElement)).toBe(false);
+    } finally {
+      flushSync(() => root.unmount());
+      container.remove();
+    }
   });
 
   it("keeps opaque folder IDs out of selectors and ARIA IDs through paging, focus, and delete recovery", async () => {
@@ -4922,6 +4996,25 @@ function workflowDraft(overrides: Partial<Record<string, unknown>> = {}) {
     },
     layout: [],
     validationErrors: [],
+    ...overrides
+  };
+}
+
+function activityDefinitionRecoveryDraft(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    draftId: "draft-1",
+    definitionId: "definition-1",
+    tenantId: "tenant-1",
+    revision: 2,
+    sourceVersionId: null,
+    status: "active",
+    contract: { contractSchemaVersion: "1", inputs: [], outputs: [], outcomes: [] },
+    provider: { providerKey: "elsa.activity-graph", schemaVersion: "1", manifestFingerprint: "sha256:test", payload: { local: true } },
+    layout: [],
+    validation: null,
+    createdAt: "2026-07-17T10:00:00Z",
+    updatedAt: "2026-07-17T10:00:00Z",
+    presentationLabel: null,
     ...overrides
   };
 }
