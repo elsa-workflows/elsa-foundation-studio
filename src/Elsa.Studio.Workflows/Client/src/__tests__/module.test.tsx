@@ -1,33 +1,21 @@
 import React from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
-import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { authSessionEndedEvent } from "@elsa-workflows/studio-sdk";
 import { register, type WorkflowDesignerPanelContext } from "../module";
-import { clearApiCapabilityCache } from "../api/capabilities";
 import { activationSlotReadsUnavailableReason, type Publication } from "../api/publishing";
 import type { WorkflowActivationSlot } from "../api/runtime";
 import { activationSlot, deactivatedActivationSlot, importedActivationSlot, publicationRecord } from "./fixtures/publicationSlots";
 import { createEnumWorkflowRunInputEditorContribution } from "../workflowRunInputEditorContributions";
 import { isConnectEndOverExistingWorkflowNode, resolveConnectEndSource } from "../workflow-editor/connectEndHelpers";
-import { workflowInspectorCollapsedStorageKey, workflowInspectorWidthStorageKey, workflowSidePanelMaximizedStorageKey } from "../workflow-editor/constants";
 import { createDraftSnapshotId, insertSequenceNodeAfter } from "../workflow-editor/editorHelpers";
 import { ValidationPanel } from "../workflow-editor/editorPanels";
 import { WorkflowLazyBoundary } from "../WorkflowLazyBoundary";
 import { createActivityDefinitionRecoveryStore } from "../activityDefinitionRecovery";
 import { capabilityDocument, definition, renderRegisteredRoute, response, runJavaScriptTypeKey, testApi } from "./routeRenderingHelpers";
 
-// The route-mount/unmount teardown that keeps `document.body` clean between tests lives with
-// `renderRegisteredRoute` in routeRenderingHelpers.tsx (imported above), so lazyRouteAnnouncement.test.tsx
-// gets the same teardown without duplicating it. This hook covers the rest of this file's global state.
-afterEach(async () => {
-  clearApiCapabilityCache();
-  vi.unstubAllGlobals();
-  window.localStorage.removeItem?.(workflowInspectorCollapsedStorageKey);
-  window.localStorage.removeItem?.(workflowInspectorWidthStorageKey);
-  window.localStorage.removeItem?.(workflowSidePanelMaximizedStorageKey);
-  window.localStorage.clear();
-});
+// Per-test teardown lives in the shared afterEach in routeRenderingHelpers.tsx.
 
 describe("workflows module", () => {
   it("renders a draft without validationErrors as valid", () => {

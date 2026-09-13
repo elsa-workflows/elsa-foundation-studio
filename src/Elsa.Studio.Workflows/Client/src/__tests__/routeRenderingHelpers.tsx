@@ -5,21 +5,33 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, expect, vi } from "vitest";
 import type { ElsaStudioModuleApi, StudioContributionRegistry, StudioSlotDefinition } from "@elsa-workflows/studio-sdk";
 import { register } from "../module";
+import { clearApiCapabilityCache } from "../api/capabilities";
+import { workflowInspectorCollapsedStorageKey, workflowInspectorWidthStorageKey, workflowSidePanelMaximizedStorageKey } from "../workflow-editor/constants";
 
 // Shared by module.test.tsx and lazyRouteAnnouncement.test.tsx so neither copies the other's
 // route-rendering setup or teardown. `WorkflowManagementPage` (module.tsx) is a module-scope
-// `React.lazy`, so lazyRouteAnnouncement.test.tsx keeps its lazy-loading assertion in its own
-// file rather than importing it here; importing `renderRegisteredRoute` alone never resolves
-// that lazy payload. See #504.
+// `React.lazy`; importing these helpers does not resolve that lazy payload, so
+// lazyRouteAnnouncement.test.tsx still renders the definitions route against a fresh, unresolved
+// lazy import. See #504.
 
 // Route hosts still attached to the document. A test that fails before its own `await unmount()` would
 // otherwise leave a live tree behind that keeps answering window `popstate`, fetches through the next
 // test's `fetch` stub, and shadows the next test's elements in document-scoped lookups.
 const mountedRouteHosts = new Set<() => Promise<void>>();
 
+// Runs once per test in every file that imports this module. Unmount registered route hosts and
+// assert `document.body` is empty first, then reset the other global state (API capability cache,
+// stubbed globals, and side-panel/inspector localStorage keys) so later assertions never see a
+// leftover live tree.
 afterEach(async () => {
   for (const unmount of [...mountedRouteHosts]) await unmount();
   expect(document.body.children, "a test left elements attached to document.body").toHaveLength(0);
+  clearApiCapabilityCache();
+  vi.unstubAllGlobals();
+  window.localStorage.removeItem?.(workflowInspectorCollapsedStorageKey);
+  window.localStorage.removeItem?.(workflowInspectorWidthStorageKey);
+  window.localStorage.removeItem?.(workflowSidePanelMaximizedStorageKey);
+  window.localStorage.clear();
 });
 
 export async function renderRegisteredRoute(
