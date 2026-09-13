@@ -42,15 +42,6 @@ jobs:
         # One package at a time, so the Workflows suite does not compete with the others for the runner's cores.
         run: pnpm --recursive --workspace-concurrency=1 test
 
-      - name: "TEMPORARY (#504, reverted before merge): module.test.tsx shuffle sweep"
-        working-directory: src/Elsa.Studio.Workflows/Client
-        run: |
-          for seed in 1 2 3 5 7 11 13 17 19 23 29 31; do
-            echo "::group::seed $seed"
-            pnpm exec vitest run src/__tests__/module.test.tsx --sequence.shuffle --sequence.seed=$seed || { echo "::error::module.test.tsx failed under shuffle seed $seed"; exit 1; }
-            echo "::endgroup::"
-          done
-
       - name: Check Workflows bundle budget
         run: pnpm check:bundle:workflows
 
