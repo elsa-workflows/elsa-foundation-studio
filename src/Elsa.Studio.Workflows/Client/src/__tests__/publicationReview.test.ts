@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { activationSlotReadsUnavailableReason } from "../api/publishing";
-import type { ActivityCatalogItem, WorkflowDefinitionVersionDetails, WorkflowDraft } from "../workflowTypes";
+import type { ActivityCatalogItem, WorkflowDraft } from "../workflowTypes";
 import {
   createPublicationReview,
   publicationBaselineFor,
@@ -10,7 +10,7 @@ import {
   summarizePublicationChanges
 } from "../workflow-editor/publicationReview";
 import { flowchartActivity, sequenceActivity } from "./fixtures";
-import { activationSlot, importedActivationSlot, publishedSlot, withoutPublication } from "./fixtures/publicationSlots";
+import { activationSlot, importedActivationSlot, publishedSlot, versionDetails, withoutPublication } from "./fixtures/publicationSlots";
 
 describe("publication review model", () => {
   it("summarizes changed activities, inputs, and outputs against the source version", () => {
@@ -153,7 +153,7 @@ describe("publication review model", () => {
     const review = createPublicationReview({
       draft: draft(),
       details: null,
-      slotVersions: { default: version("version-1", {}) },
+      slotVersions: { default: versionDetails("version-1") },
       policy: { defaultAction: "replace", defaultSlotName: "default", source: "host" },
       slots: [publishedSlot("default", { publicationId: "publication-1", versionId: "version-1" })],
       catalog: []
@@ -218,7 +218,7 @@ describe("publication review model", () => {
     const review = createPublicationReview({
       draft: draft(),
       details: null,
-      slotVersions: { blue: version("version-blue", { inputs: [{ name: "blue" }] }) },
+      slotVersions: { blue: versionDetails("version-blue", { state: { inputs: [{ name: "blue" }] } }) },
       policy: { defaultAction: "replace", defaultSlotName: "default", source: "host" },
       slots: [publishedSlot("blue")],
       catalog: []
@@ -235,7 +235,7 @@ describe("publication review model", () => {
     const review = createPublicationReview({
       draft: draft(),
       details: null,
-      slotVersions: { blue: version("version-blue", {}) },
+      slotVersions: { blue: versionDetails("version-blue") },
       policy: { defaultAction: "replace", defaultSlotName: "default", source: "host" },
       slots: [publishedSlot("blue")],
       catalog: []
@@ -272,8 +272,8 @@ describe("publication review model", () => {
       draft: draft({ inputs: [{ name: "draft-only" }] }),
       details: null,
       slotVersions: {
-        default: version("version-default", { inputs: [{ name: "draft-only" }] }),
-        blue: version("version-blue", { inputs: [{ name: "blue-only" }] })
+        default: versionDetails("version-default", { state: { inputs: [{ name: "draft-only" }] } }),
+        blue: versionDetails("version-blue", { state: { inputs: [{ name: "blue-only" }] } })
       },
       policy: { defaultAction: "replace", defaultSlotName: "default", source: "host" },
       slots: [],
@@ -358,19 +358,4 @@ function sequence(activities: ReturnType<typeof activity>[]) {
       payload: { activities }
     }
   }, sequenceActivity.activityVersionId);
-}
-
-function version(id: string, state: Partial<WorkflowDefinitionVersionDetails["state"]>): WorkflowDefinitionVersionDetails {
-  return {
-    id,
-    version: "1.0.0",
-    definition: {
-      id: "definition-1",
-      name: "Orders",
-      createdAt: "2026-07-01T00:00:00Z",
-      lastModifiedAt: "2026-07-01T00:00:00Z"
-    },
-    state: { rootActivity: activity("root"), ...state },
-    layout: []
-  };
 }

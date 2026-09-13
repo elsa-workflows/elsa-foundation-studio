@@ -10,12 +10,13 @@ import {
   type PublicationReviewState,
   type PublicationVersionSelection
 } from "../workflow-editor/publicationReview";
-import type { WorkflowDefinitionVersionDetails, WorkflowDraft } from "../workflowTypes";
+import type { WorkflowDraft } from "../workflowTypes";
 import {
   foreignSlotOwner,
   importedActivationSlot,
   publicationPreflight,
   publishedSlot,
+  versionDetails,
   withoutPublication
 } from "./fixtures/publicationSlots";
 
@@ -91,20 +92,23 @@ describe("publication channel UX", () => {
       { mode: "automatic" });
   });
 
-  it("shows the fetched design version's label in the baseline, falling back to the publication's version id", () => {
+  it("shows the fetched design version's label in the baseline when one was fetched for the slot", () => {
     const onReview = vi.fn(async () => undefined);
-    const withLabel = render(review({
+    const container = render(review({
       slots: [occupiedBlue()],
-      slotVersions: { blue: versionDetail("version-blue", "1.4.0") }
+      slotVersions: { blue: versionDetails("version-blue", { version: "1.4.0", state: { rootActivity: null } }) }
     }), { onReview });
-    changeSelect(withLabel.querySelector<HTMLSelectElement>("select[aria-label='Publication channel']")!, "blue");
+    changeSelect(container.querySelector<HTMLSelectElement>("select[aria-label='Publication channel']")!, "blue");
 
-    expect(text(withLabel)).toContain("Baseline: blue · 1.4.0");
+    expect(text(container)).toContain("Baseline: blue · 1.4.0");
+  });
 
-    const withoutLabel = render(review({ slots: [occupiedBlue()] }), { onReview });
-    changeSelect(withoutLabel.querySelector<HTMLSelectElement>("select[aria-label='Publication channel']")!, "blue");
+  it("falls back to the publication's version id in the baseline when no design version was fetched for the slot", () => {
+    const onReview = vi.fn(async () => undefined);
+    const container = render(review({ slots: [occupiedBlue()] }), { onReview });
+    changeSelect(container.querySelector<HTMLSelectElement>("select[aria-label='Publication channel']")!, "blue");
 
-    expect(text(withoutLabel)).toContain("Baseline: blue · version-blue");
+    expect(text(container)).toContain("Baseline: blue · version-blue");
   });
 
   it("names the source of a channel occupied by another activation source instead of a publication", () => {
@@ -390,16 +394,6 @@ const preflight = publicationPreflight;
 
 function occupiedBlue() {
   return publishedSlot("blue");
-}
-
-function versionDetail(id: string, version: string): WorkflowDefinitionVersionDetails {
-  return {
-    id,
-    version,
-    definition: { id: "definition-1", name: "Orders", createdAt: "2026-07-01T00:00:00Z", lastModifiedAt: "2026-07-01T00:00:00Z" },
-    state: { rootActivity: null },
-    layout: []
-  };
 }
 
 function button(container: HTMLElement, label: string) {
