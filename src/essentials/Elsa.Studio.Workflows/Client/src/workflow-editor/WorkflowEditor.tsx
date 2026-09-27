@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Boxes, Check, ChevronRight, Code2, Download, GitBranch, ListTree, Network, Package, PackageOpen, Play, Plus, Redo2, Save, SlidersHorizontal, Sparkles, Undo2, Upload, Workflow as WorkflowIcon } from "lucide-react";
-import { authSessionEndedEvent, authSessionStartedEvent, expressionEditorSessionEndedEvent, type StudioActivityPropertyEditorContribution, type StudioAiContributionApi, type StudioEndpointContext, type StudioExpressionEditorContribution, type StudioExpressionToolingClient, type StudioWorkflowDesignerPanelContribution, type StudioWorkflowRunInputEditorContribution } from "@elsa-workflows/studio-sdk";
+import { authSessionEndedEvent, authSessionStartedEvent, expressionEditorSessionEndedEvent, useStudioThemeLayout, type StudioActivityPropertyEditorContribution, type StudioAiContributionApi, type StudioEndpointContext, type StudioExpressionEditorContribution, type StudioExpressionToolingClient, type StudioWorkflowDesignerPanelContribution, type StudioWorkflowRunInputEditorContribution } from "@elsa-workflows/studio-sdk";
 import type { ActivityCatalogItem, ActivityNode, WorkflowDraft } from "../workflowTypes";
 import {
   collectActivityNodeIds,
@@ -63,6 +63,7 @@ import { useWorkflowContextBridge } from "./useWorkflowContextBridge";
 import { ActivityPalettePanel } from "./ActivityPalettePanel";
 import { GraphAuthoringCanvas } from "../graph-authoring/GraphAuthoringCanvas";
 import { GraphAuthoringWorkbench } from "../graph-authoring/GraphAuthoringWorkbench";
+import { AddStepButton } from "../graph-authoring/AddStepButton";
 import { filterGraphAuthoringContributions } from "../graph-authoring/graphAuthoringContributions";
 import {
   InspectorPanel,
@@ -167,6 +168,7 @@ export function WorkflowEditor({
   const [expandedPaletteCategories, setExpandedPaletteCategories] = useState<Set<string>>(() => new Set());
   const [paletteSearch, setPaletteSearch] = useState("");
   const [activeLeftPanelId, setActiveLeftPanelId] = useState("activities");
+  const themeLayout = useStudioThemeLayout();
   const [activeRightPanelId, setActiveRightPanelId] = useState("inspector");
   const [activeInspectorTabId, setActiveInspectorTabId] = useState<ActivityInspectorTabId>("inputs");
   const [canvasView, setCanvasView] = useState<CanvasView>("designer");
@@ -354,6 +356,7 @@ export function WorkflowEditor({
     onCanvasDragLeave,
     onCanvasDrop,
     openEmptyConnectMenu,
+    openAddStepMenu,
     onConnectMenuPick,
     addActivity,
     addBpmnShape,
@@ -836,6 +839,9 @@ export function WorkflowEditor({
     window.history.pushState({}, "", `/workflows/instances/${encodeURIComponent(workflowExecutionId)}`);
     window.dispatchEvent(new PopStateEvent("popstate"));
   };
+  // The editorial layout authors inline (Add step, and "+" on connections) instead of from a toolbox.
+  // BPMN keeps its palette: events and gateways are only authorable from the BPMN shape palette there.
+  const inlineSteps = themeLayout === "editorial" && !isBpmnDesigner;
   const contributedPanelTabs = filterGraphAuthoringContributions(workflowDesignerPanels, "workflow-definition")
     .map(panel => {
       const ContributedPanel = panel.component;
@@ -849,7 +855,7 @@ export function WorkflowEditor({
       };
     });
   const leftPanelTabs: WorkflowEditorPanelTab[] = [
-    {
+    ...(inlineSteps ? [] : [{
       id: "activities",
       title: "Activities",
       order: 0,
@@ -870,7 +876,7 @@ export function WorkflowEditor({
           />
         </>
       )
-    },
+    }]),
     ...contributedPanelTabs.filter(tab => tab.side === "left")
   ].sort(compareWorkflowPanelTabs);
   const rightPanelTabs: WorkflowEditorPanelTab[] = [
@@ -1161,13 +1167,13 @@ export function WorkflowEditor({
       <GraphAuthoringWorkbench
         resourceKind="workflow-definition"
         layout={sidePanelLayout}
-        palette={{
+        palette={activeLeftPanel ? {
           ariaLabel: "Activities panel",
           tabLabel: "Activities panel tabs",
           tabs: leftPanelTabs,
           activeTabId: activeLeftPanel.id,
           onSelect: setActiveLeftPanelId
-        }}
+        } : undefined}
         canvas={<main className="wf-canvas-shell">
           <div className="wf-canvas-tabs">
             <PanelTabList
@@ -1229,6 +1235,8 @@ export function WorkflowEditor({
               <button type="button" className="wf-empty-canvas-add" onClick={() => openEmptyConnectMenu()}>
                 <Plus size={15} /> Add activity
               </button>
+            ) : inlineSteps ? (
+              <AddStepButton disabled={!canAddActivitiesToCanvas} onOpen={openAddStepMenu} />
             ) : null}
             {connectMenu ? (
               <ConnectMenu

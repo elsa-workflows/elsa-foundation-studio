@@ -9,6 +9,7 @@ import type {
   StudioExpressionDescriptor,
   StudioExpressionEditorContribution
 } from "@elsa-workflows/studio-sdk";
+import { useStudioThemeLayout } from "@elsa-workflows/studio-sdk";
 import type { ActivityCatalogItem, ActivityNode, VariableDefinition, WorkflowDefinitionState, WorkflowInput } from "./workflowTypes";
 import {
   buildCanvas,
@@ -32,6 +33,7 @@ import { GraphAuthoringCanvas } from "./graph-authoring/GraphAuthoringCanvas";
 import { activityGraphDocumentAdapter, activityGraphLayoutToDesign } from "./activityGraphDocumentAdapter";
 import type { WorkflowEdge, WorkflowEditorPanelTab } from "./workflow-editor/editorTypes";
 import { GraphAuthoringWorkbench } from "./graph-authoring/GraphAuthoringWorkbench";
+import { AddStepButton } from "./graph-authoring/AddStepButton";
 import { useGraphAuthoringCanvas } from "./graph-authoring/useGraphAuthoringCanvas";
 import {
   useGraphCanvasInteractions,
@@ -264,6 +266,7 @@ export function ActivityGraphImplementationEditor({
   const [paletteSearch, setPaletteSearch] = useState("");
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(() => new Set());
   const [activeLeftPanelId, setActiveLeftPanelId] = useState("activities");
+  const themeLayout = useStudioThemeLayout();
   const [activeRightPanelId, setActiveRightPanelId] = useState("inspector");
   const [activeInspectorTabId, setActiveInspectorTabId] = useState<ActivityInspectorTabId>("inputs");
   const [diagnosticFocusVersion, setDiagnosticFocusVersion] = useState(0);
@@ -878,6 +881,8 @@ export function ActivityGraphImplementationEditor({
                   ? "Add a BPMN shape, or an authorized activity from the palette, to compose this process."
                   : "Choose an authorized activity from the palette to compose this graph."}</span></div>
               )
+            ) : themeLayout === "editorial" && !isBpmnSlot ? (
+              <AddStepButton disabled={readOnly} onOpen={interactions.openAddStepMenu} />
             ) : null}
             {interactions.connectMenu ? (
               <ConnectMenu
