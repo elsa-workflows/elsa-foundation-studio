@@ -198,6 +198,10 @@ vocabulary. A module that wants the glass idiom under `black-glass` guards on
    per-theme behaviour through the tokens, which the host redefines per theme. The **only**
    permitted exception is `html[data-theme="black-glass"]` for opting into the
    `--studio-glass-*` idiom, since glass is a parallel vocabulary rather than a token remap.
+   This rule is about `data-theme` (which theme). The mode attributes are not theme selectors
+   and stay allowed: `[data-theme-mode="dark"]` for the colour scheme, and
+   `[data-theme-appearance="high-contrast"]` for a High-contrast-only adjustment the tokens
+   cannot express (see [Modes and the `<html>` attributes](#modes-and-the-html-attributes)).
 4. **Gate every material treatment on `[data-theme-material]`.** Flat themes (`meridian`,
    `drift`, `schematic`, `atelier`, `harbor`, `borealis`, `ember`, `orchid`, `hot-pink`, `coral`,
    `graphite`) must stay flat. Any rule
