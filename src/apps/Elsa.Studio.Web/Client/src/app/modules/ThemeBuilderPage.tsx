@@ -3,11 +3,17 @@ import { Check, Copy, Download, FileUp, ImagePlus, Paintbrush, RefreshCcw, Save,
 import type { ElsaStudioModuleApi } from "../../sdk";
 import { SkeletonRows, StudioAlert, StudioTabs, StudioToolbar, StudioToolbarGroup } from "../ui";
 import {
+  allThemeModes,
   cloneThemeDefinition,
+  getSupportedThemeModes,
+  getThemeModeDefinition,
+  themeModeKeys,
+  themeModeLabels,
   themeTokenNames,
-  toTheme,
   type StudioThemeDefinition,
-  type ThemeMode
+  type ThemeMode,
+  type ThemeShape,
+  type ThemeTypography
 } from "../themes/presets";
 import {
   createCustomThemeFrom,
@@ -28,9 +34,20 @@ import { useTheme } from "../components/ThemeProvider";
 
 type BuilderTab = "overview" | "tokens" | "assets" | "preview";
 
-const modeTabs = [
-  { id: "light", label: "Light" },
-  { id: "dark", label: "Dark" }
+const modeTabs = allThemeModes.map(mode => ({ id: mode, label: themeModeLabels[mode] }));
+
+const typographyFields: { key: keyof ThemeTypography; label: string }[] = [
+  { key: "sans", label: "UI font" },
+  { key: "mono", label: "Code font" },
+  { key: "display", label: "Display font" }
+];
+
+const shapeFields: { key: keyof ThemeShape; label: string }[] = [
+  { key: "radiusSm", label: "radiusSm" },
+  { key: "radius", label: "radius" },
+  { key: "radiusMd", label: "radiusMd" },
+  { key: "radiusLg", label: "radiusLg" },
+  { key: "radiusXl", label: "radiusXl" }
 ];
 
 const builderTabs = [
@@ -221,16 +238,45 @@ export function ThemeBuilderPage({ api }: { api: ElsaStudioModuleApi }) {
   }
 
   function patchMode(token: string, value: string) {
-    setDraft(current => current ? {
+    const key = themeModeKeys[mode];
+    setDraft(current => current?.modes[key] ? {
       ...current,
       modes: {
         ...current.modes,
-        [mode]: {
-          ...current.modes[mode],
+        [key]: {
+          ...current.modes[key],
           [token]: value
         }
       }
     } : current);
+  }
+
+  /** Dim and High contrast are optional: seed a new one from the dark palette, which is closest. */
+  function addOptionalMode() {
+    setDraft(current => current ? {
+      ...current,
+      supportedModes: allThemeModes.filter(candidate => candidate === mode || getSupportedThemeModes(current).includes(candidate)),
+      modes: { ...current.modes, [themeModeKeys[mode]]: structuredClone(current.modes.dark) }
+    } : current);
+  }
+
+  function removeOptionalMode() {
+    setDraft(current => {
+      if (!current) return current;
+      const modes = { ...current.modes };
+      delete modes[themeModeKeys[mode] as "dim" | "highContrast"];
+      return { ...current, modes, supportedModes: getSupportedThemeModes(current).filter(candidate => candidate !== mode) };
+    });
+  }
+
+  function patchStyle<K extends "typography" | "shape">(section: K, field: string, value: string) {
+    setDraft(current => {
+      if (!current) return current;
+      const next: Record<string, string> = { ...(current[section] as Record<string, string> | undefined) };
+      if (value.trim()) next[field] = value;
+      else delete next[field];
+      return { ...current, [section]: Object.keys(next).length > 0 ? next : undefined };
+    });
   }
 
   if (!store || !draft) {
@@ -279,8 +325,9 @@ export function ThemeBuilderPage({ api }: { api: ElsaStudioModuleApi }) {
               onClick={() => setSelectedThemeId(theme.id)}
             >
               <span className="theme-builder-swatch" aria-hidden="true">
-                <span style={{ backgroundColor: theme.modes.light.primary }} />
-                <span style={{ backgroundColor: theme.modes.dark.primary }} />
+                {getSupportedThemeModes(theme).map(themeMode => (
+                  <span key={themeMode} style={{ backgroundColor: getThemeModeDefinition(theme, themeMode)?.primary }} />
+                ))}
               </span>
               <span>
                 <strong>{theme.name}</strong>
@@ -320,15 +367,49 @@ export function ThemeBuilderPage({ api }: { api: ElsaStudioModuleApi }) {
 
           {tab === "tokens" ? (
             <div className="theme-token-editor">
-              <StudioTabs tabs={modeTabs} activeTab={mode} onSelect={id => setMode(id as ThemeMode)} ariaLabel="Theme mode" />
               <div className="theme-token-grid">
-                {themeTokenNames.map(token => (
-                  <label key={token} className="theme-token-field">
-                    <span>{token}</span>
-                    <input value={String(draft.modes[mode][token])} disabled={isReadOnly} onChange={event => patchMode(token, event.target.value)} />
+                {typographyFields.map(field => (
+                  <label key={field.key} className="theme-token-field">
+                    <span>{field.label}</span>
+                    <input value={draft.typography?.[field.key] ?? ""} placeholder="Studio default" disabled={isReadOnly} onChange={event => patchStyle("typography", field.key, event.target.value)} />
+                  </label>
+                ))}
+                {shapeFields.map(field => (
+                  <label key={field.key} className="theme-token-field">
+                    <span>{field.label}</span>
+                    <input value={draft.shape?.[field.key] ?? ""} placeholder="Studio default" disabled={isReadOnly} onChange={event => patchStyle("shape", field.key, event.target.value)} />
                   </label>
                 ))}
               </div>
+              <StudioTabs tabs={modeTabs} activeTab={mode} onSelect={id => setMode(id as ThemeMode)} ariaLabel="Theme mode" />
+              {getThemeModeDefinition(draft, mode) ? (
+                <>
+                  {!isReadOnly && (mode === "dim" || mode === "high-contrast") ? (
+                    <div>
+                      <button type="button" className="studio-button danger" onClick={removeOptionalMode}>
+                        <Trash2 size={15} /> Remove {themeModeLabels[mode].toLowerCase()} mode
+                      </button>
+                    </div>
+                  ) : null}
+                  <div className="theme-token-grid">
+                    {themeTokenNames.map(token => (
+                      <label key={token} className="theme-token-field">
+                        <span>{token}</span>
+                        <input value={String(getThemeModeDefinition(draft, mode)?.[token] ?? "")} disabled={isReadOnly} onChange={event => patchMode(token, event.target.value)} />
+                      </label>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <StudioAlert tone="info">
+                  {draft.name} has no {themeModeLabels[mode].toLowerCase()} mode, so Studio shows its dark mode instead.{" "}
+                  {isReadOnly ? null : (
+                    <button type="button" className="studio-button" onClick={addOptionalMode}>
+                      Add {themeModeLabels[mode].toLowerCase()} mode
+                    </button>
+                  )}
+                </StudioAlert>
+              )}
             </div>
           ) : null}
 
@@ -450,7 +531,7 @@ function ThemePreview({
   validationIssues: ThemeValidationIssue[];
   onApply: () => void;
 }) {
-  const colors = toTheme(theme)[mode];
+  const colors = getThemeModeDefinition(theme, mode) ?? theme.modes.dark;
   const previewStyle = {
     "--preview-primary": colors.primary,
     "--preview-background": colors.background,
