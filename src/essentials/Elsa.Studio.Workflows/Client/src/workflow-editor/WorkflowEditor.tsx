@@ -63,7 +63,7 @@ import { useWorkflowContextBridge } from "./useWorkflowContextBridge";
 import { ActivityPalettePanel } from "./ActivityPalettePanel";
 import { GraphAuthoringCanvas } from "../graph-authoring/GraphAuthoringCanvas";
 import { GraphAuthoringWorkbench } from "../graph-authoring/GraphAuthoringWorkbench";
-import { AddStepButton } from "../graph-authoring/AddStepButton";
+import { AddStepButton, authorsInline } from "../graph-authoring/AddStepButton";
 import { filterGraphAuthoringContributions } from "../graph-authoring/graphAuthoringContributions";
 import {
   InspectorPanel,
@@ -839,9 +839,7 @@ export function WorkflowEditor({
     window.history.pushState({}, "", `/workflows/instances/${encodeURIComponent(workflowExecutionId)}`);
     window.dispatchEvent(new PopStateEvent("popstate"));
   };
-  // The editorial layout authors inline (Add step, and "+" on connections) instead of from a toolbox.
-  // BPMN keeps its palette: events and gateways are only authorable from the BPMN shape palette there.
-  const inlineSteps = themeLayout === "editorial" && !isBpmnDesigner;
+  const inlineSteps = authorsInline(themeLayout, isBpmnDesigner);
   const contributedPanelTabs = filterGraphAuthoringContributions(workflowDesignerPanels, "workflow-definition")
     .map(panel => {
       const ContributedPanel = panel.component;
@@ -1231,12 +1229,12 @@ export function WorkflowEditor({
                 onPickActivity={pickActivityForEmptySlot}
                 onBrowseAll={openEmptyConnectMenu}
               />
+            ) : inlineSteps ? (
+              <AddStepButton disabled={!canAddActivitiesToCanvas} onOpen={openAddStepMenu} />
             ) : (isFlowchartDesigner || isBpmnDesigner) && nodes.length === 0 ? (
               <button type="button" className="wf-empty-canvas-add" onClick={() => openEmptyConnectMenu()}>
                 <Plus size={15} /> Add activity
               </button>
-            ) : inlineSteps ? (
-              <AddStepButton disabled={!canAddActivitiesToCanvas} onOpen={openAddStepMenu} />
             ) : null}
             {connectMenu ? (
               <ConnectMenu

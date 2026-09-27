@@ -33,7 +33,7 @@ import { GraphAuthoringCanvas } from "./graph-authoring/GraphAuthoringCanvas";
 import { activityGraphDocumentAdapter, activityGraphLayoutToDesign } from "./activityGraphDocumentAdapter";
 import type { WorkflowEdge, WorkflowEditorPanelTab } from "./workflow-editor/editorTypes";
 import { GraphAuthoringWorkbench } from "./graph-authoring/GraphAuthoringWorkbench";
-import { AddStepButton } from "./graph-authoring/AddStepButton";
+import { AddStepButton, authorsInline } from "./graph-authoring/AddStepButton";
 import { useGraphAuthoringCanvas } from "./graph-authoring/useGraphAuthoringCanvas";
 import {
   useGraphCanvasInteractions,
@@ -352,9 +352,9 @@ export function ActivityGraphImplementationEditor({
   const ownerSupported = supportsActivityNode(owner, ownerCatalogItem);
   const slot = ownerSupported ? getChildSlots(owner, catalogByVersion)[0] : undefined;
   const isBpmnSlot = slot?.mode === "bpmn";
-  // The editorial layout authors inline instead of from the activity list. The Activities tab stays: it
-  // also holds the scope owner and the root-composition chooser, and BPMN keeps its palette for shapes.
-  const inlineSteps = themeLayout === "editorial" && !isBpmnSlot;
+  // Authoring inline drops the activity list, not the Activities tab: it also holds the scope owner and
+  // the root-composition chooser.
+  const inlineSteps = authorsInline(themeLayout, isBpmnSlot);
   const activities = slot?.activities ?? emptyActivities;
   const scopeFrames = useMemo(() => toScopeFrames(root, scopePath, catalogByVersion), [catalogByVersion, root, scopePath]);
   // A BPMN canvas selects ELEMENTS, whose id is the elementId rather than an activity node id. An
@@ -867,28 +867,24 @@ export function ActivityGraphImplementationEditor({
             deleteKeyCode: readOnly ? null : ["Backspace", "Delete"]
           }}
           overlays={<>
-            {nodes.length === 0 ? (
-              scopePath.length > 0 ? (
-                <SlotEmptyState
-                  slotLabel={slot.label}
-                  catalog={availableActivities}
-                  onPickActivity={activity => placeActivity(activity)}
-                  onBrowseAll={interactions.openEmptyConnectMenu}
-                />
-              ) : slot.mode === "flowchart" ? (
-                <button type="button" className="wf-empty-canvas-add" onClick={() => interactions.openEmptyConnectMenu()} disabled={readOnly}>
-                  <Plus size={15} /> Add activity
-                </button>
-              ) : inlineSteps ? (
-                <AddStepButton disabled={readOnly} onOpen={interactions.openAddStepMenu} />
-              ) : (
-                <div className="ad-graph-empty"><strong>{slot.label} is empty</strong><span>{isBpmnSlot
-                  ? "Add a BPMN shape, or an authorized activity from the palette, to compose this process."
-                  : "Choose an authorized activity from the palette to compose this graph."}</span></div>
-              )
+            {nodes.length === 0 && scopePath.length > 0 ? (
+              <SlotEmptyState
+                slotLabel={slot.label}
+                catalog={availableActivities}
+                onPickActivity={activity => placeActivity(activity)}
+                onBrowseAll={interactions.openEmptyConnectMenu}
+              />
             ) : inlineSteps ? (
               <AddStepButton disabled={readOnly} onOpen={interactions.openAddStepMenu} />
-            ) : null}
+            ) : nodes.length > 0 ? null : slot.mode === "flowchart" ? (
+              <button type="button" className="wf-empty-canvas-add" onClick={() => interactions.openEmptyConnectMenu()} disabled={readOnly}>
+                <Plus size={15} /> Add activity
+              </button>
+            ) : (
+              <div className="ad-graph-empty"><strong>{slot.label} is empty</strong><span>{isBpmnSlot
+                ? "Add a BPMN shape, or an authorized activity from the palette, to compose this process."
+                : "Choose an authorized activity from the palette to compose this graph."}</span></div>
+            )}
             {interactions.connectMenu ? (
               <ConnectMenu
                 clientX={interactions.connectMenu.clientX}

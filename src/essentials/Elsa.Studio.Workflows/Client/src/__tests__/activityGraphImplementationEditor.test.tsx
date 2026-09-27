@@ -305,6 +305,19 @@ describe("ActivityGraphImplementationEditor editorial layout", () => {
     expect(lastPayload(onChange).activities).toEqual([expect.objectContaining({ activityVersionId: "write-line-v1" })]);
   });
 
+  it("starts an empty flowchart with Add step rather than the classic Add activity", () => {
+    document.documentElement.setAttribute("data-theme-layout", "editorial");
+    catalogItems = [flowchartCatalogItem(), leafCatalogItem()];
+    const onChange = vi.fn();
+    const rendered = renderDesigner({ value: flowchartImplementationValue(flowchartStructureKind), onChange });
+
+    expect(() => buttonByText(rendered.container, "Add activity")).toThrow();
+    click(buttonByText(rendered.container, "Add step"));
+    pick(rendered.container, "Write line");
+
+    expect(lastPayload(onChange).activities).toHaveLength(1);
+  });
+
   it("offers no Add step outside the editorial layout", () => {
     catalogItems = [flowchartCatalogItem(), leafCatalogItem()];
     const value = flowchartImplementationValue(flowchartStructureKind, [writeLineActivity("write-line-1")]);

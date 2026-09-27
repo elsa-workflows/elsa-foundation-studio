@@ -13,7 +13,8 @@ async function openFlowchartWithOneStep(page: Page, layout: string) {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/?mode=activity-definition-graph-authoring&graph=flowchart");
   await page.evaluate(value => document.documentElement.setAttribute("data-theme-layout", value), layout);
-  await page.getByRole("button", { name: "Add activity" }).click();
+  // Editorial starts an empty canvas with its own Add step; every other layout with Add activity.
+  await page.getByRole("button", { name: layout === "editorial" ? "Add step" : "Add activity" }).click();
   await page.getByRole("option", { name: /Write line/ }).click();
   await expect(page.locator("[data-graph-node-id]")).toHaveCount(1);
 }

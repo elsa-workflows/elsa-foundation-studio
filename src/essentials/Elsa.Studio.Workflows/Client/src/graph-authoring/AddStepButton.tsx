@@ -1,4 +1,13 @@
 import { Plus } from "lucide-react";
+import type { StudioThemeLayout } from "@elsa-workflows/studio-sdk";
+
+/**
+ * Whether a graph scope authors inline (Add step + connection "+") instead of from the activity list.
+ * Only the editorial layout does, and never in BPMN, whose events and gateways come from its shape palette.
+ */
+export function authorsInline(layout: StudioThemeLayout, isBpmnScope: boolean) {
+  return layout === "editorial" && !isBpmnScope;
+}
 
 /**
  * The editorial layout's inline authoring entry point: a pill at the foot of the canvas that opens the

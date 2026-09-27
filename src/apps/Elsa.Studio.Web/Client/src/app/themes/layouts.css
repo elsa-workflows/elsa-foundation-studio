@@ -264,9 +264,9 @@
   }
 }
 
-/* The workbench status bar exists only in that layout (ShellFrame renders it), but it is styled
-   here unconditionally so it also reads correctly below the desktop breakpoint. */
-.studio-statusbar {
+/* The workbench status bar is keyed on the layout like every rule above, but sits outside the
+   desktop media query: ShellFrame renders it in the workbench layout at every width. */
+html[data-theme-layout="workbench"] .studio-statusbar {
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
@@ -281,7 +281,7 @@
   white-space: nowrap;
 }
 
-.studio-statusbar > span {
+html[data-theme-layout="workbench"] .studio-statusbar > span {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -290,7 +290,7 @@
   text-overflow: ellipsis;
 }
 
-.studio-statusbar .sidebar-status-dot {
+html[data-theme-layout="workbench"] .studio-statusbar .sidebar-status-dot {
   margin-top: 0;
   box-shadow: none;
 }

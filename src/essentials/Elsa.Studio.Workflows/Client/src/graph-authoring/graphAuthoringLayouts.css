@@ -111,7 +111,7 @@ html[data-theme-layout="editorial"] .wf-edge-actions:not(.visible):not(:hover):n
   border-radius: 999px;
   background: var(--wf-accent);
   box-shadow: var(--wf-shadow-menu);
-  color: var(--studio-accent-text, var(--primary-foreground));
+  color: var(--studio-accent-text);
   cursor: pointer;
   font: inherit;
   font-size: 13px;
