@@ -13,8 +13,8 @@ async function openFlowchartWithOneStep(page: Page, layout: string) {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/?mode=activity-definition-graph-authoring&graph=flowchart");
   await page.evaluate(value => document.documentElement.setAttribute("data-theme-layout", value), layout);
-  await page.getByRole("treeitem", { name: /Primitives/i }).click();
-  await page.getByRole("treeitem", { name: /Write line/ }).click();
+  await page.getByRole("button", { name: "Add activity" }).click();
+  await page.getByRole("option", { name: /Write line/ }).click();
   await expect(page.locator("[data-graph-node-id]")).toHaveCount(1);
 }
 
@@ -33,6 +33,7 @@ test("floating layout floats the palette and inspector over a full-bleed canvas"
 
 test("workbench layout keeps the palette dense", async ({ page }) => {
   await openFlowchartWithOneStep(page, "workbench");
+  await page.getByRole("treeitem", { name: /Primitives/i }).click();
   const row = page.getByRole("treeitem", { name: /Write line/ });
 
   // Classic palette rows are 42px tall.
@@ -42,6 +43,7 @@ test("workbench layout keeps the palette dense", async ({ page }) => {
 
 test("editorial layout adds steps inline and keeps connection inserts in view", async ({ page }) => {
   await openFlowchartWithOneStep(page, "editorial");
+  await expect(page.getByRole("searchbox", { name: "Search activity palette" })).toHaveCount(0);
 
   // Placing a step selects it, so Add step continues the flow from it.
   await page.getByRole("button", { name: "Add step" }).click();

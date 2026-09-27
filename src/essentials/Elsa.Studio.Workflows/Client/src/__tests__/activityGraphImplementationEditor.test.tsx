@@ -289,6 +289,22 @@ describe("ActivityGraphImplementationEditor editorial layout", () => {
     ]);
   });
 
+  it("replaces the activity list with Add step, keeping the Activities tab for the scope owner", () => {
+    document.documentElement.setAttribute("data-theme-layout", "editorial");
+    catalogItems = [flowchartCatalogItem(), leafCatalogItem()];
+    const onChange = vi.fn();
+    const rendered = renderDesigner({ value: flowchartImplementationValue(), onChange });
+
+    expect(rendered.container.querySelector("input[aria-label='Search activity palette']")).toBeNull();
+    expect(rendered.container.querySelector("[data-graph-root-location]")?.textContent).toContain("Flowchart");
+
+    // An empty scope that is not a flowchart canvas offers Add step instead of "choose from the palette".
+    click(buttonByText(rendered.container, "Add step"));
+    pick(rendered.container, "Write line");
+
+    expect(lastPayload(onChange).activities).toEqual([expect.objectContaining({ activityVersionId: "write-line-v1" })]);
+  });
+
   it("offers no Add step outside the editorial layout", () => {
     catalogItems = [flowchartCatalogItem(), leafCatalogItem()];
     const value = flowchartImplementationValue(flowchartStructureKind, [writeLineActivity("write-line-1")]);

@@ -352,6 +352,9 @@ export function ActivityGraphImplementationEditor({
   const ownerSupported = supportsActivityNode(owner, ownerCatalogItem);
   const slot = ownerSupported ? getChildSlots(owner, catalogByVersion)[0] : undefined;
   const isBpmnSlot = slot?.mode === "bpmn";
+  // The editorial layout authors inline instead of from the activity list. The Activities tab stays: it
+  // also holds the scope owner and the root-composition chooser, and BPMN keeps its palette for shapes.
+  const inlineSteps = themeLayout === "editorial" && !isBpmnSlot;
   const activities = slot?.activities ?? emptyActivities;
   const scopeFrames = useMemo(() => toScopeFrames(root, scopePath, catalogByVersion), [catalogByVersion, root, scopePath]);
   // A BPMN canvas selects ELEMENTS, whose id is the elementId rather than an activity node id. An
@@ -706,7 +709,7 @@ export function ActivityGraphImplementationEditor({
           {/* Events and gateways are what make the scope a BPMN process rather than a list of bound
               tasks; the activity palette below contributes the activity-bearing elements. */}
           {isBpmnSlot ? <BpmnShapePalette onAddShape={addBpmnShape} disabled={readOnly} /> : null}
-          <ActivityPalettePanel
+          {inlineSteps ? null : <ActivityPalettePanel
             paletteSearch={paletteSearch}
             onSearchChange={setPaletteSearch}
             groups={filteredPaletteGroups}
@@ -722,7 +725,7 @@ export function ActivityGraphImplementationEditor({
             onActivityDragStart={interactions.onPaletteDragStart}
             onActivityDragEnd={interactions.onPaletteDragEnd}
             onActivityPointerDown={interactions.onPalettePointerDown}
-          />
+          />}
         </div>
       )
     },
@@ -876,12 +879,14 @@ export function ActivityGraphImplementationEditor({
                 <button type="button" className="wf-empty-canvas-add" onClick={() => interactions.openEmptyConnectMenu()} disabled={readOnly}>
                   <Plus size={15} /> Add activity
                 </button>
+              ) : inlineSteps ? (
+                <AddStepButton disabled={readOnly} onOpen={interactions.openAddStepMenu} />
               ) : (
                 <div className="ad-graph-empty"><strong>{slot.label} is empty</strong><span>{isBpmnSlot
                   ? "Add a BPMN shape, or an authorized activity from the palette, to compose this process."
                   : "Choose an authorized activity from the palette to compose this graph."}</span></div>
               )
-            ) : themeLayout === "editorial" && !isBpmnSlot ? (
+            ) : inlineSteps ? (
               <AddStepButton disabled={readOnly} onOpen={interactions.openAddStepMenu} />
             ) : null}
             {interactions.connectMenu ? (
