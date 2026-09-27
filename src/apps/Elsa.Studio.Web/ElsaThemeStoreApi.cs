@@ -14,7 +14,8 @@ internal static class ElsaThemeStoreApi
     private static readonly Regex TokenValuePattern = new("^(?:#[0-9a-f]{3,8}|oklch\\(\\s*(?:0?\\.\\d+|1(?:\\.0+)?|0)\\s+\\d*\\.?\\d+\\s+\\d*\\.?\\d+\\s*\\)|rgba?\\([\\d\\s.,%/]+\\)|hsla?\\([\\d\\s.,%/]+\\)|var\\(--[a-z0-9-]+\\))$", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
     private static readonly Regex MaterialVariableNamePattern = new("^--studio-material-[a-z0-9-]+$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex MaterialVariableValuePattern = new("^[a-z0-9 .,%#()/+-]+$", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
-    // Mirrors isAllowedFontStack / isAllowedRadius in the client's themeStoreApi.ts.
+    // Mirrors isAllowedFontStack / isAllowedRadius in the client's themeStoreApi.ts, which also
+    // match against the trimmed value — keep the two in step or a value valid in the Theme Builder 400s here.
     private static readonly Regex FontStackPattern = new("^[a-z0-9\\s,'\"._-]{1,512}$", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
     private static readonly Regex RadiusPattern = new("^(?:0|\\d{1,3}(?:\\.\\d+)?(?:px|rem))$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly string[] ThemeModeNames = ["light", "dark", "dim", "high-contrast"];
@@ -521,13 +522,13 @@ internal static class ElsaThemeStoreApi
 
         foreach (var (name, value) in theme.Typography?.Values() ?? [])
         {
-            if (value is not null && !FontStackPattern.IsMatch(value))
+            if (value is not null && !FontStackPattern.IsMatch(value.Trim()))
                 return $"Typography.{name} may only contain font family names separated by commas.";
         }
 
         foreach (var (name, value) in theme.Shape?.Values() ?? [])
         {
-            if (value is not null && !RadiusPattern.IsMatch(value))
+            if (value is not null && !RadiusPattern.IsMatch(value.Trim()))
                 return $"Shape.{name} must be a length in px or rem.";
         }
 

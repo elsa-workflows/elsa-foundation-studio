@@ -102,8 +102,9 @@ function mode(spec: ModeSpec): ThemeModeDefinition {
 }
 
 /**
- * High contrast is deliberately shared in shape across themes: pure black ground, near-white
+ * High contrast is deliberately shared in shape across themes: pure black ground and cards, white
  * hairlines, white text and a single bright accent that also marks the active navigation item.
+ * Depth comes from borders alone; the only lifted tier is the recessed `muted` surface.
  * Only the accent changes, so each theme keeps its identity without trading away legibility.
  */
 function highContrast(accent: string, accentHue: number): ThemeModeDefinition {
@@ -112,9 +113,9 @@ function highContrast(accent: string, accentHue: number): ThemeModeDefinition {
     hue: 0,
     chroma: 0,
     background: 0,
-    card: 0.1,
-    muted: 0.18,
-    border: 0.82,
+    card: 0,
+    muted: 0.16,
+    border: 1,
     input: 0,
     sidebar: 0,
     foreground: 1,

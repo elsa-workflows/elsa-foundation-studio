@@ -11,6 +11,7 @@ import {
   toTheme,
   type StudioThemeDefinition,
   type Theme,
+  type ThemeMode,
   type ThemeModeDefinition,
   type ThemeShape,
   type ThemeTypography
@@ -244,6 +245,30 @@ export function createCustomThemeFrom(theme: StudioThemeDefinition, id: string, 
     enabled: false,
     published: false
   };
+}
+
+/** Dim and High contrast are optional: a new one is seeded from the dark palette, which is closest. */
+export function withOptionalMode(theme: StudioThemeDefinition, mode: Extract<ThemeMode, "dim" | "high-contrast">): StudioThemeDefinition {
+  const supported = getSupportedThemeModes(theme);
+  return {
+    ...theme,
+    supportedModes: allThemeModes.filter(candidate => candidate === mode || supported.includes(candidate)),
+    modes: { ...theme.modes, [themeModeKeys[mode]]: structuredClone(theme.modes.dark) }
+  };
+}
+
+export function withoutOptionalMode(theme: StudioThemeDefinition, mode: Extract<ThemeMode, "dim" | "high-contrast">): StudioThemeDefinition {
+  const modes = { ...theme.modes };
+  delete modes[themeModeKeys[mode] as "dim" | "highContrast"];
+  return { ...theme, modes, supportedModes: getSupportedThemeModes(theme).filter(candidate => candidate !== mode) };
+}
+
+/** Sets one typography or shape field; a blank value removes it, and an emptied section is dropped. */
+export function withStyleField(theme: StudioThemeDefinition, section: "typography" | "shape", field: string, value: string): StudioThemeDefinition {
+  const next: Record<string, string> = { ...(theme[section] as Record<string, string> | undefined) };
+  if (value.trim()) next[field] = value;
+  else delete next[field];
+  return { ...theme, [section]: Object.keys(next).length > 0 ? next : undefined };
 }
 
 /**

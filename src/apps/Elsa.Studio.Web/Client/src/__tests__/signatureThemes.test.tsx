@@ -14,8 +14,16 @@ import {
   type ThemeModeDefinition
 } from "../app/themes/presets";
 import { foundationThemeIds } from "../app/themes/foundationThemes";
-import { createCustomThemeFrom, normalizeThemeStore, validateThemeDefinition } from "../app/themes/themeStoreApi";
+import {
+  createCustomThemeFrom,
+  normalizeThemeStore,
+  validateThemeDefinition,
+  withOptionalMode,
+  withoutOptionalMode,
+  withStyleField
+} from "../app/themes/themeStoreApi";
 import { ThemeProvider, useTheme } from "../app/components/ThemeProvider";
+import { ThemeSwitcher } from "../app/components/ThemeSwitcher";
 
 /** WCAG 2 contrast ratio between two `oklch(L C H)` colours, via OKLab → linear sRGB. */
 function contrast(first: string, second: string) {
@@ -120,6 +128,34 @@ describe("theme modes", () => {
   });
 });
 
+describe("Theme Builder edits", () => {
+  const custom = () => createCustomThemeFrom(getTheme("harbor")!, "harbor-custom", "Harbor Custom");
+
+  it("adds an optional mode seeded from the dark palette and offers it", () => {
+    const theme = withOptionalMode(custom(), "high-contrast");
+
+    expect(theme.modes.highContrast).toEqual(theme.modes.dark);
+    expect(theme.modes.highContrast).not.toBe(theme.modes.dark);
+    expect(getSupportedThemeModes(theme)).toEqual(["light", "dark", "high-contrast"]);
+    expect(validateThemeDefinition(theme).valid).toBe(true);
+  });
+
+  it("removes an optional mode and stops offering it, leaving a valid theme", () => {
+    const theme = withoutOptionalMode(withOptionalMode(withOptionalMode(custom(), "dim"), "high-contrast"), "dim");
+
+    expect(theme.modes.dim).toBeUndefined();
+    expect(getSupportedThemeModes(theme)).toEqual(["light", "dark", "high-contrast"]);
+    expect(validateThemeDefinition(theme).valid).toBe(true);
+  });
+
+  it("sets typography and shape fields, and drops a section once it is emptied", () => {
+    const withFont = withStyleField(custom(), "typography", "sans", "\"Manrope Variable\", sans-serif");
+
+    expect(withFont.typography).toEqual({ sans: "\"Manrope Variable\", sans-serif" });
+    expect(withStyleField(withFont, "typography", "sans", "  ").typography).toBeUndefined();
+  });
+});
+
 describe("theme validation of appearance", () => {
   const base = () => createCustomThemeFrom(getTheme("meridian")!, "custom-appearance", "Custom Appearance");
   const errorsAt = (theme: ReturnType<typeof base>, path: string) =>
@@ -151,7 +187,7 @@ describe("theme validation of appearance", () => {
   });
 });
 
-describe("ThemeProvider", () => {
+describe("ThemeProvider and ThemeSwitcher", () => {
   let container: HTMLDivElement;
   let root: Root;
   let api: ReturnType<typeof useTheme> | undefined;
@@ -173,8 +209,16 @@ describe("ThemeProvider", () => {
   }
 
   async function render() {
-    await act(() => root.render(<ThemeProvider><Probe /></ThemeProvider>));
+    await act(() => root.render(<ThemeProvider><Probe /><ThemeSwitcher /></ThemeProvider>));
   }
+
+  /** Opens the theme menu from the keyboard, as Radix does for Enter on its trigger. */
+  async function openThemeMenu() {
+    const trigger = container.querySelector<HTMLButtonElement>('button[aria-label="Select theme"]')!;
+    await act(() => trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
+  }
+
+  const modeItems = () => Array.from(document.querySelectorAll<HTMLElement>('[role="menuitemradio"]'));
 
   beforeEach(() => {
     localStorage.clear();
@@ -186,6 +230,7 @@ describe("ThemeProvider", () => {
   afterEach(async () => {
     await act(() => root.unmount());
     container.remove();
+    document.body.removeAttribute("style");
     for (const attribute of ["data-theme", "data-theme-mode", "data-theme-appearance", "style"]) {
       document.documentElement.removeAttribute(attribute);
     }
@@ -226,5 +271,32 @@ describe("ThemeProvider", () => {
 
     expect(api!.mode).toBe("dim");
     expect(document.documentElement.getAttribute("data-theme-appearance")).toBe("dim");
+  });
+
+  it("offers all four modes in the picker and applies the one picked, keeping the menu open", async () => {
+    await render();
+    await openThemeMenu();
+
+    expect(modeItems().map(item => item.textContent)).toEqual(["Light", "Dark", "Dim", "High contrast"]);
+    expect(modeItems().some(item => item.hasAttribute("data-disabled"))).toBe(false);
+
+    await act(() => modeItems()[3].click());
+
+    expect(document.documentElement.getAttribute("data-theme-appearance")).toBe("high-contrast");
+    expect(modeItems()[3].getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("disables the modes the current theme does not define", async () => {
+    await render();
+    await act(() => api!.setTheme("harbor"));
+    await openThemeMenu();
+    const [, , dim, highContrast] = modeItems();
+
+    expect(dim.hasAttribute("data-disabled")).toBe(true);
+    expect(highContrast.hasAttribute("data-disabled")).toBe(true);
+
+    await act(() => dim.click());
+
+    expect(api!.preferredMode).not.toBe("dim");
   });
 });

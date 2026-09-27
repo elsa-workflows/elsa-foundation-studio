@@ -93,7 +93,8 @@ public sealed class ElsaThemeStoreApiTests : IAsyncLifetime
             Modes = new StudioThemeModes(Palette(), Palette(), Dim: Palette(), HighContrast: Palette()),
             SupportedModes = ["light", "dark", "dim", "high-contrast"],
             Typography = new StudioThemeTypography("\"Geist Variable\", system-ui, sans-serif", null, "\"Instrument Serif\", serif"),
-            Shape = new StudioThemeShape("4px", "6px", null, null, "0.75rem")
+            // Incidental whitespace is accepted, matching the client-side validator.
+            Shape = new StudioThemeShape("4px", " 6px ", null, null, "0.75rem")
         };
 
         var response = await _client.PutAsJsonAsync($"/_elsa/theme-store/themes/{theme.Id}", theme);

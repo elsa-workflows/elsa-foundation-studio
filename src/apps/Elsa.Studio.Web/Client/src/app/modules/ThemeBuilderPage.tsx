@@ -27,6 +27,9 @@ import {
   setDefaultTheme,
   uploadThemeAsset,
   validateThemeDefinition,
+  withOptionalMode,
+  withoutOptionalMode,
+  withStyleField,
   type ThemeStoreResponse,
   type ThemeValidationIssue
 } from "../themes/themeStoreApi";
@@ -84,6 +87,7 @@ export function ThemeBuilderPage({ api }: { api: ElsaStudioModuleApi }) {
   const validation = useMemo(() => draft ? validateThemeDefinition(draft) : { valid: false, issues: [] }, [draft]);
   const isReadOnly = draft?.source === "built-in";
   const hasChanges = JSON.stringify(selectedTheme) !== JSON.stringify(draft);
+  const optionalMode = mode === "dim" || mode === "high-contrast" ? mode : null;
 
   async function loadStore() {
     await run(async () => {
@@ -251,32 +255,8 @@ export function ThemeBuilderPage({ api }: { api: ElsaStudioModuleApi }) {
     } : current);
   }
 
-  /** Dim and High contrast are optional: seed a new one from the dark palette, which is closest. */
-  function addOptionalMode() {
-    setDraft(current => current ? {
-      ...current,
-      supportedModes: allThemeModes.filter(candidate => candidate === mode || getSupportedThemeModes(current).includes(candidate)),
-      modes: { ...current.modes, [themeModeKeys[mode]]: structuredClone(current.modes.dark) }
-    } : current);
-  }
-
-  function removeOptionalMode() {
-    setDraft(current => {
-      if (!current) return current;
-      const modes = { ...current.modes };
-      delete modes[themeModeKeys[mode] as "dim" | "highContrast"];
-      return { ...current, modes, supportedModes: getSupportedThemeModes(current).filter(candidate => candidate !== mode) };
-    });
-  }
-
-  function patchStyle<K extends "typography" | "shape">(section: K, field: string, value: string) {
-    setDraft(current => {
-      if (!current) return current;
-      const next: Record<string, string> = { ...(current[section] as Record<string, string> | undefined) };
-      if (value.trim()) next[field] = value;
-      else delete next[field];
-      return { ...current, [section]: Object.keys(next).length > 0 ? next : undefined };
-    });
+  function patchStyle(section: "typography" | "shape", field: string, value: string) {
+    setDraft(current => current ? withStyleField(current, section, field, value) : current);
   }
 
   if (!store || !draft) {
@@ -384,9 +364,9 @@ export function ThemeBuilderPage({ api }: { api: ElsaStudioModuleApi }) {
               <StudioTabs tabs={modeTabs} activeTab={mode} onSelect={id => setMode(id as ThemeMode)} ariaLabel="Theme mode" />
               {getThemeModeDefinition(draft, mode) ? (
                 <>
-                  {!isReadOnly && (mode === "dim" || mode === "high-contrast") ? (
+                  {!isReadOnly && optionalMode ? (
                     <div>
-                      <button type="button" className="studio-button danger" onClick={removeOptionalMode}>
+                      <button type="button" className="studio-button danger" onClick={() => setDraft(current => current ? withoutOptionalMode(current, optionalMode) : current)}>
                         <Trash2 size={15} /> Remove {themeModeLabels[mode].toLowerCase()} mode
                       </button>
                     </div>
@@ -403,8 +383,8 @@ export function ThemeBuilderPage({ api }: { api: ElsaStudioModuleApi }) {
               ) : (
                 <StudioAlert tone="info">
                   {draft.name} has no {themeModeLabels[mode].toLowerCase()} mode, so Studio shows its dark mode instead.{" "}
-                  {isReadOnly ? null : (
-                    <button type="button" className="studio-button" onClick={addOptionalMode}>
+                  {isReadOnly || !optionalMode ? null : (
+                    <button type="button" className="studio-button" onClick={() => setDraft(current => current ? withOptionalMode(current, optionalMode) : current)}>
                       Add {themeModeLabels[mode].toLowerCase()} mode
                     </button>
                   )}
