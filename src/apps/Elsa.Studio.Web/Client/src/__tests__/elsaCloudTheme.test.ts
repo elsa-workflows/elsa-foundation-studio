@@ -44,9 +44,9 @@ describe("Elsa Cloud palette", () => {
     expect(parseOklch(dim.primaryForeground).lightness).toBeLessThan(0.3);
   });
 
-  it("uses mint, not the shared leaf green, for success in Dark and Dim", () => {
-    for (const mode of ["dark", "dim"] as const) {
-      expect(parseOklch(getThemeModeDefinition(cloud, mode)!.success).hue).toBe(160);
+  it("uses mint, not the shared leaf green, for success in every mode", () => {
+    for (const mode of allThemeModes) {
+      expect(parseOklch(getThemeModeDefinition(cloud, mode)!.success).hue, mode).toBe(160);
     }
   });
 
@@ -59,42 +59,63 @@ describe("Elsa Cloud palette", () => {
   });
 });
 
+/** The rules of a stylesheet that has no at-rules or nesting: selector list -> declarations. */
+function parseRules(css: string) {
+  const source = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  expect(source, "at-rules would need a real parser").not.toContain("@");
+
+  return source.split("}").filter(chunk => chunk.includes("{")).map(chunk => {
+    const [selectorList, body] = chunk.split("{");
+    const declarations = new Map(body.split(";").map(line => line.split(/:(.*)/s).map(part => part?.trim())).filter(([name]) => name).map(([name, value]) => [name, value] as const));
+    return { selectors: selectorList.split(",").map(selector => selector.trim()), declarations };
+  });
+}
+
+const cloudRules = parseRules(elsaCloudCss);
+const scope = 'html[data-theme="elsa-cloud"]';
+const ruleFor = (selector: string) => cloudRules.find(rule => rule.selectors.includes(`${scope} ${selector}`));
+
 describe("Elsa Cloud chrome", () => {
   it("is imported by the host stylesheet", () => {
     expect(stylesCss).toContain('@import "./themes/elsaCloud.css";');
   });
 
-  it("scopes every selector to the theme, so no other theme picks up its mono labels", () => {
-    const selectors = elsaCloudCss
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .split("{")
-      .slice(0, -1)
-      .flatMap(block => block.split("}").pop()!.split(","))
-      .map(selector => selector.trim())
-      .filter(Boolean);
+  it("scopes every selector to the theme, so no other theme picks up its chrome", () => {
+    const selectors = cloudRules.flatMap(rule => rule.selectors);
 
     expect(selectors.length).toBeGreaterThan(0);
-    expect(selectors.filter(selector => !selector.startsWith('html[data-theme="elsa-cloud"]'))).toEqual([]);
+    expect(selectors.filter(selector => !selector.startsWith(`${scope} `))).toEqual([]);
   });
 
-  it("sets the eyebrow, section headings and status chips in the mono face", () => {
-    for (const selector of [".breadcrumb", ".nav-heading", ".studio-status-chip", ".studio-status-pill"]) {
-      expect(elsaCloudCss).toContain(`html[data-theme="elsa-cloud"] ${selector}`);
-    }
-    expect(elsaCloudCss).toContain("font-family: var(--font-mono)");
+  it.each([".breadcrumb", ".nav-heading", ".studio-status-chip", ".studio-status-pill"])(
+    "sets %s in the mono face",
+    selector => {
+      expect(ruleFor(selector)?.declarations.get("font-family")).toBe("var(--font-mono)");
+    });
+
+  it("draws the active navigation item as a bordered box without the accent bar", () => {
+    expect(ruleFor(".nav-section a.active")?.declarations.get("box-shadow")).toMatch(/^inset 0 0 0 1px var\(--border\)$/);
+    expect(ruleFor(".nav-section a.active::before")?.declarations.get("display")).toBe("none");
   });
 });
 
-describe("Elsa Cloud elevation", () => {
+describe("Elsa Cloud elevation and titles", () => {
+  const block = (selector: string) => tokensCss.slice(tokensCss.indexOf(`${selector} {`)).split("}")[0];
+
   it("has its own subtle dark recipe instead of the shared heavy one", () => {
     const shared = tokensCss.match(/html:is\(([^)]*)\)\[data-theme-mode="dark"\] \{/)![1];
 
     expect(shared).not.toContain("elsa-cloud");
-    expect(tokensCss).toContain('html[data-theme="elsa-cloud"][data-theme-mode="dark"] {');
+    expect(block('html[data-theme="elsa-cloud"][data-theme-mode="dark"]')).toContain("--shadow-lg:");
   });
 
-  it("declares its dark recipe before the High contrast override so High contrast stays flat", () => {
-    expect(tokensCss.indexOf('html[data-theme="elsa-cloud"][data-theme-mode="dark"] {'))
-      .toBeLessThan(tokensCss.indexOf('html[data-theme-mode][data-theme-appearance="high-contrast"] {'));
+  it("outranks every per-theme dark block under High contrast, whatever the source order", () => {
+    // Specificity, not position: `[data-theme]` and `[data-theme-mode]` lift High contrast above the
+    // `html[data-theme="…"][data-theme-mode="dark"]` blocks it also matches.
+    expect(tokensCss).toContain('html[data-theme][data-theme-mode][data-theme-appearance="high-contrast"] {');
+  });
+
+  it("sets titles at a medium weight rather than the shared bold", () => {
+    expect(block('html[data-theme="elsa-cloud"]')).toContain("--studio-title-weight: 600;");
   });
 });
