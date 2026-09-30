@@ -130,7 +130,7 @@ html[data-theme="material-design"][data-theme-mode="dark"] {
 }
 
 /*
- * Signature themes — Meridian, Drift, Schematic, Atelier.
+ * Signature themes — Meridian, Drift, Schematic, Atelier, Elsa Cloud.
  *
  * Their colours, fonts and radii come from the theme definitions (foundationThemes.ts) through
  * ThemeProvider. What lives here is what a definition cannot carry: elevation recipes and a few
@@ -178,7 +178,18 @@ html[data-theme="atelier"] {
   --studio-section-title-size: 19px;
 }
 
-html:is([data-theme="meridian"], [data-theme="drift"], [data-theme="schematic"], [data-theme="atelier"])[data-theme-mode="dark"] {
+/* Elsa Cloud is lit from within, not from above: cards separate from the ground by a hairline and a
+   soft pink-neutral glow rather than a drop shadow, so its light mode stays nearly flat. */
+html[data-theme="elsa-cloud"] {
+  --shadow-sm: 0 1px 2px oklch(0.2 0.02 285 / 0.06);
+  --shadow-md: 0 1px 2px oklch(0.2 0.02 285 / 0.05), 0 6px 16px -6px oklch(0.2 0.02 285 / 0.12);
+  --shadow-lg: 0 2px 6px oklch(0.2 0.02 285 / 0.05), 0 18px 44px -12px oklch(0.2 0.02 285 / 0.2);
+  --shadow-xl: 0 4px 10px oklch(0.2 0.02 285 / 0.06), 0 28px 64px -14px oklch(0.2 0.02 285 / 0.26);
+  --studio-surface-raised: var(--card);
+  --studio-accent-soft: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+html:is([data-theme="meridian"], [data-theme="drift"], [data-theme="schematic"], [data-theme="atelier"], [data-theme="elsa-cloud"])[data-theme-mode="dark"] {
   --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.3);
   --shadow-md: 0 1px 2px oklch(0 0 0 / 0.3), 0 8px 20px -6px oklch(0 0 0 / 0.45);
   --shadow-lg: 0 2px 6px oklch(0 0 0 / 0.3), 0 22px 50px -12px oklch(0 0 0 / 0.6);

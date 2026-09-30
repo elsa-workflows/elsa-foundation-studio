@@ -296,6 +296,44 @@ const atelier = definition(
   }
 );
 
-export const foundationThemeIds = ["meridian", "drift", "schematic", "atelier"] as const;
+// Elsa Cloud: near-black neutral surfaces, a magenta accent and mono eyebrow labels. Dark is the faithful
+// reproduction of the Elsa Cloud console; Light, Dim and High contrast are derived from the same tokens.
+const elsaCloud = definition(
+  "elsa-cloud",
+  "Elsa Cloud",
+  "The Elsa Cloud console look: near-black surfaces, a magenta accent and mono eyebrow labels.",
+  {
+    sans: `"Geist Variable", "Geist", ${sansFallback}`,
+    mono: `"Geist Mono Variable", "Geist Mono", ${monoFallback}`
+  },
+  { radiusSm: "6px", radius: "8px", radiusMd: "10px", radiusLg: "12px", radiusXl: "16px" },
+  "classic",
+  {
+    light: mode({
+      scheme: "light", hue: 285, chroma: 0.004,
+      background: 0.985, card: 1, muted: 0.965, border: 0.91, input: 1, sidebar: 0.985, foreground: 0.2, mutedForeground: 0.48,
+      primary: oklch(0.55, 0.23, 3), primaryForeground: white,
+      wash: oklch(0.96, 0.03, 3), activeForeground: oklch(0.2, 0.004, 285),
+      overrides: { sidebarActive: oklch(1, 0, 0) }
+    }),
+    dark: mode({
+      scheme: "dark", hue: 285, chroma: 0.004,
+      background: 0.14, card: 0.175, muted: 0.22, border: 0.275, input: 0.16, sidebar: 0.14, foreground: 0.96, mutedForeground: 0.7,
+      primary: oklch(0.56, 0.235, 3), primaryForeground: white,
+      wash: oklch(0.27, 0.05, 3), activeForeground: oklch(0.97, 0.004, 285),
+      overrides: { sidebarActive: oklch(0.2, 0.004, 285) }
+    }),
+    dim: mode({
+      scheme: "dim", hue: 285, chroma: 0.01,
+      background: 0.25, card: 0.285, muted: 0.325, border: 0.37, input: 0.27, sidebar: 0.25, foreground: 0.95, mutedForeground: 0.78,
+      primary: oklch(0.55, 0.22, 3), primaryForeground: white,
+      wash: oklch(0.36, 0.06, 3), activeForeground: oklch(0.97, 0.004, 285),
+      overrides: { sidebarActive: oklch(0.325, 0.01, 285) }
+    }),
+    highContrast: highContrast(oklch(0.83, 0.16, 350), 350)
+  }
+);
 
-export const foundationThemeDefinitions: StudioThemeDefinition[] = [meridian, drift, schematic, atelier];
+export const foundationThemeIds = ["meridian", "drift", "schematic", "atelier", "elsa-cloud"] as const;
+
+export const foundationThemeDefinitions: StudioThemeDefinition[] = [meridian, drift, schematic, atelier, elsaCloud];
