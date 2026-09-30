@@ -66,7 +66,7 @@ The five signature themes offer all four modes (Light, Dark, Dim and High contra
 - `"drift"` - Soft, rounded floating surfaces with a jade accent
 - `"schematic"` - Engineering workbench: squared corners, blueprint neutrals, signal orange
 - `"atelier"` - Warm editorial calm: paper neutrals, serif titles, plum accent
-- `"elsa-cloud"` - The Elsa Cloud console look: near-black surfaces, magenta accent, mono eyebrow labels
+- `"elsa-cloud"` - The Elsa Cloud console look: near-black surfaces, hot-pink accent, mono eyebrow labels
 
 Other built-in theme IDs (Light and Dark only, unless noted):
 - `"material-design"` - Material Design (the Elsa Studio 3 look)

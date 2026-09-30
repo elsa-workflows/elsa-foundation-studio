@@ -1,6 +1,7 @@
 @import "./ui/tokens.css";
 @import "./themes/fonts.css";
 @import "./themes/layouts.css";
+@import "./themes/elsaCloud.css";
 
 :root {
   /* Typography */
@@ -5524,17 +5525,4 @@ html[data-theme="black-glass"] .studio-status-pill[data-tone="accent"] {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
-}
-
-/* Elsa Cloud sets its small structural labels in the mono face, as the Elsa Cloud console does: the
-   breadcrumb eyebrow above each page title and the navigation section headings. Everything else
-   follows the theme's typography and tokens. */
-html[data-theme="elsa-cloud"] .breadcrumb,
-html[data-theme="elsa-cloud"] .nav-heading {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  opacity: 1;
 }

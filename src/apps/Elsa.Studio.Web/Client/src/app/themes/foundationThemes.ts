@@ -157,14 +157,16 @@ function definition(
   };
 }
 
+const geistTypography: ThemeTypography = {
+  sans: `"Geist Variable", "Geist", ${sansFallback}`,
+  mono: `"Geist Mono Variable", "Geist Mono", ${monoFallback}`
+};
+
 const meridian = definition(
   "meridian",
   "Meridian",
   "Crisp, neutral precision with a single indigo accent. The Elsa Studio 4 default.",
-  {
-    sans: `"Geist Variable", "Geist", ${sansFallback}`,
-    mono: `"Geist Mono Variable", "Geist Mono", ${monoFallback}`
-  },
+  geistTypography,
   { radiusSm: "5px", radius: "7px", radiusMd: "9px", radiusLg: "12px", radiusXl: "14px" },
   "classic",
   {
@@ -296,41 +298,44 @@ const atelier = definition(
   }
 );
 
-// Elsa Cloud: near-black neutral surfaces, a magenta accent and mono eyebrow labels. Dark is the faithful
+// Elsa Cloud: near-black neutral surfaces, a hot-pink accent and mono eyebrow labels. Dark is the faithful
 // reproduction of the Elsa Cloud console; Light, Dim and High contrast are derived from the same tokens.
+// Hue 4 is the console's button pink, measured from its own screenshot, and stays the same in every mode.
+// Dim lifts the pink and gives it dark text: the console's white-on-pink reads at 2.6:1 as text on Dim's
+// lighter cards, where Dark's (3.7:1) matches the source design.
+const cloudHue = 4;
+const cloudMint = oklch(0.78, 0.14, 160);
+
 const elsaCloud = definition(
   "elsa-cloud",
   "Elsa Cloud",
-  "The Elsa Cloud console look: near-black surfaces, a magenta accent and mono eyebrow labels.",
-  {
-    sans: `"Geist Variable", "Geist", ${sansFallback}`,
-    mono: `"Geist Mono Variable", "Geist Mono", ${monoFallback}`
-  },
+  "The Elsa Cloud console look: near-black surfaces, a hot-pink accent and mono eyebrow labels.",
+  geistTypography,
   { radiusSm: "6px", radius: "8px", radiusMd: "10px", radiusLg: "12px", radiusXl: "16px" },
   "classic",
   {
     light: mode({
       scheme: "light", hue: 285, chroma: 0.004,
       background: 0.985, card: 1, muted: 0.965, border: 0.91, input: 1, sidebar: 0.985, foreground: 0.2, mutedForeground: 0.48,
-      primary: oklch(0.55, 0.23, 3), primaryForeground: white,
-      wash: oklch(0.96, 0.03, 3), activeForeground: oklch(0.2, 0.004, 285),
+      primary: oklch(0.55, 0.23, cloudHue), primaryForeground: white,
+      wash: oklch(0.96, 0.03, cloudHue), activeForeground: oklch(0.2, 0.004, 285),
       overrides: { sidebarActive: oklch(1, 0, 0) }
     }),
     dark: mode({
       scheme: "dark", hue: 285, chroma: 0.004,
       background: 0.14, card: 0.175, muted: 0.22, border: 0.275, input: 0.16, sidebar: 0.14, foreground: 0.96, mutedForeground: 0.7,
-      primary: oklch(0.56, 0.235, 3), primaryForeground: white,
-      wash: oklch(0.27, 0.05, 3), activeForeground: oklch(0.97, 0.004, 285),
-      overrides: { sidebarActive: oklch(0.2, 0.004, 285) }
+      primary: oklch(0.57, 0.235, cloudHue), primaryForeground: white,
+      wash: oklch(0.27, 0.05, cloudHue), activeForeground: oklch(0.97, 0.004, 285),
+      overrides: { sidebarActive: oklch(0.2, 0.004, 285), success: cloudMint }
     }),
     dim: mode({
       scheme: "dim", hue: 285, chroma: 0.01,
       background: 0.25, card: 0.285, muted: 0.325, border: 0.37, input: 0.27, sidebar: 0.25, foreground: 0.95, mutedForeground: 0.78,
-      primary: oklch(0.55, 0.22, 3), primaryForeground: white,
-      wash: oklch(0.36, 0.06, 3), activeForeground: oklch(0.97, 0.004, 285),
-      overrides: { sidebarActive: oklch(0.325, 0.01, 285) }
+      primary: oklch(0.75, 0.16, cloudHue), primaryForeground: oklch(0.2, 0.04, cloudHue),
+      wash: oklch(0.37, 0.06, cloudHue), activeForeground: oklch(0.97, 0.004, 285),
+      overrides: { sidebarActive: oklch(0.325, 0.01, 285), success: oklch(0.8, 0.14, 160) }
     }),
-    highContrast: highContrast(oklch(0.83, 0.16, 350), 350)
+    highContrast: highContrast(oklch(0.83, 0.16, cloudHue), cloudHue)
   }
 );
 
