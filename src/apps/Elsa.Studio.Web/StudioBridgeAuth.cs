@@ -35,10 +35,10 @@ namespace Elsa.Studio.Web;
 /// (#249, ADR 0037): the backend session response already lists the user's permissions, so the introspection reads them
 /// and projects them onto the ticket as <c>elsa.identity.permission</c> claims. Permission policies — the named
 /// module-management policies here (<see cref="ModuleManagementReadPolicyName"/>,
-/// <see cref="ModuleManagementManagePolicyName"/>, <see cref="ExtensionBuilderReadPolicyName"/>,
-/// <see cref="ExtensionBuilderManagePolicyName"/>) and the inline policies a Studio module declares through
-/// <c>RequireStudioBridgePermission</c> — all carry a <see cref="StudioBridgePermissionRequirement"/>, decided by the
-/// single <see cref="StudioBridgePermissionHandler"/> registered here. A signed-in user who lacks the
+/// <see cref="ModuleManagementManagePolicyName"/>) and the inline policies a Studio module declares through
+/// <c>RequireStudioBridgePermission</c> (e.g. the optional Extension Builder module's bridge) — all carry a
+/// <see cref="StudioBridgePermissionRequirement"/>, decided by the single <see cref="StudioBridgePermissionHandler"/>
+/// registered here. A signed-in user who lacks the
 /// required permission is <b>forbidden (403)</b> — distinct from an unauthenticated <b>401</b> and from the bridge's
 /// backend-status states (<c>unconfigured</c>/<c>unreachable</c>/<c>unauthorized</c>).</para>
 ///
@@ -64,26 +64,11 @@ internal static class StudioBridgeAuth
     /// </summary>
     public const string ModuleManagementManagePolicyName = "StudioManagementBridge:ModuleManagement.Manage";
 
-    /// <summary>
-    /// Policy for the bridge's Extension Builder capabilities READ. Requires <c>extension-builder.read</c>; a holder of
-    /// <c>extension-builder.manage</c> satisfies it too (locally expanded).
-    /// </summary>
-    public const string ExtensionBuilderReadPolicyName = "StudioManagementBridge:ExtensionBuilder.Read";
-
-    /// <summary>
-    /// Policy for the bridge's Extension Builder MUTATION relays (workspace, file, source-control, build, and promote
-    /// operations, #256). Requires <c>extension-builder.manage</c>. A mere authenticated session is not enough.
-    /// </summary>
-    public const string ExtensionBuilderManagePolicyName = "StudioManagementBridge:ExtensionBuilder.Manage";
-
-    // Host-control permission keys owned by the backend features (mirrored here from
-    // Elsa.Modularity.Api.Authorization.ModuleManagementPermissionKeys and
-    // Elsa.Modularity.ExtensionBuilder.Authorization.ExtensionBuilderPermissionKeys). These string values are the
-    // stable identity-permission contract; Studio only needs the keys to check the user's permission claims.
+    // Host-control permission keys owned by the backend feature (mirrored here from
+    // Elsa.Modularity.Api.Authorization.ModuleManagementPermissionKeys). These string values are the stable
+    // identity-permission contract; Studio only needs the keys to check the user's permission claims.
     public const string ModuleManagementReadPermission = "module-management.read";
     public const string ModuleManagementManagePermission = "module-management.manage";
-    public const string ExtensionBuilderReadPermission = "extension-builder.read";
-    public const string ExtensionBuilderManagePermission = "extension-builder.manage";
 
     /// <summary>
     /// The query-string parameter carrying the browser bearer on the console-stream hub handshake. See the class
@@ -95,9 +80,9 @@ internal static class StudioBridgeAuth
 
     /// <summary>
     /// TTL, in seconds, of the in-memory bearer-introspection cache (<c>0</c> disables caching entirely). Every bridge
-    /// request re-validates the browser bearer against the backend session endpoint; without a cache the Extension
-    /// Builder build poll alone produces ~2 backend round-trips per second per user. The TTL bounds staleness: a
-    /// permission change or logout takes effect within this window at worst.
+    /// request re-validates the browser bearer against the backend session endpoint; without a cache a polling frontend
+    /// surface (e.g. a build or run poll at ~1 Hz) costs a backend round-trip per request per user. The TTL bounds
+    /// staleness: a permission change or logout takes effect within this window at worst.
     /// </summary>
     public const string SessionCacheSecondsConfigurationKey = "Studio:Auth:SessionCacheSeconds";
 
@@ -163,9 +148,7 @@ internal static class StudioBridgeAuth
             })
             // Each host-control policy requires the base authenticated session PLUS the surface's permission.
             .AddPolicy(ModuleManagementReadPolicyName, StudioBridgeAuthorization.BuildPermissionPolicy(ModuleManagementReadPermission, ModuleManagementManagePermission))
-            .AddPolicy(ModuleManagementManagePolicyName, StudioBridgeAuthorization.BuildPermissionPolicy(ModuleManagementManagePermission))
-            .AddPolicy(ExtensionBuilderReadPolicyName, StudioBridgeAuthorization.BuildPermissionPolicy(ExtensionBuilderReadPermission, ExtensionBuilderManagePermission))
-            .AddPolicy(ExtensionBuilderManagePolicyName, StudioBridgeAuthorization.BuildPermissionPolicy(ExtensionBuilderManagePermission));
+            .AddPolicy(ModuleManagementManagePolicyName, StudioBridgeAuthorization.BuildPermissionPolicy(ModuleManagementManagePermission));
 
         return services;
     }
@@ -242,8 +225,8 @@ internal sealed class StudioBridgeAuthHandler(
         }
 
         // Cache both definitive outcomes of an introspection: a recognized session (positive) spares the per-request
-        // backend round-trip (the Extension Builder build poll alone is ~2 introspections/second per user), and an
-        // explicit anonymous session (negative, shorter TTL) absorbs repeated introspections of a rejected token.
+        // backend round-trip (a polling surface alone can cost ~2 introspections/second per user), and an explicit
+        // anonymous session (negative, shorter TTL) absorbs repeated introspections of a rejected token.
         // Concurrent first misses still introspect independently — bounded by the in-flight request count, accepted
         // here over per-key single-flight complexity.
         if (sessionCache.TryGet(bearer, out var cached))
@@ -371,8 +354,8 @@ internal sealed record StudioBridgeCachedSession(bool IsAuthenticated, string? S
 
 /// <summary>
 /// Bounded, short-TTL in-memory cache for the gate's bearer introspections. Every browser-facing bridge request
-/// re-validates its bearer against the backend session endpoint; the Extension Builder build poll alone re-reads build
-/// status and log every ~900ms, so without a cache each polling user costs ~2 backend round-trips per second. The TTL
+/// re-validates its bearer against the backend session endpoint; a polling surface (e.g. a build poll re-reading status
+/// and log every ~900ms) would otherwise cost each polling user ~2 backend round-trips per second. The TTL
 /// (<see cref="StudioBridgeAuth.SessionCacheSecondsConfigurationKey"/>, default 30s, 0 = disabled) bounds staleness:
 /// a permission change or logout takes effect within the TTL at worst. Negative (anonymous/invalid) outcomes use the
 /// shorter of the TTL and <see cref="NegativeTtlCeiling"/> so a fresh login is not rejected for long while still

@@ -17,21 +17,16 @@ internal static class StudioBackendManagementBridge
     public static IEndpointRouteBuilder MapStudioBackendManagementBridge(this IEndpointRouteBuilder endpoints)
     {
         // Host-control permission gating (#249, ADR 0037). Status + registry read the backend module/feature registry,
-        // so they require `module-management.read`; the Extension Builder capabilities read requires
-        // `extension-builder.read`. When Studio auth is disabled every policy allows anonymously (demo shell). A
-        // signed-in user lacking the permission is forbidden (403) — distinct from an unauthenticated 401 and from the
-        // backend-status states this bridge also reports.
+        // so they require `module-management.read`. When Studio auth is disabled every policy allows anonymously (demo
+        // shell). A signed-in user lacking the permission is forbidden (403) — distinct from an unauthenticated 401 and
+        // from the backend-status states this bridge also reports. A Studio module that relays its own backend surface
+        // (e.g. the optional Extension Builder module) nests its routes under the same route group from its shell feature.
         var group = endpoints.MapGroup(StudioBackendManagementRoutes.RouteGroup);
 
         group.MapGet("/status", GetStatusAsync)
             .RequireAuthorization(StudioBridgeAuth.ModuleManagementReadPolicyName);
         group.MapGet("/registry", GetRegistryAsync)
             .RequireAuthorization(StudioBridgeAuth.ModuleManagementReadPolicyName);
-        group.MapGet("/extension-builder/capabilities", GetExtensionBuilderCapabilitiesAsync)
-            .RequireAuthorization(StudioBridgeAuth.ExtensionBuilderReadPolicyName);
-
-        // The Extension Builder operation relays (#256) live in their own table-driven group under this one.
-        endpoints.MapStudioExtensionBuilderBridge();
 
         return endpoints;
     }
@@ -55,14 +50,6 @@ internal static class StudioBackendManagementBridge
         var envelope = await client.GetRegistryAsync(cancellationToken);
         return Results.Ok(envelope);
     }
-
-    private static async Task<IResult> GetExtensionBuilderCapabilitiesAsync(
-        StudioBackendManagementClient client,
-        CancellationToken cancellationToken)
-    {
-        var capabilities = await client.GetExtensionBuilderCapabilitiesAsync(cancellationToken);
-        return Results.Ok(capabilities);
-    }
 }
 
 /// <summary>
@@ -85,42 +72,6 @@ internal sealed record StudioBackendManagementRegistryEnvelope(
 }
 
 /// <summary>
-/// Backend Extension Builder capabilities as seen by Studio (ADR 0037): a Studio concept ("host capabilities") the
-/// browser reads from the Studio origin instead of probing the backend host-control endpoint directly. The
-/// <see cref="Status"/> field carries the same explicit envelope as <see cref="StudioBackendManagementStatus"/> so the
-/// frontend branches on state, not on an HTTP failure. <see cref="Capabilities"/> is populated only when
-/// <see cref="Status"/> is <c>available</c>; for every other state the frontend renders an explicit
-/// "backend management unavailable" surface and gates actions rather than issuing doomed backend requests.
-/// </summary>
-internal sealed record StudioExtensionBuilderCapabilitiesResult(
-    string Status,
-    string Detail,
-    StudioExtensionBuilderCapabilities? Capabilities,
-    string? BackendBaseUrl,
-    DateTimeOffset CheckedAt)
-{
-    // Same envelope vocabulary as StudioBackendManagementStatus, re-declared here so the capabilities DTO is a
-    // self-contained Studio concept rather than reaching into the status DTO's constants.
-    public const string Available = StudioBackendManagementStatus.Available;
-    public const string Unconfigured = StudioBackendManagementStatus.Unconfigured;
-    public const string Unauthorized = StudioBackendManagementStatus.Unauthorized;
-    public const string Unreachable = StudioBackendManagementStatus.Unreachable;
-    public const string Degraded = StudioBackendManagementStatus.Degraded;
-}
-
-/// <summary>
-/// The Studio-owned view of the backend Extension Builder capability flags. Mirrors the backend's capability contract
-/// but is a Studio DTO: the frontend derives which Extension Builder actions to enable from these flags. Server
-/// enforcement on the backend remains authoritative regardless of what the browser is shown.
-/// </summary>
-internal sealed record StudioExtensionBuilderCapabilities(
-    bool CanCreateWorkspace,
-    bool CanEditFiles,
-    bool CanBuild,
-    bool CanPromote,
-    bool CanRollback);
-
-/// <summary>
 /// Studio's first server-to-server HTTP client to the backend Elsa host. It attaches the backend host management key
 /// (<see cref="StudioBackendManagementOptions.ManagementApiKeyHeaderName"/>) only on these Studio→backend calls; the browser never sees it.
 /// The client fails closed: when no backend base URL or management key is configured it returns <c>unconfigured</c>
@@ -131,16 +82,12 @@ internal sealed class StudioBackendManagementClient(
     StudioBackendManagementOptions options,
     ILogger<StudioBackendManagementClient> logger) : StudioBackendReadClient(httpClient, options, logger)
 {
-    // The backend read-only host-control endpoints the bridge probes. These paths are Studio→backend implementation
-    // details; they are never surfaced to the browser.
+    // The backend read-only host-control endpoint the bridge probes. The path is a Studio→backend implementation
+    // detail; it is never surfaced to the browser.
     private const string BackendRegistryPath = "/_elsa/module-management/registry";
-    private const string BackendExtensionBuilderCapabilitiesPath = "/_elsa/extension-builder/capabilities";
 
-    private static readonly JsonSerializerOptions BackendJsonOptions = new(JsonSerializerDefaults.Web);
-
-    // The two backend surfaces the bridge reads. Each carries its path plus the surface-specific detail strings, so
-    // every read shares ONE probe/mapping pipeline (fail-closed gate, key attachment, status mapping) while keeping the
-    // operator-facing wording each surface shipped with.
+    // The backend surface the bridge reads: its path plus the surface-specific detail strings. Status and registry share
+    // the ONE probe/mapping pipeline (fail-closed gate, key attachment, status mapping) in StudioBackendReadClient.
     private static readonly StudioBackendReadSurface ManagementRegistrySurface = new(
         Path: BackendRegistryPath,
         Description: "privileged host-management surface",
@@ -149,15 +96,6 @@ internal sealed class StudioBackendManagementClient(
         UnauthorizedDetail: "The backend rejected the Studio management key (or its privileged host-management surface is disabled). Verify Studio:BackendModuleManagementApiKey matches the backend host management key.",
         UnreachableDetail: "The privileged host-management surface could not be reached. Check that the backend host is running and Studio:BackendServerBaseUrl (or Studio:BackendBaseUrl) is correct.",
         UnrecognizedPayloadDetail: "The backend responded but did not return a recognizable management registry.");
-
-    private static readonly StudioBackendReadSurface ExtensionBuilderCapabilitiesSurface = new(
-        Path: BackendExtensionBuilderCapabilitiesPath,
-        Description: "backend Extension Builder capabilities surface",
-        UnconfiguredDetail: "Privileged host management is not configured on the Studio host. Set Studio:BackendServerBaseUrl (or Studio:BackendBaseUrl for a shared URL) and Studio:BackendModuleManagementApiKey to enable Extension Builder.",
-        AvailableDetail: "The backend Extension Builder capabilities are reachable.",
-        UnauthorizedDetail: "The backend rejected the Studio management key (or the Extension Builder surface is disabled). Verify Studio:BackendModuleManagementApiKey matches the backend host management key.",
-        UnreachableDetail: "The backend Extension Builder capabilities surface could not be reached. Check that the backend host is running and Studio:BackendServerBaseUrl (or Studio:BackendBaseUrl) is correct.",
-        UnrecognizedPayloadDetail: "The backend responded but did not return recognizable Extension Builder capabilities.");
 
     public async Task<StudioBackendManagementStatus> GetManagementStatusAsync(CancellationToken cancellationToken)
     {
@@ -174,43 +112,6 @@ internal sealed class StudioBackendManagementClient(
         var (status, registry) = await ProbeBackendAsync(ManagementRegistrySurface, cancellationToken);
         return StudioBackendManagementRegistryEnvelope.FromStatus(status, registry);
     }
-
-    // The Studio-owned Extension Builder capabilities read (#247): the shared probe against the capabilities surface,
-    // with the JSON payload projected into the Studio capability flags.
-    public async Task<StudioExtensionBuilderCapabilitiesResult> GetExtensionBuilderCapabilitiesAsync(CancellationToken cancellationToken)
-    {
-        var (status, payload) = await ProbeBackendAsync(ExtensionBuilderCapabilitiesSurface, cancellationToken);
-        var capabilities = TryDeserializeCapabilities(payload);
-
-        // A JSON-object 200 whose members don't bind to the capability flags is degraded, not available — the same
-        // "unrecognizable payload" mapping the probe applies to non-object bodies.
-        if (status.Status == StudioBackendManagementStatus.Available && capabilities is null)
-        {
-            return new(
-                StudioExtensionBuilderCapabilitiesResult.Degraded,
-                ExtensionBuilderCapabilitiesSurface.UnrecognizedPayloadDetail,
-                Capabilities: null,
-                status.BackendBaseUrl,
-                status.CheckedAt);
-        }
-
-        return new(status.Status, status.Detail, capabilities, status.BackendBaseUrl, status.CheckedAt);
-    }
-
-    private static StudioExtensionBuilderCapabilities? TryDeserializeCapabilities(JsonElement? payload)
-    {
-        if (payload is null)
-            return null;
-
-        try
-        {
-            return payload.Value.Deserialize<StudioExtensionBuilderCapabilities>(BackendJsonOptions);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
 }
 
 internal static class StudioBackendManagementBridgeServiceCollectionExtensions
@@ -219,9 +120,11 @@ internal static class StudioBackendManagementBridgeServiceCollectionExtensions
     private static readonly TimeSpan BackendRequestTimeout = TimeSpan.FromSeconds(5);
 
     /// <summary>
-    /// Registers the typed <see cref="StudioBackendManagementClient"/> and <see cref="StudioExtensionBuilderRelayClient"/>
-    /// over <see cref="IHttpClientFactory"/>. When no backend base URL is configured, no <c>BaseAddress</c> is set —
-    /// the clients still resolve and fail closed to <c>unconfigured</c> without issuing any request.
+    /// Registers the shared <see cref="StudioBackendManagementOptions"/> and the typed
+    /// <see cref="StudioBackendManagementClient"/> over <see cref="IHttpClientFactory"/>. When no backend base URL is
+    /// configured, no <c>BaseAddress</c> is set — the client still resolves and fails closed to <c>unconfigured</c>
+    /// without issuing any request. Studio modules that relay their own backend surface (e.g. Extension Builder) resolve
+    /// the same options instance for their clients.
     /// </summary>
     public static IServiceCollection AddStudioBackendManagementBridge(this IServiceCollection services, IConfiguration configuration)
     {
@@ -231,11 +134,6 @@ internal static class StudioBackendManagementBridgeServiceCollectionExtensions
 
         services.AddHttpClient<StudioBackendManagementClient>(client =>
             options.ConfigureBackendClient(client, BackendRequestTimeout));
-
-        // The relay enforces per-operation budgets with a linked CancellationTokenSource; the client-level timeout must
-        // neither race those budgets nor cap a long Text/Stream body copy, so it is disabled here.
-        services.AddHttpClient<StudioExtensionBuilderRelayClient>(client =>
-            options.ConfigureBackendClient(client, Timeout.InfiniteTimeSpan));
 
         return services;
     }

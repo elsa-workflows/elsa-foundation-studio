@@ -113,6 +113,16 @@ describe("navigation sections", () => {
     expect(navigation.map(item => item.id)).toContain("weather");
   });
 
+  it("ships no Extension Builder entry among the built-in navigation items", () => {
+    // Extension Builder is an optional module (#535): a default Studio has no nav item for it, and a host without the
+    // module infers nothing special for its path.
+    const builtIn = getStudioNavigation([], { includeThemeBuilder: true });
+
+    expect(builtIn.map(item => item.id)).not.toContain("extension-builder");
+    expect(builtIn.map(item => item.path)).not.toContain("/extension-builder");
+    expect(getNavigationSection({ id: "extension-builder", path: "/extension-builder" })).toBe("workspace");
+  });
+
   it("resolves the legacy Overview path as Dashboard", () => {
     expect(isDashboardPath("/overview")).toBe(true);
   });
@@ -120,7 +130,6 @@ describe("navigation sections", () => {
   it("groups module and feature management under Settings", () => {
     expect(getNavigationSection({ id: "dashboard", path: "/dashboard" })).toBe("workspace");
     expect(getNavigationSection({ id: "weather", path: "/weather" })).toBe("workspace");
-    expect(getNavigationSection({ id: "extension-builder", path: "/extension-builder" })).toBe("settings");
     expect(getNavigationSection({ id: "modules", path: "/modules" })).toBe("settings");
     expect(getNavigationSection({ id: "package-feeds", path: "/package-feeds" })).toBe("settings");
     expect(getNavigationSection({ id: "feature-management", path: "/features" })).toBe("settings");

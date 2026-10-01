@@ -23,13 +23,10 @@ public sealed class StudioBackendManagementBridgeTests : IAsyncDisposable
 {
     private const string StatusRoute = "/_elsa/studio/backend-management/status";
     private const string RegistryRoute = "/_elsa/studio/backend-management/registry";
-    private const string CapabilitiesRoute = "/_elsa/studio/backend-management/extension-builder/capabilities";
-    private const string BackendCapabilitiesPath = "/_elsa/extension-builder/capabilities";
     private const string BackendBaseUrl = "https://backend.example";
     private const string BackendServerBaseUrl = "http://elsa-server:8080";
     private const string ManagementKey = "s3cr3t-management-key";
     private const string ModuleListJson = """{ "modules": [] }""";
-    private const string TrustedCapabilitiesJson = """{ "canCreateWorkspace": true, "canEditFiles": true, "canBuild": true, "canPromote": false, "canRollback": false }""";
 
     private WebApplication? _app;
 
@@ -142,86 +139,6 @@ public sealed class StudioBackendManagementBridgeTests : IAsyncDisposable
         Assert.Empty(backend.ManagementRequests);
     }
 
-    // ---- Extension Builder capabilities read ----
-
-    [Fact]
-    public async Task ReturnsCapabilitiesWhenBackendAcceptsTheManagementKey()
-    {
-        var backend = RecordingBackend.RespondingWith(_ => JsonOk(TrustedCapabilitiesJson));
-        var client = await StartConfiguredHostAsync(backend);
-
-        var result = await GetCapabilitiesAsync(client);
-
-        Assert.Equal(StudioExtensionBuilderCapabilitiesResult.Available, result.Status);
-        Assert.NotNull(result.Capabilities);
-        Assert.True(result.Capabilities!.CanCreateWorkspace);
-        Assert.True(result.Capabilities.CanEditFiles);
-        Assert.True(result.Capabilities.CanBuild);
-        Assert.False(result.Capabilities.CanPromote);
-        Assert.False(result.Capabilities.CanRollback);
-        // The management key rides only on the Studio->backend call, against the Extension Builder capabilities path.
-        Assert.Single(backend.Requests);
-        Assert.Equal(BackendCapabilitiesPath, backend.Requests[0].Path);
-        Assert.Equal(ManagementKey, backend.Requests[0].ManagementKey);
-    }
-
-    [Theory]
-    [InlineData(BackendBaseUrl, null)] // no management key
-    [InlineData(null, ManagementKey)]  // no backend base URL
-    public async Task ReturnsUnconfiguredCapabilitiesWithZeroOutboundCallsWhenConfigIncomplete(string? backendBaseUrl, string? managementKey)
-    {
-        var backend = RecordingBackend.RespondingWith(_ => JsonOk(TrustedCapabilitiesJson));
-        var client = await StartBridgeHostAsync(backend, backendBaseUrl: backendBaseUrl, managementKey: managementKey);
-
-        var result = await GetCapabilitiesAsync(client);
-
-        Assert.Equal(StudioExtensionBuilderCapabilitiesResult.Unconfigured, result.Status);
-        Assert.Null(result.Capabilities);
-        // Fail closed: no outbound backend request may be issued.
-        Assert.Empty(backend.Requests);
-    }
-
-    [Theory]
-    [InlineData(HttpStatusCode.Unauthorized, StudioExtensionBuilderCapabilitiesResult.Unauthorized)]
-    [InlineData(HttpStatusCode.NotFound, StudioExtensionBuilderCapabilitiesResult.Unauthorized)]
-    [InlineData(HttpStatusCode.InternalServerError, StudioExtensionBuilderCapabilitiesResult.Degraded)]
-    [InlineData(null, StudioExtensionBuilderCapabilitiesResult.Unreachable)]
-    public async Task CapabilitiesMapsBackendOutcome(HttpStatusCode? backendStatus, string expected)
-    {
-        var client = await StartConfiguredHostAsync(BackendFor(backendStatus));
-
-        var result = await GetCapabilitiesAsync(client);
-
-        Assert.Equal(expected, result.Status);
-        Assert.Null(result.Capabilities);
-    }
-
-    [Fact]
-    public async Task AllowsAuthenticatedBrowserCapabilitiesRequestWithExtensionBuilderReadWhenStudioAuthEnabled()
-    {
-        // The capabilities read is gated by extension-builder.read (not module-management): a holder passes (#249).
-        var backend = AuthenticatedBackend(TrustedCapabilitiesJson, StudioBridgeAuth.ExtensionBuilderReadPermission);
-        var client = await StartConfiguredHostAsync(backend, authEnabled: true, bearer: "a-valid-backend-bearer");
-
-        var result = await GetCapabilitiesAsync(client);
-
-        Assert.Equal(StudioExtensionBuilderCapabilitiesResult.Available, result.Status);
-    }
-
-    [Fact]
-    public async Task ForbidsAuthenticatedBrowserCapabilitiesRequestMissingExtensionBuilderReadWhenStudioAuthEnabled()
-    {
-        // module-management.read does NOT satisfy the Extension Builder capabilities gate — the surfaces are gated
-        // independently, so a module-only holder is forbidden (403).
-        var backend = AuthenticatedBackend(TrustedCapabilitiesJson, StudioBridgeAuth.ModuleManagementReadPermission);
-        var client = await StartConfiguredHostAsync(backend, authEnabled: true, bearer: "a-valid-backend-bearer");
-
-        var response = await client.GetAsync(CapabilitiesRoute);
-
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-        Assert.Empty(backend.ManagementRequests);
-    }
-
     // ---- Registry read (#246) ----
 
     [Fact]
@@ -298,7 +215,6 @@ public sealed class StudioBackendManagementBridgeTests : IAsyncDisposable
 
     [Theory]
     [InlineData(StatusRoute)]
-    [InlineData(CapabilitiesRoute)]
     [InlineData(RegistryRoute)]
     public async Task RejectsUnauthenticatedBrowserRequestWhenStudioAuthEnabled(string route)
     {
@@ -321,15 +237,6 @@ public sealed class StudioBackendManagementBridgeTests : IAsyncDisposable
         var status = await response.Content.ReadFromJsonAsync<StudioBackendManagementStatus>();
         Assert.NotNull(status);
         return status!;
-    }
-
-    private static async Task<StudioExtensionBuilderCapabilitiesResult> GetCapabilitiesAsync(HttpClient client)
-    {
-        var response = await client.GetAsync(CapabilitiesRoute);
-        response.EnsureSuccessStatusCode();
-        var result = await response.Content.ReadFromJsonAsync<StudioExtensionBuilderCapabilitiesResult>();
-        Assert.NotNull(result);
-        return result!;
     }
 
     private static async Task<StudioBackendManagementRegistryEnvelope> GetRegistryAsync(HttpClient client)

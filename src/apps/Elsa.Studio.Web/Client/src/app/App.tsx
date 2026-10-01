@@ -3,7 +3,6 @@ import {
   Activity,
   ChevronDown,
   ChevronUp,
-  Hammer,
   ExternalLink,
   FileText,
   Gauge,
@@ -48,7 +47,6 @@ import { registerBuiltInSettingEditors } from "./ui/shared";
 import { tabElementIds, useTablistKeyboard } from "./ui/layout/Tabs";
 import { ModuleManagementPage } from "./modules/ModuleManagementPage";
 import { PackageFeedsPage } from "./modules/PackageFeedsPage";
-import { ExtensionBuilderPage } from "./modules/ExtensionBuilderPage";
 import { ThemeBuilderPage } from "./modules/ThemeBuilderPage";
 import { registerBuiltInPropertyEditors } from "./propertyEditors";
 import elsaLogo from "../assets/images/icon.png";
@@ -80,12 +78,10 @@ const navIconColors = {
   diagnostics: "#10b981",
   modules: "#8b5cf6",
   feeds: "#f59e0b",
-  themes: "#0f766e",
-  extensionBuilder: "#ec4899"
+  themes: "#0f766e"
 } as const;
 
 const builtInNavigation: StudioNavigationContribution[] = [
-  { id: "extension-builder", label: "Extension Builder", path: "/extension-builder", order: 40, iconColor: navIconColors.extensionBuilder },
   { id: "modules", label: "Modules", path: "/modules", order: 80, iconColor: navIconColors.modules },
   { id: "package-feeds", label: "Package feeds", path: "/package-feeds", order: 90, iconColor: navIconColors.feeds },
   { id: "diagnostics", label: "Diagnostics", path: "/diagnostics", activePathPrefix: "/diagnostics", order: 900, iconColor: navIconColors.diagnostics }
@@ -344,14 +340,13 @@ function AppContent({ authManager }: { authManager: AuthProviderManager | null }
         assistantAction={<AgentLauncher open={assistantOpen} sessions={agentSessions} onClick={() => setAssistantOpen(current => !current)} />}
         themeAction={themeCapabilities.pickerEnabled ? <ThemeSwitcher /> : null}
       >
-        {path === "/extension-builder" ? <ExtensionBuilderPage api={api!} /> : null}
         {path === "/modules" ? <ModuleManagementPage api={api!} /> : null}
         {themeBuilderPath ? <ThemeBuilderPage api={api!} /> : null}
         {path === "/package-feeds" ? <PackageFeedsPage api={api!} /> : null}
         {path === "/diagnostics" ? <Diagnostics api={api!} /> : null}
         {path === "/diagnostics/modules" ? <ModuleDiagnostics api={api!} /> : null}
         {ActiveComponent ? <ActiveComponent navigate={navigateTo} /> : null}
-        {!ActiveComponent && path !== "/extension-builder" && path !== "/modules" && !themeBuilderPath && path !== "/package-feeds" && path !== "/diagnostics" && path !== "/diagnostics/modules" ? (
+        {!ActiveComponent && path !== "/modules" && !themeBuilderPath && path !== "/package-feeds" && path !== "/diagnostics" && path !== "/diagnostics/modules" ? (
           <div className="empty-state">
             {owningFeatureArea
               ? `${owningFeatureArea.title} owns ${path}, but no route component is registered for it.`
@@ -975,10 +970,6 @@ function NavIcon({ id, icon: Icon }: Pick<StudioNavigationContribution, "id" | "
     return <GitBranch size={18} />;
   }
 
-  if (id.includes("extension-builder")) {
-    return <Hammer size={18} />;
-  }
-
   if (id.includes("theme")) {
     return <Paintbrush size={18} />;
   }
@@ -1013,7 +1004,6 @@ function getDefaultNavIconColor(id: string) {
   if (id.includes("modules")) return navIconColors.modules;
   if (id.includes("theme")) return navIconColors.themes;
   if (id.includes("feeds")) return navIconColors.feeds;
-  if (id.includes("extension-builder")) return navIconColors.extensionBuilder;
   return "var(--primary)";
 }
 
@@ -1041,7 +1031,7 @@ export function getNavigationSection(item: Pick<StudioNavigationContribution, "i
     return item.section;
   }
 
-  const settingsPaths = new Set(["/modules", "/theme-builder", "/package-feeds", "/features", "/extension-builder"]);
+  const settingsPaths = new Set(["/modules", "/theme-builder", "/package-feeds", "/features"]);
   if (settingsPaths.has(item.path) || item.id === "modules" || item.id === "theme-builder" || item.id === "package-feeds" || item.id === "feature-management") {
     return "settings";
   }
