@@ -219,6 +219,9 @@ export interface StudioRouteContribution {
   component: ComponentType<StudioRouteComponentProps>;
 }
 
+/** The sidebar sections the Studio host groups navigation into. */
+export type StudioNavigationSection = "workspace" | "settings";
+
 export interface StudioNavigationContribution {
   id: string;
   label: string;
@@ -227,6 +230,13 @@ export interface StudioNavigationContribution {
   order?: number;
   iconColor?: string;
   parentId?: string;
+  /**
+   * The sidebar section the item is listed under. When omitted the host infers it: its own settings-style paths
+   * (modules, feeds, features, themes) land under Settings and everything else under Workspace.
+   */
+  section?: StudioNavigationSection;
+  /** The icon rendered in the item's navigation tile. When omitted the host picks one from the item id. */
+  icon?: ComponentType<{ size?: number }>;
 }
 
 export type StudioDashboardWidgetSize = "small" | "medium" | "wide" | "full";

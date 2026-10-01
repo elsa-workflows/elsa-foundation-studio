@@ -27,6 +27,7 @@ import type {
   StudioDiagnosticsWidgetState,
   StudioModulesResponse,
   StudioNavigationContribution,
+  StudioNavigationSection,
   StudioPanelContribution
 } from "../sdk";
 import { requestStudioNavigation, useStudioThemeLayout } from "../sdk";
@@ -58,7 +59,7 @@ import "./agent/agent.css";
 import "./weaver/weaver.css";
 
 type LoadState = "loading" | "ready" | "failed";
-type NavigationSection = "workspace" | "settings";
+type NavigationSection = StudioNavigationSection;
 type NavIconTileStyle = React.CSSProperties & { "--nav-icon-color": string };
 type DiagnosticsWidgetBoundaryProps = {
   children: React.ReactNode;
@@ -952,7 +953,12 @@ function compareOrderedContributions(a: { id: string; title?: string; order?: nu
   return (a.title ?? a.id).localeCompare(b.title ?? b.id) || a.id.localeCompare(b.id);
 }
 
-function NavIcon({ id }: { id: string }) {
+function NavIcon({ id, icon: Icon }: Pick<StudioNavigationContribution, "id" | "icon">) {
+  // A contribution that names its own icon wins; the id-substring matches below are the host's defaults.
+  if (Icon) {
+    return <Icon size={18} />;
+  }
+
   if (id.includes("dashboard")) {
     return <LayoutDashboard size={18} />;
   }
@@ -995,7 +1001,7 @@ function NavIconTile({ item }: { item: StudioNavigationContribution }) {
       style={{ "--nav-icon-color": item.iconColor ?? getDefaultNavIconColor(item.id) } as NavIconTileStyle}
       aria-hidden="true"
     >
-      <NavIcon id={item.id} />
+      <NavIcon id={item.id} icon={item.icon} />
     </span>
   );
 }
@@ -1029,7 +1035,12 @@ export function getStudioNavigation(moduleNavigation: StudioNavigationContributi
     .sort((a, b) => (a.order ?? 500) - (b.order ?? 500));
 }
 
-export function getNavigationSection(item: Pick<StudioNavigationContribution, "id" | "path">): NavigationSection {
+export function getNavigationSection(item: Pick<StudioNavigationContribution, "id" | "path" | "section">): NavigationSection {
+  // A contribution that declares its section wins; the path/id matches below are the host's own settings pages.
+  if (item.section) {
+    return item.section;
+  }
+
   const settingsPaths = new Set(["/modules", "/theme-builder", "/package-feeds", "/features", "/extension-builder"]);
   if (settingsPaths.has(item.path) || item.id === "modules" || item.id === "theme-builder" || item.id === "package-feeds" || item.id === "feature-management") {
     return "settings";
