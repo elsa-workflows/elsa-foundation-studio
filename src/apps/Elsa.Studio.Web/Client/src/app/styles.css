@@ -4331,7 +4331,7 @@ html[data-theme-material] .topbar-actions > button,
 html[data-theme-material] .host-health-refresh,
 html[data-theme-material] .bottom-panel-tab-list button,
 html[data-theme-material] .bottom-panel-action-button,
-html[data-theme-material] .theme-toggle-button,
+html[data-theme-material] .theme-mode-toggle,
 html[data-theme-material] .theme-selector-button {
   border-color: var(--studio-material-edge);
   background: var(--studio-material-control-bg);
@@ -4342,7 +4342,6 @@ html[data-theme-material] .theme-selector-button {
 html[data-theme-material] .topbar-actions > a:hover,
 html[data-theme-material] .topbar-actions > button:hover,
 html[data-theme-material] .host-health-refresh:hover:not(:disabled),
-html[data-theme-material] .theme-toggle-button:hover,
 html[data-theme-material] .theme-selector-button:hover {
   border-color: var(--studio-material-edge-strong);
   background: var(--studio-material-hover-bg);
@@ -4359,6 +4358,18 @@ html[data-theme-material] .theme-item.active {
 
 html[data-theme-material] .theme-color-dot {
   border-color: var(--studio-material-edge);
+}
+
+html[data-theme-material] .theme-mode-toggle-option:hover {
+  background: var(--studio-material-hover-bg);
+  color: var(--studio-text);
+}
+
+html[data-theme-material] .theme-mode-toggle-option[aria-checked="true"] {
+  color: var(--studio-text);
+  border-color: var(--studio-material-edge-strong);
+  background: var(--studio-material-active-bg);
+  box-shadow: var(--studio-material-inset);
 }
 
 html[data-theme-material] .bottom-panel-tab-list button.active {
