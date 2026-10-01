@@ -4,17 +4,18 @@
   gap: 6px;
 }
 
-/* Quick mode control: Light / Dark / Dim as one segmented radiogroup, sized to match the
-   theme-selector button beside it. Segments the theme does not define are not rendered. */
+/* Quick mode control: Light / Dark / Dim as one segmented radiogroup. It shares the
+   theme-selector button's primitives and 40px height so the pair reads as one cluster; segments
+   the theme does not define are not rendered. */
 .theme-mode-toggle {
   display: inline-flex;
   align-items: center;
   gap: 2px;
   height: 40px;
   padding: 3px;
-  border: 1px solid var(--studio-border);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--studio-surface);
+  background: var(--card);
 }
 
 .theme-mode-toggle-option {
@@ -27,25 +28,25 @@
   border: 1px solid transparent;
   border-radius: calc(var(--radius) - 2px);
   background: transparent;
-  color: var(--studio-text-muted);
+  color: var(--muted-foreground);
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .theme-mode-toggle-option:hover {
-  background: var(--studio-surface-muted);
-  color: var(--studio-text);
+  background: var(--muted);
+  color: var(--foreground);
 }
 
 .theme-mode-toggle-option[aria-checked="true"] {
-  background: color-mix(in srgb, var(--studio-accent) 14%, var(--studio-surface));
-  border-color: var(--studio-accent);
-  color: var(--studio-text);
+  background: color-mix(in srgb, var(--primary) 14%, var(--card));
+  border-color: var(--primary);
+  color: var(--foreground);
 }
 
 .theme-mode-toggle-option:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 1px;
+  outline: 2px solid var(--studio-focus);
+  outline-offset: 2px;
 }
 
 .theme-selector-wrapper {

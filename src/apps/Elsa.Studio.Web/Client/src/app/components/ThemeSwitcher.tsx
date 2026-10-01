@@ -15,29 +15,35 @@ const modeIcons: Record<ThemeMode, LucideIcon> = {
 // High contrast is an accessibility mode, so it stays in the menu rather than the quick control.
 const quickModes: readonly ThemeMode[] = ["light", "dark", "dim"];
 
-/** Compact radiogroup for the base modes; offers only the ones the current theme defines. */
+/** The radio-group arrow keys wrap around; Home/End jump to the ends. Undefined for any other key. */
+function keyTarget(key: string, index: number, count: number): number | undefined {
+  switch (key) {
+    case "ArrowRight":
+    case "ArrowDown": return (index + 1) % count;
+    case "ArrowLeft":
+    case "ArrowUp": return (index - 1 + count) % count;
+    case "Home": return 0;
+    case "End": return count - 1;
+    default: return undefined;
+  }
+}
+
+/** Compact radiogroup for the base modes; offers only the ones the current theme defines (always at least Light and Dark). */
 function QuickModeToggle() {
   const { mode, setMode, supportedModes } = useTheme();
   const options = quickModes.filter(themeMode => supportedModes.includes(themeMode));
   const optionRefs = React.useRef<Record<string, HTMLButtonElement | null>>({});
-
-  if (options.length < 2) return null;
 
   // High contrast is not a quick option, so nothing is checked then; keep the group reachable by Tab.
   const tabStop = options.includes(mode) ? mode : options[0];
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
     const index = options.findIndex(themeMode => optionRefs.current[themeMode] === event.target);
-    const next =
-      event.key === "ArrowRight" || event.key === "ArrowDown" ? (index + 1) % options.length
-      : event.key === "ArrowLeft" || event.key === "ArrowUp" ? (index - 1 + options.length) % options.length
-      : event.key === "Home" ? 0
-      : event.key === "End" ? options.length - 1
-      : -1;
-    if (index < 0 || next < 0) return;
+    const target = index < 0 ? undefined : keyTarget(event.key, index, options.length);
+    if (target === undefined) return;
     event.preventDefault();
-    setMode(options[next]);
-    optionRefs.current[options[next]]?.focus();
+    setMode(options[target]);
+    optionRefs.current[options[target]]?.focus();
   };
 
   return (
