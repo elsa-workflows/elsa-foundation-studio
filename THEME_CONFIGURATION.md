@@ -59,7 +59,7 @@ Path to a directory or file containing custom themes. Supports:
 **Type:** `string` (nullable)  
 **Default:** `null` (first theme in list — Meridian)
 
-The theme ID to select on first load. Must match an available theme ID (either built-in or custom).
+The theme ID to select on first load. Must match an available theme ID (either built-in or custom). An ID that no longer exists, such as a retired built-in theme, falls back to the first theme in the list.
 
 The seven signature themes offer all four modes (Light, Dark, Dim and High contrast):
 - `"meridian"` - Crisp, neutral precision with an indigo accent (the default)

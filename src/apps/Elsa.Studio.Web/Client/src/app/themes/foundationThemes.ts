@@ -346,6 +346,7 @@ const elsaCloud = definition(
 // face, so titles read like panel legends. Density comes from smaller type-size tokens (tokens.css); the mono eyebrow
 // labels and status chips are a small scoped stylesheet (signal.css).
 const signalHue = 125;
+const signalLightHue = 135;
 
 const signal = definition(
   "signal",
@@ -362,8 +363,8 @@ const signal = definition(
     light: mode({
       scheme: "light", hue: signalHue, chroma: 0.01,
       background: 0.972, card: 0.999, muted: 0.948, border: 0.875, input: 0.999, sidebar: 0.955, foreground: 0.2, mutedForeground: 0.48,
-      primary: oklch(0.5, 0.15, 135), primaryForeground: white,
-      wash: oklch(0.93, 0.05, signalHue), activeForeground: oklch(0.34, 0.1, 135)
+      primary: oklch(0.5, 0.15, signalLightHue), primaryForeground: white,
+      wash: oklch(0.93, 0.05, signalHue), activeForeground: oklch(0.34, 0.1, signalLightHue)
     }),
     dark: mode({
       scheme: "dark", hue: signalHue, chroma: 0.014,
@@ -385,6 +386,8 @@ const signal = definition(
 // and amber-filled active navigation); Light and Dark share the violet and keep it as the accent.
 const duskHue = 292;
 const duskAmberHue = 80;
+const duskAmber = oklch(0.83, 0.15, duskAmberHue);
+const duskAmberInk = oklch(0.2, 0.05, 70);
 
 const dusk = definition(
   "dusk",
@@ -412,9 +415,9 @@ const dusk = definition(
     dim: mode({
       scheme: "dim", hue: duskHue, chroma: 0.04,
       background: 0.265, card: 0.31, muted: 0.35, border: 0.415, input: 0.285, sidebar: 0.24, foreground: 0.95, mutedForeground: 0.8,
-      primary: oklch(0.83, 0.15, duskAmberHue), primaryForeground: oklch(0.2, 0.05, 70),
-      wash: oklch(0.4, 0.07, duskHue), activeForeground: oklch(0.2, 0.05, 70),
-      overrides: { sidebarActive: oklch(0.83, 0.15, duskAmberHue) }
+      primary: duskAmber, primaryForeground: duskAmberInk,
+      wash: oklch(0.4, 0.07, duskHue), activeForeground: duskAmberInk,
+      overrides: { sidebarActive: duskAmber }
     }),
     highContrast: highContrast(oklch(0.86, 0.17, duskAmberHue), duskAmberHue)
   }
