@@ -31,7 +31,6 @@ interface ThemeContextType {
   setTheme: (themeId: string) => void;
   setMode: (mode: ThemeMode) => void;
   supportedModes: ThemeMode[];
-  canToggleMode: boolean;
   /** Where the main navigation is rendered: the user's override, else the theme's own default. */
   navMode: NavMode;
   /** What the user picked; `theme` means "follow the current theme". */
@@ -64,7 +63,6 @@ export function ThemeProvider({
   const [persistThemeSelection, setPersistThemeSelection] = useState(true);
   const supportedModes = getSupportedThemeModes(currentTheme);
   const activeMode = resolveThemeMode(currentTheme, preferredMode);
-  const canToggleMode = supportedModes.length > 1;
   const navMode = resolveNavMode(currentTheme.layout, navModePreference);
 
   // Initialize from localStorage on mount, falling back to the OS contrast and colour-scheme
@@ -178,7 +176,6 @@ export function ThemeProvider({
         setTheme: handleSetTheme,
         setMode: handleSetMode,
         supportedModes,
-        canToggleMode,
         navMode,
         navModePreference,
         themeNavMode: getThemeNavMode(currentTheme.layout),
