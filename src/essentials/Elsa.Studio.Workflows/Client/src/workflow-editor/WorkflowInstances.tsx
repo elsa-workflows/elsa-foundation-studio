@@ -1457,7 +1457,7 @@ function GenericExpressionSource({ expressionType, value, expanded = false }: { 
   const text = formatSnapshotPayload(value);
   const bounded = text.length > 4_000 ? `${text.slice(0, 3_997)}...` : text;
   return (
-    <div>
+    <div className="wf-input-inspection-expression">
       <small>{expressionType || "Unknown expression"}</small>
       {expanded && (bounded.includes("\n") || bounded.length > 160) ? <pre>{bounded}</pre> : <code>{bounded}</code>}
     </div>

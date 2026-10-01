@@ -55,6 +55,11 @@
   font-size: 12px;
 }
 
+.wf-input-inspection-expression {
+  display: grid;
+  gap: 4px;
+}
+
 .wf-input-inspection-source :is(code, pre) {
   max-width: 100%;
   white-space: pre-wrap;
