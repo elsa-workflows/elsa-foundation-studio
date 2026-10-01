@@ -341,8 +341,8 @@ const elsaCloud = definition(
 );
 
 // Signal: an instrument panel. Olive-tinted neutrals, hairline borders, tight corners, mono labels and a single
-// phosphor-lime accent (hue 125). Light uses the same hue as a deep ink-green so the accent keeps its identity on
-// a pale ground. Mono is carried by the display face, so titles read like panel legends; the mono eyebrow labels and
+// phosphor-lime accent (hue 125). Light shifts to hue 135, a deeper ink-green, because the lime itself washes out on a
+// pale ground; the accent keeps its identity without matching the dark modes exactly. Mono is carried by the display face, so titles read like panel legends; the mono eyebrow labels and
 // status chips are a small scoped stylesheet (signal.css).
 const signalHue = 125;
 

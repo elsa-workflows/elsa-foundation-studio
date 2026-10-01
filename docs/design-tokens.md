@@ -216,7 +216,7 @@ vocabulary. A module that wants the glass idiom under `black-glass` guards on
    `[data-theme-appearance="high-contrast"]` for a High-contrast-only adjustment the tokens
    cannot express, and `[data-theme-layout="…"]` for arrangement (see [Modes and the `<html>` attributes](#modes-and-the-html-attributes)).
 4. **Gate every material treatment on `[data-theme-material]`.** Flat themes (`meridian`,
-   `drift`, `schematic`, `atelier`, `elsa-cloud`) must stay flat. Any rule
+   `drift`, `schematic`, `atelier`, `elsa-cloud`, `signal`, `dusk`) must stay flat. Any rule
    consuming a `--studio-material-*` token belongs inside an `html[data-theme-material] …`
    guard.
 5. **A new token is defined per theme, not once.** Any new `--studio-material-*` /

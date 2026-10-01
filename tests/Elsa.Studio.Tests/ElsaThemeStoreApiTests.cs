@@ -17,7 +17,7 @@ public sealed class ElsaThemeStoreApiTests : IAsyncLifetime
     private HttpClient _client = null!;
 
     [Fact]
-    public async Task LegacyBuiltInThemeCanBeSetAsTheDefault()
+    public async Task NonSignatureBuiltInThemeCanBeSetAsTheDefault()
     {
         var response = await _client.PutAsJsonAsync("/_elsa/theme-store/default", new { ThemeId = "stone" });
         response.EnsureSuccessStatusCode();

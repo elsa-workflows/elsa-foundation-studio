@@ -1,21 +1,15 @@
 // @vitest-environment node
 
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { allThemeModes, getTheme, getThemeModeDefinition } from "../app/themes/presets";
+import { parseOklch, read, ruleDeclarations } from "./themeTestUtils";
 
-const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 const tokensCss = read("../app/ui/tokens.css");
 const signalCss = read("../app/themes/signal.css");
 const stylesCss = read("../app/styles.css");
 
 const signal = getTheme("signal")!;
 const dusk = getTheme("dusk")!;
-
-function parseOklch(value: string) {
-  const [lightness, chroma, hue] = value.match(/^oklch\(([\d.]+) ([\d.]+) ([\d.]+)\)$/)!.slice(1).map(Number);
-  return { lightness, chroma, hue };
-}
 
 describe("Signal", () => {
   it("keeps one lime hue family: the accent hue is 125 in Dark, Dim and High contrast", () => {
@@ -24,7 +18,7 @@ describe("Signal", () => {
     }
   });
 
-  it("is an instrument panel: tight corners and a mono display face", () => {
+  it("is an instrument panel: a bright lime accent on Dark, tight corners and a mono display face", () => {
     expect(parseOklch(getThemeModeDefinition(signal, "dark")!.primary).lightness).toBeGreaterThan(0.8);
     expect(parseInt(signal.shape!.radius!, 10)).toBeLessThanOrEqual(3);
     expect(signal.typography?.display).toContain("JetBrains Mono");
@@ -40,9 +34,14 @@ describe("Signal", () => {
     expect(stylesCss).toContain('@import "./themes/signal.css";');
   });
 
-  it("has its own flat elevation recipes for light and dark, ordered shadow-sm to shadow-xl", () => {
-    expect(tokensCss).toContain('html[data-theme="signal"] {');
-    expect(tokensCss).toContain('html[data-theme="signal"][data-theme-mode="dark"] {');
+  it("declares its own elevation recipes for light and dark, with a semibold title weight", () => {
+    const light = ruleDeclarations(tokensCss, 'html[data-theme="signal"]');
+    const dark = ruleDeclarations(tokensCss, 'html[data-theme="signal"][data-theme-mode="dark"]');
+
+    for (const recipe of [light, dark]) {
+      expect(Object.keys(recipe)).toEqual(expect.arrayContaining(["--shadow-sm", "--shadow-md", "--shadow-lg", "--shadow-xl"]));
+    }
+    expect(light["--studio-title-weight"]).toBe("600");
   });
 });
 

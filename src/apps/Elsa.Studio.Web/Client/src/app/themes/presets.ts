@@ -160,55 +160,6 @@ export type ThemeTokenName = (typeof themeTokenNames)[number];
 const oklchToVar = (lightness: number, chroma: number, hue: number): string =>
   `oklch(${lightness} ${chroma} ${hue})`;
 
-const white = oklchToVar(0.985, 0, 0);
-const ink = oklchToVar(0.205, 0, 0);
-
-function createMode(
-  primary: string,
-  accentHue: number,
-  overrides: Partial<ThemeModeDefinition> = {}
-): ThemeModeDefinition {
-  const isDark = overrides.background ? getOklchLightness(overrides.background) < 0.5 : false;
-  const foreground = isDark ? oklchToVar(0.96, 0.01, accentHue) : ink;
-  const background = isDark ? oklchToVar(0.17, 0.02, accentHue) : oklchToVar(0.99, 0.004, accentHue);
-
-  return {
-    primary,
-    primaryForeground: white,
-    secondary: isDark ? oklchToVar(0.25, 0.02, accentHue) : oklchToVar(0.96, 0.006, accentHue),
-    secondaryForeground: foreground,
-    accent: isDark ? oklchToVar(0.32, 0.04, accentHue) : oklchToVar(0.94, 0.025, accentHue),
-    accentForeground: foreground,
-    success: isDark ? oklchToVar(0.65, 0.16, 150) : oklchToVar(0.75, 0.16, 150),
-    successForeground: isDark ? oklchToVar(0.14, 0, 0) : white,
-    warning: isDark ? oklchToVar(0.66, 0.17, 70) : oklchToVar(0.72, 0.18, 60),
-    warningForeground: isDark ? oklchToVar(0.14, 0, 0) : white,
-    danger: isDark ? oklchToVar(0.52, 0.22, 27) : oklchToVar(0.58, 0.245, 27),
-    dangerForeground: white,
-    background,
-    foreground,
-    card: isDark ? oklchToVar(0.23, 0.02, accentHue) : oklchToVar(1, 0, 0),
-    cardForeground: foreground,
-    muted: isDark ? oklchToVar(0.28, 0.015, accentHue) : oklchToVar(0.95, 0.006, accentHue),
-    mutedForeground: isDark ? oklchToVar(0.72, 0.01, accentHue) : oklchToVar(0.45, 0.012, accentHue),
-    border: isDark ? oklchToVar(0.35, 0.015, accentHue) : oklchToVar(0.88, 0.006, accentHue),
-    input: isDark ? oklchToVar(0.29, 0.015, accentHue) : oklchToVar(0.98, 0.003, accentHue),
-    sidebar: isDark ? oklchToVar(0.14, 0.02, accentHue) : oklchToVar(0.985, 0.004, accentHue),
-    sidebarForeground: foreground,
-    sidebarActive: isDark ? oklchToVar(0.3, 0.04, accentHue) : oklchToVar(0.93, 0.03, accentHue),
-    sidebarActiveForeground: foreground,
-    ring: primary,
-    chartColors: [
-      primary,
-      oklchToVar(isDark ? 0.56 : 0.64, 0.18, 264),
-      oklchToVar(isDark ? 0.64 : 0.74, 0.12, 175),
-      oklchToVar(isDark ? 0.62 : 0.72, 0.18, 60),
-      oklchToVar(isDark ? 0.58 : 0.68, 0.2, 320)
-    ],
-    ...overrides
-  };
-}
-
 function createThemeDefinition(
   id: string,
   name: string,
@@ -451,8 +402,6 @@ const createMaterialThemeColors = (config: MaterialThemeColorConfig): ThemeColor
   ],
 });
 
-// Material Design — carries forward the recognisable Elsa Studio 3 / MudBlazor palette
-// while supplying explicit accessible foreground pairs for Studio 4 controls.
 const stoneTheme = createMaterialThemeColors({
   primary: oklchToVar(0.78, 0.13, 230),
   primaryForeground: oklchToVar(0.12, 0.02, 230),
@@ -649,8 +598,3 @@ export const getTheme = (themeId: string): Theme | undefined =>
 
 export const getThemeNames = (): { id: string; name: string }[] =>
   themes.map(t => ({ id: t.id, name: t.name }));
-
-function getOklchLightness(value: string) {
-  const match = value.match(/^oklch\((0?\.\d+|1(?:\.0+)?)\s/i);
-  return match ? Number(match[1]) : 1;
-}
