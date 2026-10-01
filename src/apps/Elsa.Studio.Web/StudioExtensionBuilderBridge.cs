@@ -1,4 +1,6 @@
 using System.Net;
+using Elsa.Studio.Api.Models;
+using Elsa.Studio.Api.Options;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Http.Features;
 
@@ -18,7 +20,7 @@ namespace Elsa.Studio.Web;
 internal static class StudioExtensionBuilderBridge
 {
     /// <summary>The Studio-owned route group the browser calls. Nested under the management bridge group.</summary>
-    public const string RouteGroup = StudioBackendManagementBridge.RouteGroup + "/extension-builder";
+    public const string RouteGroup = StudioBackendManagementRoutes.RouteGroup + "/extension-builder";
 
     /// <summary>The backend Extension Builder root the relay forwards to. A Studio→backend implementation detail.</summary>
     internal const string BackendRoot = "/_elsa/extension-builder";

@@ -1,5 +1,7 @@
-using System.Net;
 using System.Text.Json;
+using Elsa.Studio.Api.Models;
+using Elsa.Studio.Api.Options;
+using Elsa.Studio.Api.Services;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Elsa.Studio.Web;
@@ -12,9 +14,6 @@ namespace Elsa.Studio.Web;
 /// </summary>
 internal static class StudioBackendManagementBridge
 {
-    /// <summary>The Studio-owned bridge route group. Routes and DTOs express Studio concepts, not backend endpoint paths.</summary>
-    public const string RouteGroup = "/_elsa/studio/backend-management";
-
     public static IEndpointRouteBuilder MapStudioBackendManagementBridge(this IEndpointRouteBuilder endpoints)
     {
         // Host-control permission gating (#249, ADR 0037). Status + registry read the backend module/feature registry,
@@ -22,7 +21,7 @@ internal static class StudioBackendManagementBridge
         // `extension-builder.read`. When Studio auth is disabled every policy allows anonymously (demo shell). A
         // signed-in user lacking the permission is forbidden (403) — distinct from an unauthenticated 401 and from the
         // backend-status states this bridge also reports.
-        var group = endpoints.MapGroup(RouteGroup);
+        var group = endpoints.MapGroup(StudioBackendManagementRoutes.RouteGroup);
 
         group.MapGet("/status", GetStatusAsync)
             .RequireAuthorization(StudioBridgeAuth.ModuleManagementReadPolicyName);
@@ -122,35 +121,6 @@ internal sealed record StudioExtensionBuilderCapabilities(
     bool CanRollback);
 
 /// <summary>
-/// The status of the backend host's management surface as seen by Studio.
-/// <list type="bullet">
-/// <item><c>available</c>: Studio reached the backend management surface and it responded with a sane registry.</item>
-/// <item><c>unconfigured</c>: Studio has no backend base URL and/or no backend management key, so it fails closed
-/// without issuing any outbound backend call.</item>
-/// <item><c>unauthorized</c>: the backend rejected Studio's management key (401), or reported the surface as disabled
-/// because the backend itself has no key configured (404). From Studio's vantage point these are indistinguishable
-/// remediation-wise — the operator must fix the key on one side — so both collapse to <c>unauthorized</c>.</item>
-/// <item><c>unreachable</c>: the backend could not be reached (network error, DNS failure, or timeout).</item>
-/// <item><c>degraded</c>: Studio reached the backend but it answered with a server error (5xx) or an otherwise
-/// unexpected non-success response — the surface exists but is not healthy.</item>
-/// </list>
-/// The DTO never echoes the management key or raw backend error bodies (which can leak backend topology); the backend
-/// base URL is already browser-known via runtime configuration today, so it is safe to include for operator clarity.
-/// </summary>
-internal sealed record StudioBackendManagementStatus(
-    string Status,
-    string Detail,
-    string? BackendBaseUrl,
-    DateTimeOffset CheckedAt)
-{
-    public const string Available = "available";
-    public const string Unconfigured = "unconfigured";
-    public const string Unauthorized = "unauthorized";
-    public const string Unreachable = "unreachable";
-    public const string Degraded = "degraded";
-}
-
-/// <summary>
 /// Studio's first server-to-server HTTP client to the backend Elsa host. It attaches the backend host management key
 /// (<see cref="StudioBackendManagementOptions.ManagementApiKeyHeaderName"/>) only on these Studio→backend calls; the browser never sees it.
 /// The client fails closed: when no backend base URL or management key is configured it returns <c>unconfigured</c>
@@ -159,7 +129,7 @@ internal sealed record StudioBackendManagementStatus(
 internal sealed class StudioBackendManagementClient(
     HttpClient httpClient,
     StudioBackendManagementOptions options,
-    ILogger<StudioBackendManagementClient> logger)
+    ILogger<StudioBackendManagementClient> logger) : StudioBackendReadClient(httpClient, options, logger)
 {
     // The backend read-only host-control endpoints the bridge probes. These paths are Studio→backend implementation
     // details; they are never surfaced to the browser.
@@ -171,7 +141,7 @@ internal sealed class StudioBackendManagementClient(
     // The two backend surfaces the bridge reads. Each carries its path plus the surface-specific detail strings, so
     // every read shares ONE probe/mapping pipeline (fail-closed gate, key attachment, status mapping) while keeping the
     // operator-facing wording each surface shipped with.
-    private static readonly BackendReadSurface ManagementRegistrySurface = new(
+    private static readonly StudioBackendReadSurface ManagementRegistrySurface = new(
         Path: BackendRegistryPath,
         Description: "privileged host-management surface",
         UnconfiguredDetail: "Privileged host management is not configured on the Studio host. Set Studio:BackendServerBaseUrl (or Studio:BackendBaseUrl for a shared URL) and Studio:BackendModuleManagementApiKey to enable Server module management.",
@@ -180,7 +150,7 @@ internal sealed class StudioBackendManagementClient(
         UnreachableDetail: "The privileged host-management surface could not be reached. Check that the backend host is running and Studio:BackendServerBaseUrl (or Studio:BackendBaseUrl) is correct.",
         UnrecognizedPayloadDetail: "The backend responded but did not return a recognizable management registry.");
 
-    private static readonly BackendReadSurface ExtensionBuilderCapabilitiesSurface = new(
+    private static readonly StudioBackendReadSurface ExtensionBuilderCapabilitiesSurface = new(
         Path: BackendExtensionBuilderCapabilitiesPath,
         Description: "backend Extension Builder capabilities surface",
         UnconfiguredDetail: "Privileged host management is not configured on the Studio host. Set Studio:BackendServerBaseUrl (or Studio:BackendBaseUrl for a shared URL) and Studio:BackendModuleManagementApiKey to enable Extension Builder.",
@@ -241,177 +211,6 @@ internal sealed class StudioBackendManagementClient(
             return null;
         }
     }
-
-    // Shared probe for every bridge read: fails closed with zero outbound calls when unconfigured, sends the single
-    // management-keyed Studio->backend request for the given surface, and maps the response to a (status, payload)
-    // pair. Status, registry, and capabilities all project from this so the fail-closed guarantee and the
-    // unauthorized/unreachable/degraded mapping live in exactly one place.
-    private async Task<(StudioBackendManagementStatus Status, JsonElement? Payload)> ProbeBackendAsync(
-        BackendReadSurface surface,
-        CancellationToken cancellationToken)
-    {
-        var checkedAt = DateTimeOffset.UtcNow;
-        var backendBaseUrl = options.NormalizedBackendBaseUrl;
-
-        // Fail closed: without a backend base URL or a management key we make ZERO outbound calls (ADR 0037: possession
-        // of no credential must never reach the bridge's backend call path).
-        if (!options.IsConfigured)
-        {
-            return (new(
-                StudioBackendManagementStatus.Unconfigured,
-                surface.UnconfiguredDetail,
-                backendBaseUrl,
-                checkedAt), null);
-        }
-
-        try
-        {
-            using var request = new HttpRequestMessage(HttpMethod.Get, surface.Path);
-            request.Headers.TryAddWithoutValidation(StudioBackendManagementOptions.ManagementApiKeyHeaderName, options.ManagementApiKey);
-            request.Headers.TryAddWithoutValidation("Accept", "application/json");
-
-            using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-
-            return await MapResponseAsync(surface, response, backendBaseUrl, checkedAt, cancellationToken);
-        }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException)
-        {
-            // A caller-cancelled request bubbles up; only our own timeout / transport failures map to `unreachable`.
-            if (cancellationToken.IsCancellationRequested)
-                throw;
-
-            logger.LogWarning(ex, "Studio could not reach the {BackendSurface} at {BackendBaseUrl}.", surface.Description, options.BackendBaseUrl);
-            return (new(
-                StudioBackendManagementStatus.Unreachable,
-                surface.UnreachableDetail,
-                backendBaseUrl,
-                checkedAt), null);
-        }
-    }
-
-    private async Task<(StudioBackendManagementStatus Status, JsonElement? Payload)> MapResponseAsync(
-        BackendReadSurface surface,
-        HttpResponseMessage response,
-        string? backendBaseUrl,
-        DateTimeOffset checkedAt,
-        CancellationToken cancellationToken)
-    {
-        // 401: our management key was rejected. 404: the backend has no key configured, so it hides the surface — from
-        // Studio's side that is the same remediation ("fix the management key wiring"), so collapse both to `unauthorized`.
-        if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden or HttpStatusCode.NotFound)
-        {
-            return (new(
-                StudioBackendManagementStatus.Unauthorized,
-                surface.UnauthorizedDetail,
-                backendBaseUrl,
-                checkedAt), null);
-        }
-
-        if (response.IsSuccessStatusCode)
-        {
-            // Guard against a 200 that isn't actually the surface's payload (e.g. an SPA fallback page): a sane payload
-            // must be a JSON object. Anything else means we hit something other than the surface, so treat it as degraded.
-            var payload = await ReadJsonObjectAsync(response, cancellationToken);
-            if (payload is not null)
-            {
-                return (new(
-                    StudioBackendManagementStatus.Available,
-                    surface.AvailableDetail,
-                    backendBaseUrl,
-                    checkedAt), payload);
-            }
-
-            return (new(
-                StudioBackendManagementStatus.Degraded,
-                surface.UnrecognizedPayloadDetail,
-                backendBaseUrl,
-                checkedAt), null);
-        }
-
-        // 5xx (and any other unexpected non-success): the surface exists but is unhealthy.
-        logger.LogWarning("The {BackendSurface} at {BackendBaseUrl} responded with {StatusCode}.", surface.Description, options.BackendBaseUrl, (int)response.StatusCode);
-        return (new(
-            StudioBackendManagementStatus.Degraded,
-            $"The {surface.Description} responded with an unexpected status ({(int)response.StatusCode}).",
-            backendBaseUrl,
-            checkedAt), null);
-    }
-
-    // Reads the response body when it is a JSON object, returning a detached clone (the response stream is disposed by
-    // the caller, so the JsonElement must own its buffer). Returns null when the body is missing, not JSON, or not a
-    // JSON object — those cases map to `degraded`, never `available`.
-    private static async Task<JsonElement?> ReadJsonObjectAsync(HttpResponseMessage response, CancellationToken cancellationToken)
-    {
-        var mediaType = response.Content.Headers.ContentType?.MediaType;
-        if (mediaType is null || !mediaType.Contains("json", StringComparison.OrdinalIgnoreCase))
-            return null;
-
-        try
-        {
-            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-            if (document.RootElement.ValueKind != JsonValueKind.Object)
-                return null;
-
-            // Clone so the element survives the `using document` disposal below.
-            return document.RootElement.Clone();
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
-
-    /// <summary>
-    /// A backend read surface the bridge probes: its Studio→backend path plus the surface-specific operator-facing
-    /// detail strings. <see cref="Description"/> feeds logs and the degraded unexpected-status detail.
-    /// </summary>
-    private sealed record BackendReadSurface(
-        string Path,
-        string Description,
-        string UnconfiguredDetail,
-        string AvailableDetail,
-        string UnauthorizedDetail,
-        string UnreachableDetail,
-        string UnrecognizedPayloadDetail);
-}
-
-/// <summary>
-/// Server-side configuration for Studio→backend calls, bound from <c>Studio:BackendServerBaseUrl</c> and
-/// <c>Studio:BackendModuleManagementApiKey</c>. <c>Studio:BackendBaseUrl</c> remains the browser-facing URL and is
-/// used as the server-side fallback for single-host deployments. The management key is held server-side only and is
-/// never emitted to the browser by the bridge.
-/// </summary>
-internal sealed record StudioBackendManagementOptions(string? BackendBaseUrl, string? ManagementApiKey)
-{
-    public const string BackendBaseUrlConfigurationKey = "Studio:BackendBaseUrl";
-    public const string BackendServerBaseUrlConfigurationKey = "Studio:BackendServerBaseUrl";
-    public const string ManagementApiKeyConfigurationKey = "Studio:BackendModuleManagementApiKey";
-
-    /// <summary>
-    /// The request header the backend Elsa host expects the management key on. This is the backend host-control
-    /// contract; Studio attaches it server-side on Studio→backend calls only. The browser never carries it (ADR 0037).
-    /// </summary>
-    public const string ManagementApiKeyHeaderName = "X-Elsa-Module-Management-Key";
-
-    /// <summary>Both halves of the Studio→backend credential pair are present. When false every bridge surface fails
-    /// closed to <c>unconfigured</c> with zero outbound calls (ADR 0037).</summary>
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(BackendBaseUrl) && !string.IsNullOrWhiteSpace(ManagementApiKey);
-
-    /// <summary>The resolved server-side backend URL without its trailing slash, or null when unset.</summary>
-    public string? NormalizedBackendBaseUrl => string.IsNullOrWhiteSpace(BackendBaseUrl) ? null : BackendBaseUrl.TrimEnd('/');
-
-    /// <summary>
-    /// Resolves the URL used by Studio's server-side backend clients. The dedicated server URL is preferred; the
-    /// legacy/shared URL remains a fallback so existing deployments keep their current behaviour.
-    /// </summary>
-    public static string? ResolveServerBaseUrl(IConfiguration configuration) =>
-        string.IsNullOrWhiteSpace(configuration[BackendServerBaseUrlConfigurationKey])
-            ? configuration[BackendBaseUrlConfigurationKey]
-            : configuration[BackendServerBaseUrlConfigurationKey];
-
-    public static StudioBackendManagementOptions FromConfiguration(IConfiguration configuration) =>
-        new(ResolveServerBaseUrl(configuration), configuration[ManagementApiKeyConfigurationKey]);
 }
 
 internal static class StudioBackendManagementBridgeServiceCollectionExtensions
@@ -431,20 +230,13 @@ internal static class StudioBackendManagementBridgeServiceCollectionExtensions
         services.TryAddSingleton(TimeProvider.System);
 
         services.AddHttpClient<StudioBackendManagementClient>(client =>
-            ConfigureBackendClient(client, options, BackendRequestTimeout));
+            options.ConfigureBackendClient(client, BackendRequestTimeout));
 
         // The relay enforces per-operation budgets with a linked CancellationTokenSource; the client-level timeout must
         // neither race those budgets nor cap a long Text/Stream body copy, so it is disabled here.
         services.AddHttpClient<StudioExtensionBuilderRelayClient>(client =>
-            ConfigureBackendClient(client, options, Timeout.InfiniteTimeSpan));
+            options.ConfigureBackendClient(client, Timeout.InfiniteTimeSpan));
 
         return services;
-    }
-
-    private static void ConfigureBackendClient(HttpClient client, StudioBackendManagementOptions options, TimeSpan timeout)
-    {
-        client.Timeout = timeout;
-        if (!string.IsNullOrWhiteSpace(options.BackendBaseUrl))
-            client.BaseAddress = new Uri(options.BackendBaseUrl, UriKind.Absolute);
     }
 }

@@ -4,6 +4,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using Elsa.Studio.Api.Authorization;
+using Elsa.Studio.Api.Options;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -31,10 +33,12 @@ namespace Elsa.Studio.Web;
 ///
 /// <para>Beyond proving the caller holds a live backend session, the gate carries the user's host-control permissions
 /// (#249, ADR 0037): the backend session response already lists the user's permissions, so the introspection reads them
-/// and projects them onto the ticket as <c>elsa.identity.permission</c> claims. Named permission policies
-/// (<see cref="ModuleManagementReadPolicyName"/>, <see cref="ModuleManagementManagePolicyName"/>,
-/// <see cref="ExtensionBuilderReadPolicyName"/>, <see cref="ExtensionBuilderManagePolicyName"/>) then gate the
-/// individual surfaces. A signed-in user who lacks the
+/// and projects them onto the ticket as <c>elsa.identity.permission</c> claims. Permission policies — the named
+/// module-management policies here (<see cref="ModuleManagementReadPolicyName"/>,
+/// <see cref="ModuleManagementManagePolicyName"/>, <see cref="ExtensionBuilderReadPolicyName"/>,
+/// <see cref="ExtensionBuilderManagePolicyName"/>) and the inline policies a Studio module declares through
+/// <c>RequireStudioBridgePermission</c> — all carry a <see cref="StudioBridgePermissionRequirement"/>, decided by the
+/// single <see cref="StudioBridgePermissionHandler"/> registered here. A signed-in user who lacks the
 /// required permission is <b>forbidden (403)</b> — distinct from an unauthenticated <b>401</b> and from the bridge's
 /// backend-status states (<c>unconfigured</c>/<c>unreachable</c>/<c>unauthorized</c>).</para>
 ///
@@ -80,16 +84,6 @@ internal static class StudioBridgeAuth
     public const string ModuleManagementManagePermission = "module-management.manage";
     public const string ExtensionBuilderReadPermission = "extension-builder.read";
     public const string ExtensionBuilderManagePermission = "extension-builder.manage";
-
-    /// <summary>
-    /// The backend identity claim type carrying a granted permission key. Matches
-    /// <c>Elsa.Foundation.Identity.Abstractions.Authorization.IdentityClaimTypes.Permission</c>; the introspection
-    /// projects each permission from the backend session onto a claim of this type.
-    /// </summary>
-    public const string PermissionClaimType = "elsa.identity.permission";
-
-    /// <summary>The authentication scheme backing the built-in bearer-introspection gate.</summary>
-    public const string SchemeName = "StudioManagementBridgeAuth";
 
     /// <summary>
     /// The query-string parameter carrying the browser bearer on the console-stream hub handshake. See the class
@@ -148,58 +142,50 @@ internal static class StudioBridgeAuth
             sessionCacheMaxEntries > 0 ? sessionCacheMaxEntries : DefaultSessionCacheMaxEntries));
 
         services.AddAuthentication()
-            .AddScheme<StudioBridgeAuthOptions, StudioBridgeAuthHandler>(SchemeName, schemeOptions =>
+            .AddScheme<StudioBridgeAuthOptions, StudioBridgeAuthHandler>(StudioBridgeAuthorization.SchemeName, schemeOptions =>
             {
                 schemeOptions.AuthEnabled = authEnabled;
                 schemeOptions.BackendBaseUrl = backendBaseUrl;
                 schemeOptions.QueryTokenPathPrefixes = queryTokenPathPrefixes;
             });
 
+        // The one decision point for every StudioBridgePermissionRequirement — the named policies below and the inline
+        // policies Studio modules declare through RequireStudioBridgePermission. It captures authEnabled so that when
+        // Studio auth is disabled every permission surface allows anonymously (the demo shell keeps full access);
+        // permission enforcement is an auth-enabled-only concern.
+        services.AddSingleton<IAuthorizationHandler>(new StudioBridgePermissionHandler(authEnabled));
+
         services.AddAuthorizationBuilder()
             .AddPolicy(PolicyName, policy =>
             {
-                policy.AddAuthenticationSchemes(SchemeName);
+                policy.AddAuthenticationSchemes(StudioBridgeAuthorization.SchemeName);
                 policy.RequireAuthenticatedUser();
             })
-            // Each host-control policy requires the base authenticated session PLUS the surface's permission. When
-            // Studio auth is disabled the requirement passes anonymously (authEnabled captured below), so the demo shell
-            // keeps full access — permission enforcement is an auth-enabled-only concern.
-            .AddPolicy(ModuleManagementReadPolicyName, policy =>
-                ConfigurePermissionPolicy(policy, authEnabled, ModuleManagementReadPermission, ModuleManagementManagePermission))
-            .AddPolicy(ModuleManagementManagePolicyName, policy =>
-                ConfigurePermissionPolicy(policy, authEnabled, ModuleManagementManagePermission))
-            .AddPolicy(ExtensionBuilderReadPolicyName, policy =>
-                ConfigurePermissionPolicy(policy, authEnabled, ExtensionBuilderReadPermission, ExtensionBuilderManagePermission))
-            .AddPolicy(ExtensionBuilderManagePolicyName, policy =>
-                ConfigurePermissionPolicy(policy, authEnabled, ExtensionBuilderManagePermission));
+            // Each host-control policy requires the base authenticated session PLUS the surface's permission.
+            .AddPolicy(ModuleManagementReadPolicyName, StudioBridgeAuthorization.BuildPermissionPolicy(ModuleManagementReadPermission, ModuleManagementManagePermission))
+            .AddPolicy(ModuleManagementManagePolicyName, StudioBridgeAuthorization.BuildPermissionPolicy(ModuleManagementManagePermission))
+            .AddPolicy(ExtensionBuilderReadPolicyName, StudioBridgeAuthorization.BuildPermissionPolicy(ExtensionBuilderReadPermission, ExtensionBuilderManagePermission))
+            .AddPolicy(ExtensionBuilderManagePolicyName, StudioBridgeAuthorization.BuildPermissionPolicy(ExtensionBuilderManagePermission));
 
         return services;
     }
+}
 
-    /// <summary>
-    /// Builds a host-control permission policy: the base bearer-introspection scheme, an authenticated user, and (only
-    /// when Studio auth is enabled) at least one of <paramref name="satisfyingPermissions"/> present as an
-    /// <c>elsa.identity.permission</c> claim. Passing more than one key is how implication is expanded <i>locally</i>:
-    /// e.g. a read surface lists both <c>read</c> and <c>manage</c>, so a <c>manage</c>-only holder satisfies the read
-    /// gate without Studio depending on the backend to expand <c>manage ⇒ read</c>. A signed-in user missing every key
-    /// fails the requirement while remaining authenticated, so ASP.NET returns 403 (not 401).
-    /// </summary>
-    private static void ConfigurePermissionPolicy(
-        AuthorizationPolicyBuilder policy,
-        bool authEnabled,
-        params string[] satisfyingPermissions)
+/// <summary>
+/// Decides every <see cref="StudioBridgePermissionRequirement"/> (#249, ADR 0037). When Studio auth is disabled the
+/// requirement passes unconditionally — the base gate already issued an anonymous ticket, so the surface stays fully
+/// open, matching the base policy's demo posture. When enabled, the user must hold at least one of the requirement's
+/// permission keys as an <c>elsa.identity.permission</c> claim; a signed-in user missing every key leaves the
+/// requirement unmet while remaining authenticated, so ASP.NET returns 403 (not 401).
+/// </summary>
+internal sealed class StudioBridgePermissionHandler(bool authEnabled) : AuthorizationHandler<StudioBridgePermissionRequirement>
+{
+    protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, StudioBridgePermissionRequirement requirement)
     {
-        policy.AddAuthenticationSchemes(SchemeName);
-        policy.RequireAuthenticatedUser();
+        if (!authEnabled || requirement.SatisfyingPermissions.Any(permission => context.User.HasClaim(StudioBridgeAuthorization.PermissionClaimType, permission)))
+            context.Succeed(requirement);
 
-        // Demo mode: the base authenticated-user check already passes anonymously (the gate issues an anonymous ticket),
-        // so add no permission requirement — the surface stays fully open, matching the base policy's posture.
-        if (!authEnabled)
-            return;
-
-        policy.RequireAssertion(context =>
-            satisfyingPermissions.Any(permission =>
-                context.User.HasClaim(PermissionClaimType, permission)));
+        return Task.CompletedTask;
     }
 }
 
@@ -347,7 +333,7 @@ internal sealed class StudioBridgeAuthHandler(
     }
 
     // Anonymous demo mode carries no permissions; the permission policies allow anonymously anyway (see
-    // ConfigurePermissionPolicy), so an empty permission set here is correct.
+    // StudioBridgePermissionHandler), so an empty permission set here is correct.
     private AuthenticateResult Success(string name, IReadOnlyCollection<string>? permissions = null)
     {
         var claims = new List<Claim> { new(ClaimTypes.Name, name) };
@@ -358,10 +344,10 @@ internal sealed class StudioBridgeAuthHandler(
         foreach (var permission in permissions ?? [])
         {
             if (!string.IsNullOrWhiteSpace(permission))
-                claims.Add(new Claim(StudioBridgeAuth.PermissionClaimType, permission));
+                claims.Add(new Claim(StudioBridgeAuthorization.PermissionClaimType, permission));
         }
 
-        var identity = new ClaimsIdentity(claims, StudioBridgeAuth.SchemeName);
+        var identity = new ClaimsIdentity(claims, StudioBridgeAuthorization.SchemeName);
         var ticket = new AuthenticationTicket(new ClaimsPrincipal(identity), Scheme.Name);
         return AuthenticateResult.Success(ticket);
     }
