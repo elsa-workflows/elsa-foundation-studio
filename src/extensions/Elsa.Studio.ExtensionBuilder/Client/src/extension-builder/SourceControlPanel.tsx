@@ -35,7 +35,7 @@ export function SourceControlPanel({
   const hasBranch = !!status?.activeBranch;
   return (
     <div className="extension-builder-source-control">
-      <div className="modules-inspector-section">
+      <div className="extension-builder-inspector-section">
         <h4>Working copy</h4>
         <p><code>{status?.activeBranch ?? "No branch"}</code></p>
         <StatusChip tone={status?.isDirty ? "warning" : "success"}>{status?.isDirty ? "dirty" : "clean"}</StatusChip>
@@ -76,7 +76,7 @@ export function SourceControlPanel({
         onDiff={path => onSelectDiff(path, false)}
       />
 
-      <div className="modules-inspector-section">
+      <div className="extension-builder-inspector-section">
         <h4>Commit</h4>
         <textarea
           aria-label="Commit message"
@@ -91,7 +91,7 @@ export function SourceControlPanel({
         </button>
       </div>
 
-      <div className="modules-inspector-section">
+      <div className="extension-builder-inspector-section">
         <h4>Diff</h4>
         {diff ? (
           <>
@@ -99,7 +99,7 @@ export function SourceControlPanel({
             <pre className="extension-builder-diff">{diff.patch || "No diff available."}</pre>
           </>
         ) : (
-          <p className="modules-muted">Select a changed file to inspect its diff.</p>
+          <p className="extension-builder-muted">Select a changed file to inspect its diff.</p>
         )}
       </div>
     </div>

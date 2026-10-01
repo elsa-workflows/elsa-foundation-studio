@@ -19,9 +19,9 @@ export function SourceControlFileList({
   onDiff(path: string): void;
 }) {
   return (
-    <div className="modules-inspector-section extension-builder-source-list">
+    <div className="extension-builder-inspector-section extension-builder-source-list">
       <h4>{title}</h4>
-      {files.length === 0 ? <p className="modules-muted">{empty}</p> : null}
+      {files.length === 0 ? <p className="extension-builder-muted">{empty}</p> : null}
       {files.map(file => (
         <div key={`${title}-${file.path}`} className="extension-builder-source-row">
           <button type="button" onClick={() => onDiff(file.path)}>

@@ -17,7 +17,7 @@ export function RuntimeVersionRow({
 }) {
   const disabled = busy || !canRollback || !version.available || version.version === currentVersion;
   return (
-    <div className="modules-list-row">
+    <div className="extension-builder-list-row">
       <span>
         <strong>{version.version}</strong>
         <small>{version.available ? formatDate(version.promotedAt) : "Rollback target unavailable"}</small>

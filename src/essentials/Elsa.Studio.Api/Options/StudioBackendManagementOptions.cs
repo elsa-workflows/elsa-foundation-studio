@@ -20,6 +20,12 @@ public sealed record StudioBackendManagementOptions(string? BackendBaseUrl, stri
     /// </summary>
     public const string ManagementApiKeyHeaderName = "X-Elsa-Module-Management-Key";
 
+    /// <summary>
+    /// The timeout for browser-facing Studio→backend reads (bridge status, registry, module capabilities). Short, so
+    /// those reads stay snappy even when the backend is slow to answer.
+    /// </summary>
+    public static readonly TimeSpan ReadRequestTimeout = TimeSpan.FromSeconds(5);
+
     /// <summary>Both halves of the Studio→backend credential pair are present. When false every bridge surface fails
     /// closed to <c>unconfigured</c> with zero outbound calls (ADR 0037).</summary>
     public bool IsConfigured => !string.IsNullOrWhiteSpace(BackendBaseUrl) && !string.IsNullOrWhiteSpace(ManagementApiKey);

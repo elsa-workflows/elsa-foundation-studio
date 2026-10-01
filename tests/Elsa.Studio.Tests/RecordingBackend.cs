@@ -2,7 +2,7 @@ using System.Net;
 using System.Text.Json;
 using Elsa.Studio.Api.Options;
 
-namespace Elsa.Studio.Tests.ExtensionBuilder;
+namespace Elsa.Studio.Tests;
 
 /// <summary>
 /// A recording <see cref="HttpMessageHandler"/> standing in for the backend Elsa host. Captures every request

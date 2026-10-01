@@ -20,7 +20,7 @@ internal static class StudioBackendManagementBridge
         // so they require `module-management.read`. When Studio auth is disabled every policy allows anonymously (demo
         // shell). A signed-in user lacking the permission is forbidden (403) — distinct from an unauthenticated 401 and
         // from the backend-status states this bridge also reports. A Studio module that relays its own backend surface
-        // (e.g. the optional Extension Builder module) nests its routes under the same route group from its shell feature.
+        // nests its routes under the same route group from its shell feature.
         var group = endpoints.MapGroup(StudioBackendManagementRoutes.RouteGroup);
 
         group.MapGet("/status", GetStatusAsync)
@@ -116,15 +116,12 @@ internal sealed class StudioBackendManagementClient(
 
 internal static class StudioBackendManagementBridgeServiceCollectionExtensions
 {
-    // Short, so the browser-facing bridge status endpoint stays snappy even when the backend is slow to answer.
-    private static readonly TimeSpan BackendRequestTimeout = TimeSpan.FromSeconds(5);
-
     /// <summary>
     /// Registers the shared <see cref="StudioBackendManagementOptions"/> and the typed
     /// <see cref="StudioBackendManagementClient"/> over <see cref="IHttpClientFactory"/>. When no backend base URL is
     /// configured, no <c>BaseAddress</c> is set — the client still resolves and fails closed to <c>unconfigured</c>
-    /// without issuing any request. Studio modules that relay their own backend surface (e.g. Extension Builder) resolve
-    /// the same options instance for their clients.
+    /// without issuing any request. Studio modules that relay their own backend surface resolve the same options
+    /// instance for their clients.
     /// </summary>
     public static IServiceCollection AddStudioBackendManagementBridge(this IServiceCollection services, IConfiguration configuration)
     {
@@ -133,7 +130,7 @@ internal static class StudioBackendManagementBridgeServiceCollectionExtensions
         services.TryAddSingleton(TimeProvider.System);
 
         services.AddHttpClient<StudioBackendManagementClient>(client =>
-            options.ConfigureBackendClient(client, BackendRequestTimeout));
+            options.ConfigureBackendClient(client, StudioBackendManagementOptions.ReadRequestTimeout));
 
         return services;
     }

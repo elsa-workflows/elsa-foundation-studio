@@ -5,7 +5,7 @@ using Elsa.Studio.ExtensionBuilder;
 using Elsa.Studio.Web;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
-using static Elsa.Studio.Tests.ExtensionBuilder.RecordingBackend;
+using static Elsa.Studio.Tests.RecordingBackend;
 
 namespace Elsa.Studio.Tests.ExtensionBuilder;
 
@@ -95,7 +95,7 @@ public sealed class StudioExtensionBuilderCapabilitiesTests : IAsyncDisposable
     public async Task AllowsAuthenticatedBrowserCapabilitiesRequestWithExtensionBuilderReadWhenStudioAuthEnabled()
     {
         // The capabilities read is gated by extension-builder.read (not module-management): a holder passes (#249).
-        var client = await StartAuthenticatedHostAsync(ExtensionBuilderPermissions.Read);
+        var (client, _) = await StartAuthenticatedHostWithBackendAsync(ExtensionBuilderPermissions.Read);
 
         var result = await GetCapabilitiesAsync(client);
 
@@ -149,9 +149,6 @@ public sealed class StudioExtensionBuilderCapabilitiesTests : IAsyncDisposable
         Assert.NotNull(result);
         return result!;
     }
-
-    private async Task<HttpClient> StartAuthenticatedHostAsync(params string[] permissions) =>
-        (await StartAuthenticatedHostWithBackendAsync(permissions)).Client;
 
     // An auth-enabled host whose stub backend recognizes ValidBearer with the given host-control permissions and answers
     // the capabilities read with the trusted flags; the client carries that bearer.

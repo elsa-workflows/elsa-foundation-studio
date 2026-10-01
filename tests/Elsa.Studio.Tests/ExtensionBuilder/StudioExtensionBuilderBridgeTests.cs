@@ -7,7 +7,7 @@ using Elsa.Studio.Web;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Time.Testing;
-using static Elsa.Studio.Tests.ExtensionBuilder.RecordingBackend;
+using static Elsa.Studio.Tests.RecordingBackend;
 
 namespace Elsa.Studio.Tests.ExtensionBuilder;
 

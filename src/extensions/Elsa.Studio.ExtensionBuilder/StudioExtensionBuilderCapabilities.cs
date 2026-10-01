@@ -61,9 +61,9 @@ internal sealed class StudioExtensionBuilderCapabilitiesClient(
     private static readonly StudioBackendReadSurface CapabilitiesSurface = new(
         Path: BackendCapabilitiesPath,
         Description: "backend Extension Builder capabilities surface",
-        UnconfiguredDetail: "Privileged host management is not configured on the Studio host. Set Studio:BackendServerBaseUrl (or Studio:BackendBaseUrl for a shared URL) and Studio:BackendModuleManagementApiKey to enable Extension Builder.",
+        UnconfiguredDetail: StudioExtensionBuilderBridge.UnconfiguredDetail,
         AvailableDetail: "The backend Extension Builder capabilities are reachable.",
-        UnauthorizedDetail: "The backend rejected the Studio management key (or the Extension Builder surface is disabled). Verify Studio:BackendModuleManagementApiKey matches the backend host management key.",
+        UnauthorizedDetail: StudioExtensionBuilderBridge.UnauthorizedDetail,
         UnreachableDetail: "The backend Extension Builder capabilities surface could not be reached. Check that the backend host is running and Studio:BackendServerBaseUrl (or Studio:BackendBaseUrl) is correct.",
         UnrecognizedPayloadDetail: "The backend responded but did not return recognizable Extension Builder capabilities.");
 

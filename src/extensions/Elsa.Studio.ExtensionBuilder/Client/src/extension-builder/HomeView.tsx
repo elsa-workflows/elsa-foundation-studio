@@ -17,7 +17,6 @@ export function HomeView({
   capabilities,
   advanced,
   busy,
-  loading,
   stats,
   repositories,
   workspaces,
@@ -45,7 +44,6 @@ export function HomeView({
   capabilities: ExtensionBuilderCapabilities;
   advanced: boolean;
   busy: boolean;
-  loading: boolean;
   stats: HomeStat[];
   repositories: ExtensionRepositorySummary[];
   workspaces: ExtensionWorkspace[];
@@ -98,7 +96,7 @@ export function HomeView({
             <input type="checkbox" aria-label="Advanced mode" checked={advanced} disabled={busy} onChange={event => onToggleAdvanced(event.target.checked)} />
             <span>Advanced</span>
           </label>
-          <button type="button" className="studio-button" disabled={loading || busy} onClick={onRefresh}>
+          <button type="button" className="studio-button" disabled={busy} onClick={onRefresh}>
             <RefreshCcw size={15} />
             Refresh
           </button>
@@ -175,7 +173,7 @@ export function HomeView({
                 <StatusChip tone={buildTone(repository.latestBuildStatus)}>{repository.latestBuildStatus ?? "new"}</StatusChip>
               </div>
               <h4>{repository.name}</h4>
-              <p className="modules-muted">{repository.owner ?? "current owner"} · {repository.projectCount} project(s)</p>
+              <p className="extension-builder-muted">{repository.owner ?? "current owner"} · {repository.projectCount} project(s)</p>
               <div className="extension-builder-solution-card-meta">
                 {advanced ? <span>{repository.activeBranch ?? "no branch"} · {formatRemoteState(repository.remoteState)}{repository.isDirty ? " · dirty" : ""}</span> : <span>Open to edit, build &amp; publish</span>}
                 {advanced && repository.attentionCount > 0 ? <StatusChip tone="warning">{repository.attentionCount}</StatusChip> : null}

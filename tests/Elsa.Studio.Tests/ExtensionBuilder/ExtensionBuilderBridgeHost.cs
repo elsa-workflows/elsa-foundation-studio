@@ -31,19 +31,7 @@ internal static class ExtensionBuilderBridgeHost
         TimeProvider? timeProvider = null,
         string? pathBase = null)
     {
-        var settings = new Dictionary<string, string?>
-        {
-            [StudioBackendManagementOptions.BackendBaseUrlConfigurationKey] = backendBaseUrl,
-            [StudioBackendManagementOptions.ManagementApiKeyConfigurationKey] = managementKey,
-            ["Studio:Auth:Enabled"] = authEnabled ? "true" : "false"
-        };
-
-        var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { EnvironmentName = Environments.Production });
-        builder.WebHost.UseTestServer();
-        builder.Configuration.AddInMemoryCollection(settings);
-
-        builder.Services.AddStudioBridgeAuth(builder.Configuration);
-        builder.Services.AddStudioBackendManagementBridge(builder.Configuration);
+        var builder = CreateBuilder(backendBaseUrl, managementKey, authEnabled);
         builder.Services.AddStudioExtensionBuilderBridge();
         if (timeProvider is not null)
             builder.Services.AddSingleton(timeProvider);
@@ -59,6 +47,31 @@ internal static class ExtensionBuilderBridgeHost
 
         await app.StartAsync();
         return app;
+    }
+
+    /// <summary>
+    /// A TestServer builder carrying the host's bridge infrastructure (auth gate + backend options) configured with the
+    /// given backend coordinates, auth switch, and any extra configuration (e.g. CShells shell settings).
+    /// </summary>
+    public static WebApplicationBuilder CreateBuilder(
+        string? backendBaseUrl = BackendBaseUrl,
+        string? managementKey = ManagementKey,
+        bool authEnabled = false,
+        IDictionary<string, string?>? extraSettings = null)
+    {
+        var settings = new Dictionary<string, string?>(extraSettings ?? new Dictionary<string, string?>())
+        {
+            [StudioBackendManagementOptions.BackendBaseUrlConfigurationKey] = backendBaseUrl,
+            [StudioBackendManagementOptions.ManagementApiKeyConfigurationKey] = managementKey,
+            ["Studio:Auth:Enabled"] = authEnabled ? "true" : "false"
+        };
+
+        var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { EnvironmentName = Environments.Production });
+        builder.WebHost.UseTestServer();
+        builder.Configuration.AddInMemoryCollection(settings);
+        builder.Services.AddStudioBridgeAuth(builder.Configuration);
+        builder.Services.AddStudioBackendManagementBridge(builder.Configuration);
+        return builder;
     }
 
     /// <summary>

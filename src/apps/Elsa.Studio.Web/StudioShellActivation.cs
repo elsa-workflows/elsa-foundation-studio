@@ -13,25 +13,40 @@ namespace Elsa.Studio.Web;
 /// <c>/_elsa/{**path}</c> fallback (which carries no policy), so authorization had already passed the request through:
 /// the first request to a gated shell endpoint after a cold start would execute without its policy being evaluated.
 /// Activating the shell first means routing sees the real endpoint and authorization enforces its policy.</para>
+///
+/// <para>Activation is best-effort: if it fails for any reason other than the caller aborting the request, the failure
+/// is logged and the request continues, so a broken shell cannot turn static files or the SPA into 500s. CShells' own
+/// middleware answers shell requests downstream as before.</para>
 /// </summary>
 internal static class StudioShellActivation
 {
     public static IApplicationBuilder UseStudioDefaultShellActivation(this IApplicationBuilder app) =>
         app.Use(async (context, next) =>
         {
-            var shells = context.RequestServices.GetRequiredService<IShellRegistry>();
-            if (shells.GetActive(ShellConstants.DefaultShellName) is null)
+            try
             {
-                try
-                {
-                    await shells.GetOrActivateAsync(ShellConstants.DefaultShellName, context.RequestAborted);
-                }
-                catch (Exception ex) when (ex is ShellBlueprintNotFoundException or ShellBlueprintUnavailableException)
-                {
-                    // No usable default shell blueprint: CShells' own middleware answers this case (404/503) downstream.
-                }
+                await context.RequestServices.GetRequiredService<IShellRegistry>().GetOrActivateDefaultShellAsync(context.RequestAborted);
+            }
+            catch (Exception ex) when (ex is ShellBlueprintNotFoundException or ShellBlueprintUnavailableException)
+            {
+                // No usable default shell blueprint: CShells' own middleware answers this case (404/503) downstream.
+            }
+            catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                context.RequestServices.GetRequiredService<ILoggerFactory>()
+                    .CreateLogger(typeof(StudioShellActivation))
+                    .LogWarning(ex, "Activating the default Studio shell failed; continuing the request without it.");
             }
 
             await next(context);
         });
+
+    /// <summary>The active default shell, activating it first when it is cold.</summary>
+    public static async Task<IShell> GetOrActivateDefaultShellAsync(this IShellRegistry shells, CancellationToken cancellationToken) =>
+        shells.GetActive(ShellConstants.DefaultShellName)
+        ?? await shells.GetOrActivateAsync(ShellConstants.DefaultShellName, cancellationToken);
 }

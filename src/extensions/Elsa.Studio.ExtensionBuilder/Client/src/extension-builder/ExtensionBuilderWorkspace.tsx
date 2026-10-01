@@ -32,8 +32,8 @@ export function ExtensionBuilderWorkspace() {
           </button>
           <span className="extension-builder-crumb">
             <strong>{workspaceLabel}</strong>
-            {selectedProject ? <span className="modules-muted"> / {selectedProject.packageId} {selectedProject.packageVersion}</span> : null}
-            {advanced && selectedRepository?.activeBranch ? <span className="modules-muted"> · {selectedRepository.activeBranch}</span> : null}
+            {selectedProject ? <span className="extension-builder-muted"> / {selectedProject.packageId} {selectedProject.packageVersion}</span> : null}
+            {advanced && selectedRepository?.activeBranch ? <span className="extension-builder-muted"> · {selectedRepository.activeBranch}</span> : null}
           </span>
         </div>
         <div className="extension-builder-commandbar-right">

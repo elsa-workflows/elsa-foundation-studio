@@ -33,7 +33,7 @@ function ExtensionBuilderView() {
     if (managementUnavailable?.kind === "forbidden") {
       return (
         <section className="extension-builder-page">
-          <div className="section-header modules-header">
+          <div className="extension-builder-header">
             <div>
               <h2>Extension Builder</h2>
               <p>Trusted-team project workspaces, builds, promotion, and runtime recovery.</p>
@@ -50,7 +50,7 @@ function ExtensionBuilderView() {
     // that names the real reason and offers a retry, rather than issuing doomed backend requests. No actions render.
     return (
       <section className="extension-builder-page">
-        <div className="section-header modules-header">
+        <div className="extension-builder-header">
           <div>
             <h2>Extension Builder</h2>
             <p>Trusted-team project workspaces, builds, promotion, and runtime recovery.</p>
@@ -71,7 +71,7 @@ function ExtensionBuilderView() {
   if (!isTrusted(capabilities)) {
     return (
       <section className="extension-builder-page">
-        <div className="section-header modules-header">
+        <div className="extension-builder-header">
           <div>
             <h2>Extension Builder</h2>
             <p>Trusted-team project workspaces, builds, promotion, and runtime recovery.</p>
@@ -96,7 +96,6 @@ function ExtensionBuilderView() {
           capabilities={capabilities!}
           advanced={advanced}
           busy={builder.isBusy("home")}
-          loading={false}
           stats={stats}
           repositories={builder.repositories}
           workspaces={builder.workspaces}

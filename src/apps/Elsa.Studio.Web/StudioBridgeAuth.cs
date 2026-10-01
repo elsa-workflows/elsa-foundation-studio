@@ -36,7 +36,7 @@ namespace Elsa.Studio.Web;
 /// and projects them onto the ticket as <c>elsa.identity.permission</c> claims. Permission policies — the named
 /// module-management policies here (<see cref="ModuleManagementReadPolicyName"/>,
 /// <see cref="ModuleManagementManagePolicyName"/>) and the inline policies a Studio module declares through
-/// <c>RequireStudioBridgePermission</c> (e.g. the optional Extension Builder module's bridge) — all carry a
+/// <c>RequireStudioBridgePermission</c> — all carry a
 /// <see cref="StudioBridgePermissionRequirement"/>, decided by the single <see cref="StudioBridgePermissionHandler"/>
 /// registered here. A signed-in user who lacks the
 /// required permission is <b>forbidden (403)</b> — distinct from an unauthenticated <b>401</b> and from the bridge's

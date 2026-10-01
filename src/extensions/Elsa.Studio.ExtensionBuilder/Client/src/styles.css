@@ -1,6 +1,174 @@
 /* Extension Builder module styles (#535). Every rule resolves colour through the --studio-* token contract
-   (docs/design-tokens.md); the page also uses the host's shared button, icon-button, section-header and
-   modules-* classes, which the host owns and serves. */
+   (docs/design-tokens.md); the page also uses the host's shared studio-button and studio-icon-button classes,
+   which the host owns and serves. */
+
+/* Page header, inspector sections, metadata, lists and diagnostics: the module's own copies of the host Module
+   Management page's look, so the module does not depend on that page's private classes. */
+.extension-builder-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0;
+}
+
+.extension-builder-header > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.extension-builder-header h2 {
+  margin: 0;
+  font-family: var(--studio-font-display);
+  font-size: var(--studio-page-title-size, 20px);
+  font-weight: var(--studio-title-weight, 720);
+  line-height: 1.2;
+  color: var(--studio-text);
+}
+
+.extension-builder-header p {
+  margin: 0;
+  color: var(--studio-text-muted);
+  line-height: 1.5;
+  font-size: 13px;
+}
+
+.extension-builder-muted {
+  color: var(--studio-text-muted);
+}
+
+.extension-builder-metadata {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.extension-builder-metadata div {
+  display: grid;
+  gap: 3px;
+  border-bottom: 1px solid var(--studio-border);
+  border-radius: 0;
+  padding: 0 0 7px;
+}
+
+.extension-builder-metadata dt {
+  color: var(--studio-text-muted);
+  font-size: var(--studio-label-size);
+  font-weight: 700;
+}
+
+.extension-builder-metadata dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--studio-body-size);
+}
+
+.extension-builder-inspector-section {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--studio-border);
+  padding-top: 13px;
+  margin-top: 13px;
+}
+
+.extension-builder-inspector-section h4 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.extension-builder-manifest-code {
+  max-height: 360px;
+  overflow: auto;
+  border: 1px solid var(--studio-border);
+  border-radius: var(--studio-radius);
+  background: var(--studio-bg);
+  color: var(--studio-text);
+  font-family: var(--studio-font-mono);
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0;
+  padding: 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.extension-builder-contribution-list,
+.extension-builder-diagnostics-list,
+.extension-builder-list {
+  display: grid;
+  gap: 8px;
+}
+
+.extension-builder-contribution-row,
+.extension-builder-diagnostic-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--studio-border);
+  border-radius: var(--studio-radius);
+  padding: 8px 10px;
+}
+
+.extension-builder-contribution-row code {
+  color: var(--studio-text-muted);
+  font-family: var(--studio-font-mono);
+  font-size: 12px;
+}
+
+.extension-builder-diagnostic-row {
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.extension-builder-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--studio-border);
+  border-radius: var(--studio-radius);
+  background: var(--studio-surface);
+  padding: 8px 10px;
+}
+
+.extension-builder-list-row:hover {
+  border-color: color-mix(in srgb, var(--studio-accent) 28%, var(--studio-border));
+  background: color-mix(in srgb, var(--studio-accent) 5%, var(--studio-surface));
+}
+
+.extension-builder-list-row > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.extension-builder-list-row strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.extension-builder-operation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@media (max-width: 640px) {
+  .extension-builder-header {
+    flex-direction: column;
+    align-items: flex-start;
+    margin: 24px 0 16px 0;
+  }
+
+  .extension-builder-operation-grid {
+    grid-template-columns: 1fr;
+  }
+}
 
 /* The Extension Builder workspace is a full-bleed IDE: drop the host content container's padding so the
    shell fills the whole area (the home view keeps the normal padded layout). */
@@ -574,7 +742,7 @@
   text-align: left;
   color: inherit;
   font: inherit;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .extension-builder-solution-card:hover {

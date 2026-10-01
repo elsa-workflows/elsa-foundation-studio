@@ -20,7 +20,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using static Elsa.Studio.Tests.ExtensionBuilder.RecordingBackend;
+using static Elsa.Studio.Tests.RecordingBackend;
 
 namespace Elsa.Studio.Tests.ExtensionBuilder;
 
@@ -38,6 +38,8 @@ public sealed class ExtensionBuilderOptionalityTests : IAsyncDisposable
     private const string StatusRoute = StudioBackendManagementRoutes.RouteGroup + "/status";
     private const string ExtensionBuilderReadBearer = "user-extension-builder-read";
     private const string ModuleReadBearer = "user-module-read";
+    private const string StaticAssetRoute = "/studio/asset.txt";
+    private const string StaticAssetContent = "asset";
 
     private static readonly IReadOnlyDictionary<string, string[]> BearerPermissions = new Dictionary<string, string[]>
     {
@@ -153,6 +155,19 @@ public sealed class ExtensionBuilderOptionalityTests : IAsyncDisposable
         Assert.Equal(expected == HttpStatusCode.OK ? 2 : 0, backend.ManagementRequests.Count);
     }
 
+    [Fact]
+    public async Task ComposedShellWhoseActivationFailsStillServesHostRequests()
+    {
+        // A feature that throws while the shell activates must not turn every host request into a 500: the eager
+        // activation logs the failure and the request continues, so a static file is still served.
+        var client = await StartComposedHostAsync(RespondingWith(_ => JsonOk("{}")), featureEnabled: true, withFailingFeature: true);
+
+        var response = await client.GetAsync(StaticAssetRoute);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(StaticAssetContent, await response.Content.ReadAsStringAsync());
+    }
+
     // ---- Harness -----------------------------------------------------------------------------------------------------
 
     private static string[] ReadDefaultShellFeatures()
@@ -178,7 +193,7 @@ public sealed class ExtensionBuilderOptionalityTests : IAsyncDisposable
 
     private async Task<HttpClient> StartHostBridgeOnlyAsync()
     {
-        var builder = CreateBuilder(authEnabled: false);
+        var builder = ExtensionBuilderBridgeHost.CreateBuilder();
         builder.Services.RouteBackendClientsThrough(RespondingWith(_ => JsonOk("""{ "modules": [] }""")));
         builder.Services.AddHttpClient(nameof(StudioBackendManagementClient))
             .ConfigurePrimaryHttpMessageHandler(() => RespondingWith(_ => JsonOk("""{ "modules": [] }""")));
@@ -194,8 +209,8 @@ public sealed class ExtensionBuilderOptionalityTests : IAsyncDisposable
 
     // A host composed like Program.cs: the host's bridge auth + options on the root, the Extension Builder feature
     // assembly offered to CShells, and the Default shell configured from (shells.json-shaped) configuration with or
-    // without the feature enabled.
-    private async Task<HttpClient> StartComposedHostAsync(RecordingBackend backend, bool featureEnabled, bool authEnabled = false)
+    // without the feature enabled (optionally alongside a feature whose activation throws).
+    private async Task<HttpClient> StartComposedHostAsync(RecordingBackend backend, bool featureEnabled, bool authEnabled = false, bool withFailingFeature = false)
     {
         var shellSettings = new Dictionary<string, string?>
         {
@@ -203,13 +218,15 @@ public sealed class ExtensionBuilderOptionalityTests : IAsyncDisposable
         };
         if (featureEnabled)
             shellSettings[$"CShells:Shells:Default:Features:{FeatureName}"] = "true";
+        if (withFailingFeature)
+            shellSettings[$"CShells:Shells:Default:Features:{FailingShellFeature.Name}"] = "true";
 
-        var builder = CreateBuilder(authEnabled, shellSettings);
+        var builder = ExtensionBuilderBridgeHost.CreateBuilder(authEnabled: authEnabled, extraSettings: shellSettings);
         builder.Services.RouteBackendClientsThrough(backend);
         builder.Services.AddCShellsAspNetCore(shells =>
         {
             shells
-                .WithAssemblies(typeof(ExtensionBuilderStudioFeature).Assembly)
+                .WithAssemblies(typeof(ExtensionBuilderStudioFeature).Assembly, typeof(FailingShellFeature).Assembly)
                 .WithConfigurationProvider(builder.Configuration)
                 .WithWebRouting(options => options.EnablePathRouting = true);
         });
@@ -219,30 +236,13 @@ public sealed class ExtensionBuilderOptionalityTests : IAsyncDisposable
         app.UseRouting();
         app.UseAuthentication();
         app.UseAuthorization();
+        // Program.cs's UseStaticFiles sits here, ahead of the shell middleware MapShells adds.
+        app.Map(StaticAssetRoute, asset => asset.Run(context => context.Response.WriteAsync(StaticAssetContent)));
         app.MapStudioBackendManagementBridge();
         app.MapShells();
         MapFallbacks(app);
 
         return await StartAsync(app);
-    }
-
-    private static WebApplicationBuilder CreateBuilder(bool authEnabled, IDictionary<string, string?>? extraSettings = null)
-    {
-        var settings = new Dictionary<string, string?>
-        {
-            [StudioBackendManagementOptions.BackendBaseUrlConfigurationKey] = ExtensionBuilderBridgeHost.BackendBaseUrl,
-            [StudioBackendManagementOptions.ManagementApiKeyConfigurationKey] = ExtensionBuilderBridgeHost.ManagementKey,
-            ["Studio:Auth:Enabled"] = authEnabled ? "true" : "false"
-        };
-        foreach (var (key, value) in extraSettings ?? new Dictionary<string, string?>())
-            settings[key] = value;
-
-        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = Environments.Production });
-        builder.WebHost.UseTestServer();
-        builder.Configuration.AddInMemoryCollection(settings);
-        builder.Services.AddStudioBridgeAuth(builder.Configuration);
-        builder.Services.AddStudioBackendManagementBridge(builder.Configuration);
-        return builder;
     }
 
     // Program.cs's fallbacks: unknown API routes stay real 404s instead of being swallowed by the SPA fallback.
@@ -264,4 +264,14 @@ public sealed class ExtensionBuilderOptionalityTests : IAsyncDisposable
         if (_app is not null)
             await _app.DisposeAsync();
     }
+}
+
+/// <summary>A shell feature whose service registration throws, so activating a shell that enables it fails.</summary>
+[ShellFeature(Name)]
+public sealed class FailingShellFeature : IShellFeature
+{
+    public const string Name = "FailingStudioTestFeature";
+
+    public void ConfigureServices(IServiceCollection services) =>
+        throw new InvalidOperationException("Feature registration failed.");
 }

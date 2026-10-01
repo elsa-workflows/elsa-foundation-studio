@@ -100,7 +100,7 @@ export function SolutionExplorer({
         <div className="extension-builder-explorer-section">
           <span className="extension-builder-explorer-label">Projects</span>
           {projects.length === 0 ? (
-            <p className="modules-muted">No projects yet. Add one below.</p>
+            <p className="extension-builder-muted">No projects yet. Add one below.</p>
           ) : (
             <div className="extension-builder-project-switch">
               {projects.map(item => (
@@ -131,7 +131,7 @@ export function SolutionExplorer({
         </div>
 
         <div className="extension-builder-tree" aria-label="Repository files">
-          {files.length === 0 ? <p className="modules-muted">No files in this solution yet.</p> : null}
+          {files.length === 0 ? <p className="extension-builder-muted">No files in this solution yet.</p> : null}
           {files.map(file => (
             <div key={file.path} className={file.path === activeFilePath ? "extension-builder-file-row active" : "extension-builder-file-row"}>
               <button type="button" disabled={file.type !== "file"} title={file.path} onClick={() => onOpenFile(file.path)}>
@@ -207,7 +207,7 @@ export function SolutionExplorer({
         {advanced || projects.length === 0 ? (
           <details className="extension-builder-explorer-details" open={projects.length === 0}>
             <summary>Add project</summary>
-            {projects.length === 0 ? <p className="modules-muted">A project is the build target. Add one to pack this solution into a NuGet package.</p> : null}
+            {projects.length === 0 ? <p className="extension-builder-muted">A project is the build target. Add one to pack this solution into a NuGet package.</p> : null}
             <label>
               <span>Template</span>
               <select aria-label="Project template" value={projectDraft.templateId} disabled={busy || !canCreate} onChange={event => onProjectDraftChange(applyTemplateDefaults({ ...projectDraft, templateId: event.target.value }, templates.find(template => template.id === event.target.value)))}>

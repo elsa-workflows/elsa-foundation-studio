@@ -3,7 +3,7 @@ import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { derivePackageId, ExtensionBuilderPage } from "../extension-builder";
-import { studioExtensionBuilderBridgeRoot, studioExtensionBuilderCapabilitiesPath, type ExtensionRepositorySummary, type ExtensionRuntimeStatus } from "../extensionBuilderApi";
+import { type ExtensionRepositorySummary, type ExtensionRuntimeStatus } from "../extensionBuilderApi";
 import { StudioHttpError, type ElsaStudioModuleApi } from "@elsa-workflows/studio-sdk";
 
 describe("extension builder page", () => {
@@ -87,6 +87,24 @@ describe("extension builder page", () => {
     await clickButton(container, "Retry");
     await flushPromises();
     expect(container.textContent).toContain("optional privileged host-management integration");
+
+    await unmount();
+  });
+
+  it("treats an available capabilities envelope without capability flags as degraded", async () => {
+    // The bridge says "available" but carries no flags: the unrecognizable-payload case the bridge itself maps to
+    // degraded. With no detail to show, the surface names the degraded state rather than an unknown one.
+    const workspaceGetJson = vi.fn(defaultGetJson);
+    const { container, unmount } = await renderExtensionBuilderPage(stubApi({
+      getJson: workspaceGetJson,
+      hostGetJson: async url => url.endsWith(CAPABILITIES_BRIDGE_PATH) ? bridgeStatusResult("available", "") : {}
+    }));
+
+    await waitForText(container, "optional privileged host-management integration");
+
+    expect(container.textContent).toContain(defaultBridgeDetail("degraded"));
+    expect(container.textContent).not.toContain("Create workspace");
+    expect(workspaceGetJson).not.toHaveBeenCalled();
 
     await unmount();
   });
@@ -243,6 +261,31 @@ describe("extension builder page", () => {
     // …and the mutation's effects are re-read best-effort: the runtime status and the promoted build.
     await waitFor(() => runtimeReads() > runtimeReadsBefore, "Expected a best-effort runtime-status refresh after the relay timeout.");
     expect(getJson).toHaveBeenCalledWith(`${BRIDGE_ROOT}/builds/build-1`);
+
+    await unmount();
+  });
+
+  it("surfaces the relay-timeout detail on a retry reconciliation and refreshes the runtime status best-effort", async () => {
+    // The runtime mutations share the relay-timeout catch path: a 504/unreachable on retry-reconcile must still carry
+    // the bridge's detail to the tracker and re-read the runtime status, in case the reconciliation landed.
+    const detail = "The backend management relay timed out; the reconciliation may still have completed on the backend.";
+    const postJson = vi.fn(async (url: string) => {
+      if (url.endsWith("/retry-reconcile")) throw managementBridgeError(504, "unreachable", detail);
+      return defaultPostJson(url);
+    });
+    const getJson = vi.fn(async (url: string) => url.endsWith("/runtime-status") ? failedRuntime({ features: [] }) : defaultGetJson(url));
+    const { container, unmount } = await renderExtensionBuilderPage(stubApi({ getJson, postJson }));
+    await openSolution(container);
+    await waitForText(container, "Activities/HelloActivity.cs");
+    await clickTab(container, "Runtime");
+    const runtimeReads = () => getJson.mock.calls.filter(([url]) => String(url).endsWith("/runtime-status")).length;
+    const runtimeReadsBefore = runtimeReads();
+
+    await clickButton(container, "Retry reconciliation");
+    await waitForText(container, "Privileged host management is unreachable");
+
+    expect(container.textContent).toContain("may still have completed");
+    await waitFor(() => runtimeReads() > runtimeReadsBefore, "Expected a best-effort runtime-status refresh after the relay timeout.");
 
     await unmount();
   });
@@ -1367,8 +1410,8 @@ function runningBuild() {
 }
 
 // The Studio-owned bridge route group every Extension Builder call is routed through (ADR 0037, #256).
-const BRIDGE_ROOT = studioExtensionBuilderBridgeRoot;
-const CAPABILITIES_BRIDGE_PATH = studioExtensionBuilderCapabilitiesPath;
+const BRIDGE_ROOT = "/_elsa/studio/backend-management/extension-builder";
+const CAPABILITIES_BRIDGE_PATH = `${BRIDGE_ROOT}/capabilities`;
 
 // Backend-context calls recorded by the failing stub. The afterEach guard asserts this stays empty: after
 // ADR 0037/#256 the browser must never talk to the backend host-control surface.

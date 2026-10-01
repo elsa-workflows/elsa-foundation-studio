@@ -33,16 +33,16 @@ export function PromotePanel({
           : undefined;
 
   return (
-    <div className="modules-inspector-section">
+    <div className="extension-builder-inspector-section">
       <h4>Artifact</h4>
       {artifact ? (
-        <dl className="modules-metadata">
+        <dl className="extension-builder-metadata">
           <div><dt>Package</dt><dd>{artifact.packageId}</dd></div>
           <div><dt>Version</dt><dd>{artifact.version}</dd></div>
           <div><dt>File</dt><dd>{artifact.fileName ?? artifact.id}</dd></div>
           <div><dt>Size</dt><dd>{artifact.size ? `${artifact.size} B` : "n/a"}</dd></div>
         </dl>
-      ) : <p className="modules-muted">Promote becomes available after a successful build produces a package artifact.</p>}
+      ) : <p className="extension-builder-muted">Promote becomes available after a successful build produces a package artifact.</p>}
       <button type="button" className="studio-button" disabled={busy || !canPromote} title={promoteReason} onClick={onPromote}>
         <PackageCheck size={15} />
         Promote build

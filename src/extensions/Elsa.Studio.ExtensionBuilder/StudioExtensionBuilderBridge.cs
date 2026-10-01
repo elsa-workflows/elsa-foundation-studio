@@ -36,6 +36,12 @@ internal static class StudioExtensionBuilderBridge
     /// <summary>The backend Extension Builder root the relay forwards to. A Studio→backend implementation detail.</summary>
     internal const string BackendRoot = "/_elsa/extension-builder";
 
+    /// <summary>The detail shared by the capabilities read and the relay when the bridge is not configured.</summary>
+    internal const string UnconfiguredDetail = "Privileged host management is not configured on the Studio host. Set Studio:BackendServerBaseUrl (or Studio:BackendBaseUrl for a shared URL) and Studio:BackendModuleManagementApiKey to enable Extension Builder.";
+
+    /// <summary>The detail shared by the capabilities read and the relay when the backend rejects the management key.</summary>
+    internal const string UnauthorizedDetail = "The backend rejected the Studio management key (or the Extension Builder surface is disabled). Verify Studio:BackendModuleManagementApiKey matches the backend host management key.";
+
     internal enum BridgeAccess
     {
         Read,
@@ -165,8 +171,6 @@ internal sealed class StudioExtensionBuilderRelayClient(
     TimeProvider timeProvider,
     ILogger<StudioExtensionBuilderRelayClient> logger)
 {
-    private const string UnconfiguredDetail = "Privileged host management is not configured on the Studio host. Set Studio:BackendServerBaseUrl (or Studio:BackendBaseUrl for a shared URL) and Studio:BackendModuleManagementApiKey to enable Extension Builder.";
-    private const string UnauthorizedDetail = "The backend rejected the Studio management key (or the Extension Builder surface is disabled). Verify Studio:BackendModuleManagementApiKey matches the backend host management key.";
     private const string UnreachableDetail = "The backend Extension Builder surface could not be reached. Check that the backend host is running and Studio:BackendServerBaseUrl (or Studio:BackendBaseUrl) is correct.";
     private const string TimedOutDetail = "The backend Extension Builder surface did not answer within the operation's time budget. The operation may still have completed on the backend.";
     private const string UnrecognizedPayloadDetail = "The backend responded but did not return a recognizable Extension Builder payload.";
@@ -177,7 +181,7 @@ internal sealed class StudioExtensionBuilderRelayClient(
         // — the infrastructure plane dominates.
         if (!options.IsConfigured)
         {
-            await WriteErrorAsync(context, StatusCodes.Status503ServiceUnavailable, StudioBackendManagementStatus.Unconfigured, UnconfiguredDetail);
+            await WriteErrorAsync(context, StatusCodes.Status503ServiceUnavailable, StudioBackendManagementStatus.Unconfigured, StudioExtensionBuilderBridge.UnconfiguredDetail);
             return;
         }
 
@@ -281,7 +285,7 @@ internal sealed class StudioExtensionBuilderRelayClient(
         if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden ||
             (response.StatusCode == HttpStatusCode.NotFound && !isJson))
         {
-            await WriteErrorAsync(context, StatusCodes.Status503ServiceUnavailable, StudioBackendManagementStatus.Unauthorized, UnauthorizedDetail);
+            await WriteErrorAsync(context, StatusCodes.Status503ServiceUnavailable, StudioBackendManagementStatus.Unauthorized, StudioExtensionBuilderBridge.UnauthorizedDetail);
             return;
         }
 
@@ -383,9 +387,6 @@ internal sealed class StudioExtensionBuilderRelayClient(
 
 internal static class StudioExtensionBuilderBridgeServiceCollectionExtensions
 {
-    // Short, so the browser-facing capabilities read stays snappy even when the backend is slow to answer.
-    private static readonly TimeSpan CapabilitiesRequestTimeout = TimeSpan.FromSeconds(5);
-
     /// <summary>
     /// Registers the typed <see cref="StudioExtensionBuilderCapabilitiesClient"/> and
     /// <see cref="StudioExtensionBuilderRelayClient"/> over <see cref="IHttpClientFactory"/>, pointed at the backend
@@ -398,7 +399,7 @@ internal static class StudioExtensionBuilderBridgeServiceCollectionExtensions
         services.TryAddSingleton(TimeProvider.System);
 
         services.AddHttpClient<StudioExtensionBuilderCapabilitiesClient>((serviceProvider, client) =>
-            serviceProvider.GetRequiredService<StudioBackendManagementOptions>().ConfigureBackendClient(client, CapabilitiesRequestTimeout));
+            serviceProvider.GetRequiredService<StudioBackendManagementOptions>().ConfigureBackendClient(client, StudioBackendManagementOptions.ReadRequestTimeout));
 
         // The relay enforces per-operation budgets with a linked CancellationTokenSource; the client-level timeout must
         // neither race those budgets nor cap a long Text/Stream body copy, so it is disabled here.

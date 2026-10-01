@@ -41,7 +41,7 @@ export function BuildPanel({
   onDiagnosticSelect(diagnostic: BuildDiagnostic): void;
 }) {
   return (
-    <div className="modules-inspector-section">
+    <div className="extension-builder-inspector-section">
       <h4>Run</h4>
       {advanced ? (
         <>
@@ -71,18 +71,18 @@ export function BuildPanel({
       )}
       <h4>Build status</h4>
       {activeBuild ? (
-        <dl className="modules-metadata">
+        <dl className="extension-builder-metadata">
           <div><dt>Build</dt><dd>{activeBuild.id}</dd></div>
           <div><dt>Status</dt><dd><StatusChip tone={buildTone(activeBuild.status)}>{activeBuild.status}</StatusChip></dd></div>
           <div><dt>Started</dt><dd>{formatDate(activeBuild.startedAt)}</dd></div>
           <div><dt>Finished</dt><dd>{formatDate(activeBuild.finishedAt)}</dd></div>
         </dl>
-      ) : <p className="modules-muted">No build has been selected.</p>}
+      ) : <p className="extension-builder-muted">No build has been selected.</p>}
       <h4>Package outputs</h4>
-      <div className="modules-list">
-        {(activeBuild?.artifacts ?? []).length === 0 ? <p className="modules-muted">No package artifacts reported.</p> : null}
+      <div className="extension-builder-list">
+        {(activeBuild?.artifacts ?? []).length === 0 ? <p className="extension-builder-muted">No package artifacts reported.</p> : null}
         {activeBuild?.artifacts.map(artifact => (
-          <div key={artifact.id} className="modules-list-row">
+          <div key={artifact.id} className="extension-builder-list-row">
             <span>
               <strong>{artifact.packageId} {artifact.version}</strong>
               <small>{artifact.fileName ?? artifact.id}{artifact.branch ? ` · ${artifact.branch}` : ""}{artifact.sourceRevisionId ? ` · ${artifact.sourceRevisionId.slice(0, 8)}` : ""}{artifact.sourceIsDirty ? " · uncommitted" : ""}</small>
@@ -96,22 +96,22 @@ export function BuildPanel({
         ))}
       </div>
       <h4>Diagnostics</h4>
-      <div className="modules-diagnostics-list">
-        {(activeBuild?.diagnostics ?? []).length === 0 ? <p className="modules-muted">No diagnostics reported.</p> : null}
+      <div className="extension-builder-diagnostics-list">
+        {(activeBuild?.diagnostics ?? []).length === 0 ? <p className="extension-builder-muted">No diagnostics reported.</p> : null}
         {activeBuild?.diagnostics.map((diagnostic, index) => (
-          <button key={`${diagnostic.message}-${index}`} type="button" className="modules-diagnostic-row extension-builder-diagnostic-button" onClick={() => onDiagnosticSelect(diagnostic)}>
+          <button key={`${diagnostic.message}-${index}`} type="button" className="extension-builder-diagnostic-row extension-builder-diagnostic-button" onClick={() => onDiagnosticSelect(diagnostic)}>
             <StatusChip tone={diagnosticTone(diagnostic.severity)}>{diagnostic.severity}</StatusChip>
             <span>{diagnostic.message}<small>{formatDiagnosticLocation(diagnostic)}</small></span>
           </button>
         ))}
       </div>
       <h4>Log</h4>
-      <pre className="modules-manifest-code extension-builder-build-log">{buildLog || "Build log will appear here."}</pre>
+      <pre className="extension-builder-manifest-code extension-builder-build-log">{buildLog || "Build log will appear here."}</pre>
       <h4>History</h4>
-      <div className="modules-list">
-        {buildHistory.length === 0 ? <p className="modules-muted">No build history reported for this project.</p> : null}
+      <div className="extension-builder-list">
+        {buildHistory.length === 0 ? <p className="extension-builder-muted">No build history reported for this project.</p> : null}
         {buildHistory.map(build => (
-          <button key={build.id} type="button" className="modules-list-row extension-builder-history-row" onClick={() => onSelectBuild(build)}>
+          <button key={build.id} type="button" className="extension-builder-list-row extension-builder-history-row" onClick={() => onSelectBuild(build)}>
             <span>
               <strong>{build.id}</strong>
               <small>{formatDate(build.finishedAt ?? build.startedAt)}</small>
