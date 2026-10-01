@@ -43,6 +43,15 @@ describe("Signal", () => {
     }
     expect(light["--studio-title-weight"]).toBe("600");
   });
+
+  it("is denser than the default: every type-size token steps down from the shared defaults", () => {
+    const light = ruleDeclarations(tokensCss, 'html[data-theme="signal"]');
+    const defaults = ruleDeclarations(tokensCss, ":root");
+
+    for (const token of ["--studio-page-title-size", "--studio-section-title-size", "--studio-body-size", "--studio-label-size"]) {
+      expect(parseFloat(light[token]), token).toBeLessThan(parseFloat(defaults[token]));
+    }
+  });
 });
 
 describe("Dusk", () => {

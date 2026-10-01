@@ -219,8 +219,8 @@ Beyond the required `light` and `dark` palettes, a theme may add:
   Geist, Geist Mono, Manrope, DM Mono, IBM Plex Sans/Mono, Instrument Sans/Serif and JetBrains Mono.
 - `shape` — `radiusSm`, `radius`, `radiusMd`, `radiusLg`, `radiusXl` as `px` or `rem` lengths.
 - `layout` — `classic` (default), `floating`, `workbench` or `editorial`: how the shell and the
-  workflow designer are arranged. The signature themes use Meridian `classic`, Drift `floating`,
-  Schematic `workbench` and Atelier `editorial`; any theme may choose any layout.
+  workflow designer are arranged. The signature themes use Drift `floating`, Schematic `workbench`
+  and Atelier `editorial`; Meridian, Elsa Cloud, Signal and Dusk use `classic`. Any theme may choose any layout.
 
 ```json
 {

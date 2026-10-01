@@ -8,8 +8,9 @@ export function parseOklch(value: string) {
   return { lightness, chroma, hue };
 }
 
-/** The declarations of the first rule whose selector is exactly `selector`, as a property to value map. */
-export function ruleDeclarations(css: string, selector: string): Record<string, string> {
+/** The declarations of the first rule whose selector is exactly `selector` (comments ignored), as a property to value map. */
+export function ruleDeclarations(source: string, selector: string): Record<string, string> {
+  const css = source.replace(/\/\*[\s\S]*?\*\//g, "");
   const start = css.indexOf(`${selector} {`);
   if (start < 0) return {};
   const body = css.slice(css.indexOf("{", start) + 1, css.indexOf("}", start));

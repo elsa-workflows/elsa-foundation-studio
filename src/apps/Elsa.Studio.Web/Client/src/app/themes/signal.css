@@ -16,6 +16,8 @@ html[data-theme="signal"] .studio-status-pill {
   letter-spacing: 0.04em;
 }
 
+/* The two eyebrow legends are also small, spaced capitals. They are dimmed in the shared rules (opacity
+   .6); here they stay full strength because mono at this size needs the contrast. */
 html[data-theme="signal"] .breadcrumb,
 html[data-theme="signal"] .nav-heading {
   font-size: 10.5px;

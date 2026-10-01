@@ -158,6 +158,11 @@ html[data-theme="signal"] {
   --studio-surface-raised: var(--card);
   --studio-accent-soft: color-mix(in srgb, var(--primary) 12%, transparent);
   --studio-title-weight: 600;
+  /* Density is the feature: a step down on every type-size token, in all modes. */
+  --studio-page-title-size: 18px;
+  --studio-section-title-size: 14px;
+  --studio-body-size: 12.5px;
+  --studio-label-size: 11px;
 }
 
 /* Dusk's light recipe: soft violet-tinted shadows. Dark and Dim use the shared dark recipe below. */
