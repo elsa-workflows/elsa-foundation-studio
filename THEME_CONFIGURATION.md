@@ -61,30 +61,20 @@ Path to a directory or file containing custom themes. Supports:
 
 The theme ID to select on first load. Must match an available theme ID (either built-in or custom).
 
-The five signature themes offer all four modes (Light, Dark, Dim and High contrast):
+The seven signature themes offer all four modes (Light, Dark, Dim and High contrast):
 - `"meridian"` - Crisp, neutral precision with an indigo accent (the default)
 - `"drift"` - Soft, rounded floating surfaces with a jade accent
 - `"schematic"` - Engineering workbench: squared corners, blueprint neutrals, signal orange
 - `"atelier"` - Warm editorial calm: paper neutrals, serif titles, plum accent
 - `"elsa-cloud"` - The Elsa Cloud console look: near-black surfaces, hot-pink accent, mono eyebrow labels
+- `"signal"` - Instrument panel: hairline borders, tight corners, mono legends, one phosphor-lime accent
+- `"dusk"` - Dim-first violet slate with an amber highlight, for long low-light sessions
 
 Other built-in theme IDs (Light and Dark only, unless noted):
-- `"material-design"` - Material Design (the Elsa Studio 3 look)
 - `"black-glass"` - Dark HUD style
 - `"stone"` - Slate surfaces
-- `"paper"` - Layered paper
 - `"blueprint"` - Architectural draft
-- `"ceramic"` - Matte porcelain
-- `"carbon"` - Technical carbon
-- `"brass-instrument"` - Brass & enamel
-- `"walnut-workshop"` - Walnut inlays
-- `"harbor"` - Crisp blue
-- `"borealis"` - Green-teal
-- `"ember"` - Warm amber
-- `"orchid"` - Violet
-- `"hot-pink"` - High-energy pink
-- `"coral"` - Red-coral
-- `"graphite"` - Neutral
+- `"brass-instrument"` - Brass & enamel (Dark only)
 
 ## Examples
 
