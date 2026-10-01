@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import type { StudioEndpointContext, StudioExpressionEditorContribution } from "@elsa-workflows/studio-sdk";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getActivityExecutionDescendants, getActivityExecutionInspection, getActivityExecutionLayout } from "../api/runtime";
+import { getActivityExecutionValuePayload } from "../api/activityExecutionValuePayload";
 import {
   WorkflowActivityExecutionDetails,
   WorkflowIncidentList,
@@ -15,6 +16,7 @@ import type { ScopeFrame } from "../workflowAdapter";
 import type {
   ActivityCatalogItem,
   ActivityExecutionInspection,
+  ActivityExecutionInspectionValueSnapshot,
   ActivityExecutionStateSummary,
   IncidentStateSummary,
   WorkflowDefinitionVersionDetails,
@@ -27,7 +29,12 @@ vi.mock("../api/runtime", async importOriginal => ({
   ...(await importOriginal<typeof import("../api/runtime")>()),
   getActivityExecutionInspection: vi.fn(),
   getActivityExecutionDescendants: vi.fn(),
-  getActivityExecutionLayout: vi.fn()
+  getActivityExecutionLayout: vi.fn(),
+  getActivityExecutionValuePayload: vi.fn()
+}));
+
+vi.mock("../api/activityExecutionValuePayload", () => ({
+  getActivityExecutionValuePayload: vi.fn()
 }));
 
 vi.mock("../workflow-editor/ReusableBoundaryInspector", () => ({
@@ -55,6 +62,7 @@ afterEach(() => {
   vi.mocked(getActivityExecutionInspection).mockReset();
   vi.mocked(getActivityExecutionDescendants).mockReset();
   vi.mocked(getActivityExecutionLayout).mockReset();
+  vi.mocked(getActivityExecutionValuePayload).mockReset();
 });
 
 function render(ui: React.ReactElement) {
@@ -64,6 +72,12 @@ function render(ui: React.ReactElement) {
   flushSync(() => root.render(ui));
   active = { root, container };
   return container;
+}
+
+function rerender(ui: React.ReactElement) {
+  if (!active) throw new Error("No active render to update.");
+  flushSync(() => active!.root.render(ui));
+  return active.container;
 }
 
 async function waitFor(assertion: () => void) {
@@ -184,6 +198,26 @@ function inspection(valueSnapshots: ActivityExecutionInspection["valueSnapshots"
   };
 }
 
+function valueEvidence(overrides: Partial<ActivityExecutionInspectionValueSnapshot> = {}): ActivityExecutionInspectionValueSnapshot {
+  return {
+    evidenceId: "evidence-1",
+    name: "Captured value",
+    subject: "ActivityInput",
+    captureMode: "DiagnosticSnapshot",
+    captureState: "diagnosticSnapshotCaptured",
+    state: "captured",
+    type: { kind: "alias", id: "Int32", schema: null },
+    capturedAt: "2026-07-09T10:00:01Z",
+    payload: null,
+    snapshot: null,
+    captureReason: "Diagnostic snapshot captured.",
+    isSensitive: false,
+    accessState: "resolutionAvailable",
+    metadata: {},
+    ...overrides
+  };
+}
+
 describe("WorkflowActivityExecutionDetails", () => {
   it("uses frozen source-reference wording before the live catalog fallback", async () => {
     vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([]));
@@ -300,6 +334,182 @@ describe("WorkflowActivityExecutionDetails", () => {
     expect(inputSection?.querySelector(".wf-runtime-evidence-count")?.textContent).toBe("1");
     expect(inputSection?.querySelector(".wf-runtime-capture-mode")?.textContent).toBe("Paired evidence");
     expect(inputSection?.querySelector(".wf-runtime-input .wf-runtime-capture-mode")).toBeNull();
+  });
+
+  it("resolves metadata-only detail evidence through the payload capability and renders its diagnostic tree", async () => {
+    const snapshot = valueEvidence();
+    vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([snapshot]));
+    vi.mocked(getActivityExecutionValuePayload).mockResolvedValue({
+      evidenceId: "evidence-1",
+      captureMode: "DiagnosticSnapshot",
+      payload: {
+        kind: "object",
+        typeName: "Result",
+        properties: [
+          { name: "status", value: { kind: "string", preview: "diagnostic tree readable value", length: 28, truncated: false } },
+          { name: "empty", value: { kind: "string", preview: "", length: 0, truncated: false } }
+        ],
+        truncated: false
+      }
+    });
+
+    const container = render(<WorkflowActivityExecutionDetails context={context} activity={activity} activityCatalog={catalog} />);
+
+    await waitFor(() => expect(container.textContent).toContain("diagnostic tree readable value"));
+    expect(getActivityExecutionValuePayload).toHaveBeenCalledWith(
+      context,
+      "wf-1",
+      "ae-1",
+      "evidence-1",
+      "DiagnosticSnapshot",
+      expect.any(AbortSignal)
+    );
+    expect(container.textContent).toContain("Int32");
+    expect(container.textContent).toContain('""');
+    expect(container.querySelector(".wf-runtime-snapshot-node")).not.toBeNull();
+    expect(container.textContent).not.toContain('"kind": "object"');
+  });
+
+  it("renders a resolved Payload as raw data even when the object has a kind property", async () => {
+    vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([valueEvidence({
+      captureMode: "Payload",
+      captureState: "payloadCaptured"
+    })]));
+    vi.mocked(getActivityExecutionValuePayload).mockResolvedValue({
+      evidenceId: "evidence-1",
+      captureMode: "Payload",
+      payload: { kind: "string", preview: "This is raw payload data." }
+    });
+
+    const container = render(<WorkflowActivityExecutionDetails context={context} activity={activity} activityCatalog={catalog} />);
+
+    await waitFor(() => expect(container.textContent).toContain('"kind": "string"'));
+    expect(container.textContent).toContain("This is raw payload data.");
+    expect(container.querySelector(".wf-runtime-snapshot-node")).toBeNull();
+  });
+
+  it("requires an explicit action before resolving a sensitive value", async () => {
+    vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([valueEvidence({
+      name: "Secret",
+      captureMode: "Payload",
+      captureState: "payloadCaptured",
+      isSensitive: true
+    })]));
+    vi.mocked(getActivityExecutionValuePayload).mockResolvedValue({
+      evidenceId: "evidence-1",
+      captureMode: "Payload",
+      payload: "TOP_SECRET_RAW_VALUE"
+    });
+
+    const container = render(<WorkflowActivityExecutionDetails context={context} activity={activity} activityCatalog={catalog} />);
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(getActivityExecutionValuePayload).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain("TOP_SECRET_RAW_VALUE");
+    const showButton = [...container.querySelectorAll<HTMLButtonElement>("button")]
+      .find(button => button.textContent === "Show captured value");
+    expect(showButton).toBeDefined();
+    showButton!.click();
+
+    await waitFor(() => expect(container.textContent).toContain("TOP_SECRET_RAW_VALUE"));
+    expect(getActivityExecutionValuePayload).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not request redacted, unavailable, metadata-only, off, or permission-required evidence", async () => {
+    vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([
+      valueEvidence({ evidenceId: "redacted", name: "Redacted", captureMode: "Payload", captureState: "payloadCaptured", payload: "REDACTED_INLINE_SECRET", accessState: "redacted" }),
+      valueEvidence({ evidenceId: "permission", name: "Needs permission", captureMode: "Payload", captureState: "payloadCaptured", payload: "NO_PERMISSION_INLINE_SECRET", accessState: "resolutionPermissionRequired" }),
+      valueEvidence({ evidenceId: "sensitive-permission", name: "Sensitive permission", captureMode: "Payload", captureState: "payloadCaptured", payload: "SENSITIVE_PERMISSION_SECRET", accessState: "resolutionPermissionRequired", isSensitive: true }),
+      valueEvidence({ evidenceId: "metadata", name: "Metadata only", captureMode: "Metadata", captureState: "metadataOnly", payload: "METADATA_INLINE_SECRET", accessState: "unavailable", captureReason: "Policy is set to Metadata." }),
+      valueEvidence({ evidenceId: "off", name: "Off", captureMode: "None", captureState: "notCaptured", payload: "OFF_INLINE_SECRET", accessState: "unavailable", captureReason: "Input capture is off." })
+    ]));
+
+    const container = render(<WorkflowActivityExecutionDetails context={context} activity={activity} activityCatalog={catalog} />);
+
+    await waitFor(() => expect(container.textContent).toContain("Additional permission is required"));
+    expect(container.textContent).toContain("Policy is set to Metadata.");
+    expect(container.textContent).toContain("Input capture is off.");
+    expect(container.textContent).not.toContain("INLINE_SECRET");
+    expect(container.textContent).not.toContain("SENSITIVE_PERMISSION_SECRET");
+    expect(container.textContent).not.toContain("Show captured value");
+    expect(getActivityExecutionValuePayload).not.toHaveBeenCalled();
+  });
+
+  it("cancels a payload request and drops its result when the selected activity changes", async () => {
+    const oldSnapshot = valueEvidence({ evidenceId: "old-evidence" });
+    vi.mocked(getActivityExecutionInspection).mockImplementation(async (_context, _workflowExecutionId, activityExecutionId) =>
+      inspection(activityExecutionId === "ae-1" ? [oldSnapshot] : []));
+
+    let resolvePayload!: (value: { evidenceId: string; captureMode: string; payload: unknown }) => void;
+    let payloadSignal: AbortSignal | undefined;
+    vi.mocked(getActivityExecutionValuePayload).mockImplementation((_context, _workflowExecutionId, _activityExecutionId, _evidenceId, _captureMode, signal) => {
+      payloadSignal = signal;
+      return new Promise(resolve => { resolvePayload = resolve; });
+    });
+
+    const container = render(<WorkflowActivityExecutionDetails context={context} activity={activity} activityCatalog={catalog} />);
+    await waitFor(() => expect(getActivityExecutionValuePayload).toHaveBeenCalledTimes(1));
+    expect(payloadSignal?.aborted).toBe(false);
+
+    rerender(<WorkflowActivityExecutionDetails context={context} activity={{ ...activity, activityExecutionId: "ae-2" }} activityCatalog={catalog} />);
+    await waitFor(() => expect(getActivityExecutionInspection).toHaveBeenCalledWith(context, "wf-1", "ae-2", expect.any(AbortSignal)));
+    expect(payloadSignal?.aborted).toBe(true);
+    resolvePayload({ evidenceId: "old-evidence", captureMode: "DiagnosticSnapshot", payload: "STALE_OLD_ACTIVITY_VALUE" });
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(container.textContent).not.toContain("STALE_OLD_ACTIVITY_VALUE");
+    expect(container.textContent).toContain("No declared inputs, pinned bindings, or runtime input evidence are available for this execution.");
+  });
+
+  it("drops a resolved value after the same evidence is redacted by a refreshed host context", async () => {
+    const refreshedContext = {} as StudioEndpointContext;
+    vi.mocked(getActivityExecutionInspection)
+      .mockResolvedValueOnce(inspection([valueEvidence()]))
+      .mockResolvedValueOnce(inspection([valueEvidence({
+        snapshot: { kind: "redacted", reason: "permission-changed" },
+        accessState: "redacted",
+        captureReason: "Runtime value evidence is redacted."
+      })]));
+
+    let payloadSignal: AbortSignal | undefined;
+    vi.mocked(getActivityExecutionValuePayload).mockImplementation(async (_context, _workflowExecutionId, _activityExecutionId, _evidenceId, _captureMode, signal) => {
+      payloadSignal = signal;
+      return { evidenceId: "evidence-1", captureMode: "DiagnosticSnapshot", payload: "VALUE_BEFORE_PERMISSION_CHANGE" };
+    });
+
+    const container = render(<WorkflowActivityExecutionDetails context={context} activity={activity} activityCatalog={catalog} />);
+    await waitFor(() => expect(container.textContent).toContain("VALUE_BEFORE_PERMISSION_CHANGE"));
+
+    rerender(<WorkflowActivityExecutionDetails context={refreshedContext} activity={activity} activityCatalog={catalog} />);
+    await waitFor(() => expect(container.textContent).toContain("Runtime value evidence is redacted."));
+
+    expect(payloadSignal?.aborted).toBe(true);
+    expect(container.textContent).not.toContain("VALUE_BEFORE_PERMISSION_CHANGE");
+    expect(getActivityExecutionValuePayload).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows automatic resolution loading and offers retry after a resolver error", async () => {
+    vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([valueEvidence()]));
+    let rejectPending!: (reason: unknown) => void;
+    const pending = new Promise<{ evidenceId: string; captureMode: string; payload: unknown }>((_resolve, reject) => {
+      rejectPending = reject;
+    });
+    vi.mocked(getActivityExecutionValuePayload)
+      .mockImplementationOnce(() => pending)
+      .mockResolvedValueOnce({ evidenceId: "evidence-1", captureMode: "DiagnosticSnapshot", payload: "retried value" });
+
+    const container = render(<WorkflowActivityExecutionDetails context={context} activity={activity} activityCatalog={catalog} />);
+
+    await waitFor(() => expect(container.textContent).toContain("Resolving captured value..."));
+    rejectPending(new Error("temporary payload service failure"));
+    await waitFor(() => expect(container.textContent).toContain("temporary payload service failure"));
+    const retryButton = [...container.querySelectorAll<HTMLButtonElement>("button")]
+      .find(button => button.textContent === "Retry");
+    expect(retryButton).toBeDefined();
+    retryButton!.click();
+
+    await waitFor(() => expect(container.textContent).toContain("retried value"));
+    expect(getActivityExecutionValuePayload).toHaveBeenCalledTimes(2);
   });
 
   it("shows the capture reason when input values were omitted by policy", async () => {

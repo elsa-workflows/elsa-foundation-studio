@@ -4,6 +4,7 @@ import type {
   WorkflowExecutableAuthoredInput,
   WorkflowExecutableInputBinding
 } from "./workflowTypes";
+import { runtimeValueTypeLabel } from "./runtimeValueFormatting";
 
 export type InputInspectionState =
   | "missingDeclaration"
@@ -255,7 +256,7 @@ export function evaluationPhase(evaluation: ActivityExecutionInspectionValueSnap
 }
 
 function runtimeType(evaluation: ActivityExecutionInspectionValueSnapshot | undefined) {
-  return evaluation?.type?.displayName || evaluation?.type?.typeName || evaluation?.type?.alias || undefined;
+  return runtimeValueTypeLabel(evaluation?.type);
 }
 
 function normalizeKey(value: string | null | undefined) {

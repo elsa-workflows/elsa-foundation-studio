@@ -88,6 +88,14 @@ describe("buildInputInspectionRows", () => {
 
     expect(rows[0]?.states).toEqual(expect.arrayContaining(["orphanEvidence", "redacted", "failedEvaluation"]));
   });
+
+  it("uses the Runtime type descriptor ID when the host supplies only kind and id", () => {
+    const rows = buildInputInspectionRows({
+      evaluations: [evidence({ inputKey: undefined, type: { kind: "alias", id: "Int32", schema: null } })]
+    });
+
+    expect(rows[0]?.declaredType).toBe("Int32");
+  });
 });
 
 function evidence(overrides: Partial<ActivityExecutionInspectionValueSnapshot> = {}): ActivityExecutionInspectionValueSnapshot {
