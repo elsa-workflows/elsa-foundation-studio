@@ -223,7 +223,7 @@ describe("ReusableBoundaryInspector", () => {
         metadata: {}
       }],
       valueSnapshots: [
-        value("Captured value", { state: "captured", snapshot: { kind: "string", preview: "visible" } }),
+        value("Captured value", { state: "captured", type: { kind: "alias", id: "Int32" }, snapshot: { kind: "string", preview: "visible" } }),
         value("Redacted value", { state: "captured", snapshot: { kind: "redacted", reason: "secret" } }),
         value("Not captured value", { state: "notCaptured", captureMode: "None", captureReason: "Policy omitted it." }),
         value("Capture failed value", { state: "captureFailed", failure: { code: "capture.failed", message: "Serializer failed." } }),
@@ -246,6 +246,7 @@ describe("ReusableBoundaryInspector", () => {
     click(treeItem(container, "attempt-2"));
 
     await waitFor(() => expect(container.textContent).toContain("Canonical execution attempt-2"));
+    expect(container.textContent).toContain("ActivityInput · Int32");
     expect(container.textContent).toContain("bookmark-attempt-2");
     expect(container.textContent).toContain("incident-attempt-2");
     expect(container.textContent).toContain("The first fault remains visible.");

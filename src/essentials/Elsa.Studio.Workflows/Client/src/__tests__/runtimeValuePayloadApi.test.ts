@@ -84,6 +84,32 @@ describe("activity execution value payload client", () => {
     expect(runtime.http.getJson).toHaveBeenCalledTimes(1);
   });
 
+  it("does not let cancelled capability lookups block payload requests on another host", async () => {
+    let releaseCapabilities!: (value: unknown) => void;
+    const oldHost = context(() => new Promise(resolve => { releaseCapabilities = resolve; }));
+    const controllers = Array.from({ length: 3 }, () => new AbortController());
+    const cancelledRequests = controllers.map(controller => getActivityExecutionValuePayload(
+      oldHost, "workflow-old", "activity-old", "evidence-old", "Payload", controller.signal
+    ).catch(error => error));
+    const newHost = context(async url => url === "/capabilities"
+      ? capabilitiesWithPayload
+      : { evidenceId: "evidence-new", captureMode: "Payload", payload: "new host value" });
+
+    try {
+      await waitUntil(() => vi.mocked(oldHost.http.getJson).mock.calls.length === 1);
+      controllers.forEach(controller => controller.abort());
+      const request = getActivityExecutionValuePayload(
+        newHost, "workflow-new", "activity-new", "evidence-new", "Payload"
+      );
+      await waitUntil(() => vi.mocked(newHost.http.getJson).mock.calls.length === 2);
+      await expect(request).resolves.toMatchObject({ payload: "new host value" });
+    } finally {
+      releaseCapabilities(capabilitiesWithPayload);
+      await Promise.all(cancelledRequests);
+    }
+    expect(oldHost.http.getJson).toHaveBeenCalledTimes(1);
+  });
+
   it("limits concurrent payload requests while resolving a selected activity's evidence", async () => {
     let active = 0;
     let maximumActive = 0;

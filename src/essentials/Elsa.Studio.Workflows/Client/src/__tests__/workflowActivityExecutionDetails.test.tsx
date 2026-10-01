@@ -388,7 +388,7 @@ describe("WorkflowActivityExecutionDetails", () => {
     expect(container.querySelector(".wf-runtime-snapshot-node")).toBeNull();
   });
 
-  it("requires an explicit action before resolving a sensitive value", async () => {
+  it("requires a fresh explicit action for sensitive evidence after a selection change with slash-containing IDs", async () => {
     vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([valueEvidence({
       name: "Secret",
       captureMode: "Payload",
@@ -401,7 +401,9 @@ describe("WorkflowActivityExecutionDetails", () => {
       payload: "TOP_SECRET_RAW_VALUE"
     });
 
-    const container = render(<WorkflowActivityExecutionDetails context={context} activity={activity} activityCatalog={catalog} />);
+    const firstActivity = { ...activity, workflowExecutionId: "wf/a", activityExecutionId: "b" };
+    const secondActivity = { ...activity, workflowExecutionId: "wf", activityExecutionId: "a/b" };
+    const container = render(<WorkflowActivityExecutionDetails context={context} activity={firstActivity} activityCatalog={catalog} />);
     await new Promise(resolve => setTimeout(resolve, 0));
 
     expect(getActivityExecutionValuePayload).not.toHaveBeenCalled();
@@ -413,6 +415,17 @@ describe("WorkflowActivityExecutionDetails", () => {
 
     await waitFor(() => expect(container.textContent).toContain("TOP_SECRET_RAW_VALUE"));
     expect(getActivityExecutionValuePayload).toHaveBeenCalledTimes(1);
+
+    rerender(<WorkflowActivityExecutionDetails context={context} activity={secondActivity} activityCatalog={catalog} />);
+    await waitFor(() => expect(container.textContent).toContain("Show captured value"));
+    expect(container.textContent).not.toContain("TOP_SECRET_RAW_VALUE");
+    expect(getActivityExecutionValuePayload).toHaveBeenCalledTimes(1);
+    const nextShowButton = [...container.querySelectorAll<HTMLButtonElement>("button")]
+      .find(button => button.textContent === "Show captured value")!;
+    nextShowButton.click();
+    await waitFor(() => expect(getActivityExecutionValuePayload).toHaveBeenCalledTimes(2));
+    expect(getActivityExecutionValuePayload).toHaveBeenLastCalledWith(
+      context, "wf", "a/b", "evidence-1", "Payload", expect.any(AbortSignal));
   });
 
   it("does not request redacted, unavailable, metadata-only, off, or permission-required evidence", async () => {
@@ -510,6 +523,47 @@ describe("WorkflowActivityExecutionDetails", () => {
 
     await waitFor(() => expect(container.textContent).toContain("retried value"));
     expect(getActivityExecutionValuePayload).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["visible", "allowed"])("preserves an authorized inline null payload with %s access", async accessState => {
+    vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([valueEvidence({
+      captureMode: "Payload",
+      captureState: "payloadCaptured",
+      accessState,
+      payload: null
+    })]));
+
+    const container = render(<WorkflowActivityExecutionDetails context={context} activity={activity} activityCatalog={catalog} />);
+
+    await waitFor(() => expect(container.querySelector(".wf-runtime-input-value")?.textContent).toBe("null"));
+    expect(getActivityExecutionValuePayload).not.toHaveBeenCalled();
+  });
+
+  it("retains native input disclosures with distinct controlled regions for punctuation-containing keys", async () => {
+    vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([]));
+    const pairedCatalog: ActivityCatalogItem[] = [{
+      ...catalog[0]!,
+      inputs: [
+        { referenceKey: "a.b", name: "First", typeName: "System.String" },
+        { referenceKey: "a-b", name: "Second", typeName: "System.String" }
+      ]
+    }];
+    const container = render(<WorkflowActivityExecutionDetails context={context} activity={activity} activityCatalog={pairedCatalog} />);
+    await waitFor(() => expect(container.textContent).toContain("No runtime output snapshots were recorded"));
+
+    const summaries = [...container.querySelectorAll<HTMLElement>(".wf-input-inspection-summary")];
+    const ids = summaries.map(summary => summary.getAttribute("aria-controls"));
+    expect(summaries).toHaveLength(2);
+    expect(new Set(ids).size).toBe(2);
+    for (const summary of summaries) {
+      const disclosure = summary.parentElement!;
+      expect(disclosure.tagName).toBe("DETAILS");
+      expect(disclosure.hasAttribute("role")).toBe(false);
+      expect(disclosure.closest("[role=listitem]")).not.toBe(disclosure);
+      const region = document.getElementById(summary.getAttribute("aria-controls")!);
+      expect(region?.querySelector("section")?.getAttribute("aria-label"))
+        .toBe(`${summary.querySelector("strong")!.textContent} runtime evidence`);
+    }
   });
 
   it("shows the capture reason when input values were omitted by policy", async () => {

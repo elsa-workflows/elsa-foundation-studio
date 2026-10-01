@@ -1,5 +1,5 @@
 import "./activityInspection.css";
-import { Component, createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
+import { Component, createContext, lazy, Suspense, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { ReactFlow, Background, Controls, MiniMap, type Edge, type Node } from "@xyflow/react";
 import { Activity as ActivityIcon, AlertCircle, Boxes, ChevronLeft, ChevronRight, ListTree, Maximize2, Minimize2, RotateCcw, SlidersHorizontal, Sparkles, Workflow as WorkflowIcon } from "lucide-react";
 import type { StudioActivityInputDescriptor, StudioAiContributionApi, StudioEndpointContext, StudioExpressionEditorContribution, StudioExpressionSourceRendererContext } from "@elsa-workflows/studio-sdk";
@@ -1303,46 +1303,48 @@ function InputInspectionRowCard({
   const latest = row.latestEvaluation;
   const sourceKind = row.authoredSource?.expressionType || row.compiledBinding?.source || "No source";
   const sourceProtected = isProtectedSourceAccess(sourceAccess) || isProtectedSourceAccess(row.authoredSource?.accessState ?? row.authoredSource?.access) || !!row.authoredSource?.isSensitive || !!row.compiledBinding?.isSensitive || !!latest?.isSensitive;
-  const regionId = `input-inspection-${safeDomId(row.rowKey)}`;
+  const regionId = useId();
 
   return (
-    <details className="wf-runtime-input wf-input-inspection-row" role="listitem">
-      <summary className="wf-input-inspection-summary" aria-controls={regionId}>
-        <span className="wf-input-inspection-summary-grid">
-          <span className="wf-input-inspection-identity">
-            <strong className="wf-input-inspection-name">{row.name}</strong>
-            <small className="wf-input-inspection-type">{row.declaredType || "Unknown type"}</small>
+    <div className="wf-runtime-input wf-input-inspection-row" role="listitem">
+      <details>
+        <summary className="wf-input-inspection-summary" aria-controls={regionId}>
+          <span className="wf-input-inspection-summary-grid">
+            <span className="wf-input-inspection-identity">
+              <strong className="wf-input-inspection-name">{row.name}</strong>
+              <small className="wf-input-inspection-type">{row.declaredType || "Unknown type"}</small>
+            </span>
+            <span className="wf-input-inspection-preview">
+              <small>Evaluated at runtime</small>
+              <code>{runtimeEvidencePreview(latest)}</code>
+            </span>
+            <span className="wf-input-inspection-preview">
+              <small>{sourceKind}</small>
+              <code>{sourcePreview(row, sourceProtected, sourceAccess)}</code>
+            </span>
           </span>
-          <span className="wf-input-inspection-preview">
-            <small>Evaluated at runtime</small>
-            <code>{runtimeEvidencePreview(latest)}</code>
-          </span>
-          <span className="wf-input-inspection-preview">
-            <small>{sourceKind}</small>
-            <code>{sourcePreview(row, sourceProtected, sourceAccess)}</code>
-          </span>
-        </span>
-      </summary>
-      <div id={regionId} className="wf-runtime-input-content wf-input-inspection-content">
-        {row.states.length > 0 ? (
-          <p className="wf-instance-note">{row.states.map(formatInputInspectionState).join(" · ")}</p>
-        ) : null}
-        <section className="wf-input-inspection-detail" aria-label={`${row.name} runtime evidence`}>
-          <h5>Evaluated at runtime</h5>
-          {latest ? <RuntimeValueEvidenceCard snapshot={latest} listItem={false} /> : <p>No runtime evaluation was recorded.</p>}
-          {row.evaluations.length > 1 ? <InputEvaluationHistory evaluations={row.evaluations} /> : null}
-        </section>
-        <section className="wf-input-inspection-detail wf-input-inspection-source" aria-label={`${row.name} authored source`}>
-          <h5>Authored source</h5>
-          <AuthoredInputSource
-            row={row}
-            sourceAccess={sourceAccess}
-            protectedSource={sourceProtected}
-            expressionEditors={expressionEditors}
-          />
-        </section>
-      </div>
-    </details>
+        </summary>
+        <div id={regionId} className="wf-runtime-input-content wf-input-inspection-content">
+          {row.states.length > 0 ? (
+            <p className="wf-instance-note">{row.states.map(formatInputInspectionState).join(" · ")}</p>
+          ) : null}
+          <section className="wf-input-inspection-detail" aria-label={`${row.name} runtime evidence`}>
+            <h5>Evaluated at runtime</h5>
+            {latest ? <RuntimeValueEvidenceCard snapshot={latest} listItem={false} /> : <p>No runtime evaluation was recorded.</p>}
+            {row.evaluations.length > 1 ? <InputEvaluationHistory evaluations={row.evaluations} /> : null}
+          </section>
+          <section className="wf-input-inspection-detail wf-input-inspection-source" aria-label={`${row.name} authored source`}>
+            <h5>Authored source</h5>
+            <AuthoredInputSource
+              row={row}
+              sourceAccess={sourceAccess}
+              protectedSource={sourceProtected}
+              expressionEditors={expressionEditors}
+            />
+          </section>
+        </div>
+      </details>
+    </div>
   );
 }
 
@@ -1495,10 +1497,6 @@ function isProtectedSourceAccess(access: string | null | undefined) {
   return normalized !== "visible" && normalized !== "allowed";
 }
 
-function safeDomId(value: string) {
-  return value.replace(/[^a-zA-Z0-9_-]/g, "-");
-}
-
 function formatInputInspectionState(state: InputInspectionState) {
   const labels: Record<InputInspectionState, string> = {
     missingDeclaration: "Declaration unavailable",
@@ -1608,7 +1606,7 @@ function RuntimeValueEvidenceCard({ snapshot, listItem = true }: { snapshot: Act
   const capturedState = !captureStateKey || captureStateKey === "payloadcaptured" || captureStateKey === "diagnosticsnapshotcaptured";
   const permissionAllowsResolution = accessKey === "resolutionavailable";
   const canResolve = !!scope && !!evidenceId && supportedCaptureMode && capturedState && permissionAllowsResolution;
-  const resolutionIdentity = [runtimeValueContextId(scope?.context), scope?.workflowExecutionId, scope?.activityExecutionId, evidenceId, captureModeKey].join("/");
+  const resolutionIdentity = JSON.stringify([runtimeValueContextId(scope?.context), scope?.workflowExecutionId, scope?.activityExecutionId, evidenceId, captureModeKey]);
   const [requestedSensitiveIdentity, setRequestedSensitiveIdentity] = useState<string | null>(null);
   const [retrySequence, setRetrySequence] = useState(0);
   const [resolution, setResolution] = useState<RuntimeValueResolutionState | null>(null);
@@ -1646,7 +1644,7 @@ function RuntimeValueEvidenceCard({ snapshot, listItem = true }: { snapshot: Act
   }, [evidenceId, resolutionIdentity, retrySequence, scope, shouldResolve, snapshot.captureMode]);
 
   const typeName = runtimeValueTypeLabel(snapshot.type) || "Unknown";
-  const hasInlinePayload = snapshot.payload !== undefined && !(snapshot.accessState && snapshot.payload === null);
+  const hasInlinePayload = snapshot.payload !== undefined && !(permissionAllowsResolution && snapshot.payload === null);
   const diagnosticSnapshot = snapshot.snapshot ?? (snapshot.captureMode === "DiagnosticSnapshot" && hasInlinePayload ? snapshot.payload : null);
   const hasPayload = snapshot.captureMode === "Payload" && hasInlinePayload;
   const currentResolution = resolution?.identity === resolutionIdentity ? resolution : null;

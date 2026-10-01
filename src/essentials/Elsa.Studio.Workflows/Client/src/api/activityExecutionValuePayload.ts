@@ -17,7 +17,7 @@ const queuedValuePayloadResolutions: Array<{
 }> = [];
 
 /** Resolve one captured value through the separately advertised, permission-checked Runtime relation. */
-export function getActivityExecutionValuePayload(
+export async function getActivityExecutionValuePayload(
   context: StudioEndpointContext,
   workflowExecutionId: string,
   activityExecutionId: string,
@@ -25,13 +25,15 @@ export function getActivityExecutionValuePayload(
   expectedCaptureMode: string,
   signal?: AbortSignal
 ) {
+  throwIfAborted(signal);
+  const path = await resolveCapabilityLink(
+    context,
+    capabilityIds.runtime,
+    "activity-execution-value-payload",
+    { workflowExecutionId, activityExecutionId, evidenceId });
+  throwIfAborted(signal);
+
   return withValuePayloadResolutionSlot(signal, async () => {
-    const path = await resolveCapabilityLink(
-      context,
-      capabilityIds.runtime,
-      "activity-execution-value-payload",
-      { workflowExecutionId, activityExecutionId, evidenceId });
-    throwIfAborted(signal);
     const response = signal
       ? await context.http.getJson<ActivityExecutionValuePayload>(path, { signal })
       : await context.http.getJson<ActivityExecutionValuePayload>(path);

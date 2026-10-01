@@ -21,6 +21,7 @@ import {
   getActivityExecutionLayout
 } from "../api/runtime";
 import { observeReusableActivity } from "../reusableActivityObservability";
+import { runtimeValueTypeLabel } from "../runtimeValueFormatting";
 import {
   classifyBoundaryCursorProblem,
   emptyBoundaryEvidenceSnapshot,
@@ -1020,7 +1021,7 @@ function SelectedValueEvidence({ snapshot }: { snapshot: ActivityExecutionInspec
       <header style={boundaryStyles.splitHeader}>
         <span style={boundaryStyles.stack}>
           <strong>{snapshot.name}</strong>
-          <small>{snapshot.subject} · {snapshot.type?.displayName ?? snapshot.type?.typeName ?? "Unknown type"}</small>
+          <small>{snapshot.subject} · {runtimeValueTypeLabel(snapshot.type) || "Unknown type"}</small>
         </span>
         <span style={boundaryStyles.badge}>{labels[presentation]}</span>
       </header>
