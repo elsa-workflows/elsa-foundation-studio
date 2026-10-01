@@ -208,7 +208,7 @@ function evaluationStates(evaluations: ActivityExecutionInspectionValueSnapshot[
   const states: InputInspectionState[] = [];
   for (const evaluation of evaluations) {
     const access = (evaluation.accessState ?? evaluation.access)?.toLowerCase();
-    const state = evaluation.state?.toLowerCase();
+    const state = (evaluation.captureState ?? evaluation.state)?.replace(/[^a-z]/gi, "").toLowerCase();
     const snapshotKind = evaluation.snapshot?.kind.toLowerCase();
     if (access === "redacted" || snapshotKind === "redacted") states.push("redacted");
     if (access === "unavailable" || state === "unavailable") states.push("unavailable");

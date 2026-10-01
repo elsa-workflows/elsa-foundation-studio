@@ -553,6 +553,33 @@ describe("WorkflowActivityExecutionDetails", () => {
     expect(getActivityExecutionValuePayload).not.toHaveBeenCalled();
   });
 
+  it("wraps compact resolved Payload strings so narrow inspectors can show the entire value", async () => {
+    const payload = "A compact captured value with enough content to span multiple lines in the narrow activity inspector.";
+    vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([valueEvidence({
+      subject: "ActivityOutput", captureMode: "Payload", captureState: "payloadCaptured"
+    })]));
+    vi.mocked(getActivityExecutionValuePayload).mockResolvedValue({
+      evidenceId: "evidence-1", captureMode: "Payload", payload
+    });
+
+    const container = render(<WorkflowActivityExecutionDetails context={context} activity={activity} activityCatalog={catalog} />);
+
+    await waitFor(() => expect(container.querySelector(".wf-runtime-input-value")?.textContent).toBe(payload));
+    expect(container.querySelector(".wf-runtime-input-value")?.classList.contains("wf-runtime-snapshot-value")).toBe(true);
+  });
+
+  it.each([undefined, "captured"] as const)("uses metadata-only captureState in the input summary with legacy state %s", async state => {
+    vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([valueEvidence({
+      captureMode: "Metadata", captureState: "metadataOnly", state,
+      accessState: "visible", payload: undefined, snapshot: null, captureReason: ""
+    })]));
+
+    const container = render(<WorkflowActivityExecutionDetails context={context} activity={activity} activityCatalog={catalog} />);
+
+    await waitFor(() => expect(container.querySelector(".wf-input-inspection-content > .wf-instance-note")?.textContent).toContain("Metadata only"));
+    expect([...container.querySelectorAll(".wf-input-inspection-preview code")].map(node => node.textContent)).toContain("metadata Only");
+  });
+
   it("retains native input disclosures with distinct controlled regions for punctuation-containing keys", async () => {
     vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([]));
     const pairedCatalog: ActivityCatalogItem[] = [{

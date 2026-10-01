@@ -304,7 +304,7 @@ function RuntimeInputPayload({ payload }: { payload: unknown }) {
   const compact = text.length <= 160 && !text.includes("\n");
 
   return compact ? (
-    <code className="wf-runtime-input-value">{displayText}</code>
+    <code className="wf-runtime-input-value wf-runtime-snapshot-value">{displayText}</code>
   ) : (
     <details className="wf-runtime-input-value-details">
       <summary>{previewSnapshotPayload(displayText)}</summary>

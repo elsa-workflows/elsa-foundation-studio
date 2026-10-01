@@ -1471,7 +1471,7 @@ function runtimeEvidencePreview(snapshot: ActivityExecutionInspectionValueSnapsh
   if (node && isKnownSnapshotNode(node) && (node.kind === "scalar" || node.kind === "number")) return previewSnapshotPayload(formatSnapshotPayload(node.value));
   if (node) return formatSnapshotKind(node.kind);
   if (snapshot.captureMode === "Payload" && snapshot.payload !== undefined) return previewSnapshotPayload(formatSnapshotPayload(snapshot.payload));
-  return snapshot.captureReason || formatCaptureMode(snapshot.state || snapshot.captureMode);
+  return snapshot.captureReason || formatCaptureMode(snapshot.captureState ?? snapshot.state ?? snapshot.captureMode);
 }
 
 function sourcePreview(row: InputInspectionRow, protectedSource: boolean, sourceAccess?: string | null) {
