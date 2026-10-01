@@ -77,7 +77,11 @@
 
   /* ── Editorial (Atelier): the page is a sheet on a desk ────────────────────────────────── */
 
+  /* The desk margin around the sheet. On the start side the sidebar already provides it, so the
+     frame takes `--shell-frame-inset-start` there: unset (0) beside a sidebar, the full inset when
+     the navigation is on top. */
   html[data-theme-layout="editorial"] .studio-shell {
+    --shell-frame-inset: 10px;
     background: var(--background);
   }
 
@@ -121,7 +125,7 @@
   }
 
   html[data-theme-layout="editorial"] .main-frame {
-    margin: 10px 10px 10px 0;
+    margin: var(--shell-frame-inset) var(--shell-frame-inset) var(--shell-frame-inset) var(--shell-frame-inset-start, 0);
     border: 1px solid var(--border);
     border-radius: var(--radius-xl);
     background: var(--card);
@@ -146,7 +150,7 @@
   }
 
   html[data-theme-layout="editorial"] .bottom-panel {
-    margin: 0 10px 10px;
+    margin: 0 var(--shell-frame-inset) var(--shell-frame-inset);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
   }
@@ -154,7 +158,9 @@
   /* ── Top navigation: the sidebar becomes a menubar, whatever the theme ─────────────────── */
   /* Last in the query so it outranks the floating/editorial `.sidebar` rules at equal specificity. */
 
+  /* With no sidebar beside it, the main frame keeps a layout's full frame inset on its start side. */
   html[data-nav-mode="top"] .studio-shell {
+    --shell-frame-inset-start: var(--shell-frame-inset, 0);
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto auto;
   }

@@ -41,6 +41,17 @@ describe("navigation mode stylesheet", () => {
 
     expect(selectors(layoutsCss).filter(selector => selector.includes("data-theme-layout") && menubarParts.test(selector))).toEqual([]);
     expect(selectors(layoutsCss).some(selector => selector.startsWith('html[data-theme-layout="workbench"] .sidebar'))).toBe(false);
+    expect(selectors(layoutsCss).filter(selector => selector.includes("data-theme-layout") && selector.includes("data-nav-mode"))).toEqual([]);
+  });
+
+  // A layout that insets its main frame states the inset once; the start side follows the navigation.
+  it("keeps the editorial desk margin on the sheet's start side only when no sidebar provides it", () => {
+    const editorial = 'html[data-theme-layout="editorial"]';
+
+    expect(ruleBody(layoutsCss, `${editorial} .studio-shell`)).toMatch(/--shell-frame-inset:\s*10px;/);
+    expect(ruleBody(layoutsCss, `${editorial} .main-frame`)).toMatch(
+      /margin:\s*var\(--shell-frame-inset\) var\(--shell-frame-inset\) var\(--shell-frame-inset\) var\(--shell-frame-inset-start, 0\);/);
+    expect(ruleBody(layoutsCss, `${topNav} .studio-shell`)).toMatch(/--shell-frame-inset-start:\s*var\(--shell-frame-inset, 0\);/);
   });
 
   it("confines the menubar to desktop widths and renders the status bar at every width", () => {
