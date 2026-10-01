@@ -501,21 +501,34 @@ describe("WorkflowActivityExecutionDetails", () => {
     expect(getActivityExecutionValuePayload).toHaveBeenCalledTimes(1);
   });
 
-  it("shows automatic resolution loading and offers retry after a resolver error", async () => {
-    vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([valueEvidence()]));
+  it.each([
+    ["metadata-only detail", "DiagnosticSnapshot", false],
+    ["inline diagnostic", "DiagnosticSnapshot", true],
+    ["inline payload", "Payload", true]
+  ] as const)("handles loading and retry for %s evidence without using unauthorized inline fields", async (_label, captureMode, inline) => {
+    vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([valueEvidence({
+      subject: "ActivityOutput", captureMode,
+      captureState: captureMode === "Payload" ? "payloadCaptured" : "diagnosticSnapshotCaptured",
+      ...(inline ? {
+        payload: "INLINE_UNAUTHORIZED_VALUE",
+        snapshot: { kind: "string", preview: "INLINE_UNAUTHORIZED_VALUE" }
+      } : {})
+    })]));
     let rejectPending!: (reason: unknown) => void;
     const pending = new Promise<{ evidenceId: string; captureMode: string; payload: unknown }>((_resolve, reject) => {
       rejectPending = reject;
     });
     vi.mocked(getActivityExecutionValuePayload)
       .mockImplementationOnce(() => pending)
-      .mockResolvedValueOnce({ evidenceId: "evidence-1", captureMode: "DiagnosticSnapshot", payload: "retried value" });
+      .mockResolvedValueOnce({ evidenceId: "evidence-1", captureMode, payload: "retried value" });
 
     const container = render(<WorkflowActivityExecutionDetails context={context} activity={activity} activityCatalog={catalog} />);
 
     await waitFor(() => expect(container.textContent).toContain("Resolving captured value..."));
+    expect(container.textContent).not.toContain("INLINE_UNAUTHORIZED_VALUE");
     rejectPending(new Error("temporary payload service failure"));
     await waitFor(() => expect(container.textContent).toContain("temporary payload service failure"));
+    expect(container.textContent).not.toContain("INLINE_UNAUTHORIZED_VALUE");
     const retryButton = [...container.querySelectorAll<HTMLButtonElement>("button")]
       .find(button => button.textContent === "Retry");
     expect(retryButton).toBeDefined();
@@ -523,6 +536,7 @@ describe("WorkflowActivityExecutionDetails", () => {
 
     await waitFor(() => expect(container.textContent).toContain("retried value"));
     expect(getActivityExecutionValuePayload).toHaveBeenCalledTimes(2);
+    expect(container.textContent).not.toContain("INLINE_UNAUTHORIZED_VALUE");
   });
 
   it.each(["visible", "allowed"])("preserves an authorized inline null payload with %s access", async accessState => {

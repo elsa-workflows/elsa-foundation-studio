@@ -116,8 +116,10 @@ export function RuntimeValueEvidenceContent({ snapshot }: { snapshot: ActivityEx
     return () => controller.abort();
   }, [evidenceId, resolutionIdentity, retrySequence, scope, shouldResolve, snapshot.captureMode]);
 
-  const hasInlinePayload = snapshot.payload !== undefined && !(permissionAllowsResolution && snapshot.payload === null);
-  const diagnosticSnapshot = snapshot.snapshot ?? (snapshot.captureMode === "DiagnosticSnapshot" && hasInlinePayload ? snapshot.payload : null);
+  const hasInlinePayload = !permissionAllowsResolution && snapshot.payload !== undefined;
+  const diagnosticSnapshot = permissionAllowsResolution
+    ? null
+    : snapshot.snapshot ?? (snapshot.captureMode === "DiagnosticSnapshot" && hasInlinePayload ? snapshot.payload : null);
   const hasPayload = snapshot.captureMode === "Payload" && hasInlinePayload;
   const currentResolution = resolution?.identity === resolutionIdentity ? resolution : null;
   const protectedAccess = ["redacted", "permissionhidden", "permission-hidden", "resolutionpermissionrequired", "unavailable"].includes(accessKey);
