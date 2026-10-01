@@ -12,28 +12,66 @@ const modeIcons: Record<ThemeMode, LucideIcon> = {
   "high-contrast": Contrast
 };
 
+// High contrast is an accessibility mode, so it stays in the menu rather than the quick control.
+const quickModes: readonly ThemeMode[] = ["light", "dark", "dim"];
+
+/** Compact radiogroup for the base modes; offers only the ones the current theme defines. */
+function QuickModeToggle() {
+  const { mode, setMode, supportedModes } = useTheme();
+  const options = quickModes.filter(themeMode => supportedModes.includes(themeMode));
+  const optionRefs = React.useRef<Record<string, HTMLButtonElement | null>>({});
+
+  if (options.length < 2) return null;
+
+  // High contrast is not a quick option, so nothing is checked then; keep the group reachable by Tab.
+  const tabStop = options.includes(mode) ? mode : options[0];
+
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    const index = options.findIndex(themeMode => optionRefs.current[themeMode] === event.target);
+    const next =
+      event.key === "ArrowRight" || event.key === "ArrowDown" ? (index + 1) % options.length
+      : event.key === "ArrowLeft" || event.key === "ArrowUp" ? (index - 1 + options.length) % options.length
+      : event.key === "Home" ? 0
+      : event.key === "End" ? options.length - 1
+      : -1;
+    if (index < 0 || next < 0) return;
+    event.preventDefault();
+    setMode(options[next]);
+    optionRefs.current[options[next]]?.focus();
+  };
+
+  return (
+    <div className="theme-mode-toggle" role="radiogroup" aria-label="Colour mode" onKeyDown={handleKeyDown}>
+      {options.map(themeMode => {
+        const Icon = modeIcons[themeMode];
+        return (
+          <button
+            key={themeMode}
+            ref={element => { optionRefs.current[themeMode] = element; }}
+            type="button"
+            role="radio"
+            className="theme-mode-toggle-option"
+            data-mode={themeMode}
+            aria-checked={mode === themeMode}
+            aria-label={themeModeLabels[themeMode]}
+            title={`${themeModeLabels[themeMode]} mode`}
+            tabIndex={themeMode === tabStop ? 0 : -1}
+            onClick={() => setMode(themeMode)}
+          >
+            <Icon size={16} aria-hidden="true" />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function ThemeSwitcher() {
-  const { currentTheme, mode, setTheme, setMode, availableThemes, supportedModes, canToggleMode } = useTheme();
-  // The quick toggle flips between the two base modes; Dim and High contrast live in the menu.
-  const toggleTarget: ThemeMode = mode === "light" ? "dark" : "light";
-  const toggleAvailable = canToggleMode && supportedModes.includes(toggleTarget);
-  const modeToggleTitle = toggleAvailable
-    ? `${themeModeLabels[toggleTarget]} mode`
-    : `${currentTheme.name} supports ${themeModeLabels[mode].toLowerCase()} mode only`;
-  const ToggleIcon = toggleTarget === "dark" ? Moon : Sun;
+  const { currentTheme, mode, setTheme, setMode, availableThemes, supportedModes } = useTheme();
 
   return (
     <div className="theme-switcher-container">
-      <button
-        type="button"
-        className="theme-toggle-button"
-        onClick={() => toggleAvailable && setMode(toggleTarget)}
-        disabled={!toggleAvailable}
-        aria-label={toggleAvailable ? `Switch to ${themeModeLabels[toggleTarget].toLowerCase()} mode` : modeToggleTitle}
-        title={modeToggleTitle}
-      >
-        <ToggleIcon size={18} />
-      </button>
+      <QuickModeToggle />
 
       {/* Theme Selector Dropdown (Radix: keyboard nav, Esc, focus trap/restore, ARIA menu) */}
       <DropdownMenu.Root>

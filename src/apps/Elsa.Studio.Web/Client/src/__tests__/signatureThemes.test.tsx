@@ -317,6 +317,72 @@ describe("ThemeProvider and ThemeSwitcher", () => {
     expect(api!.preferredMode).not.toBe("dim");
   });
 
+  const quickOptions = () => Array.from(container.querySelectorAll<HTMLButtonElement>('[role="radiogroup"][aria-label="Colour mode"] [role="radio"]'));
+  const quickOption = (label: string) => quickOptions().find(option => option.getAttribute("aria-label") === label)!;
+
+  it("offers Light, Dark and Dim as a one-click radiogroup, leaving High contrast to the menu", async () => {
+    await render();
+
+    expect(quickOptions().map(option => option.getAttribute("aria-label"))).toEqual(["Light", "Dark", "Dim"]);
+    expect(quickOption("Light").getAttribute("aria-checked")).toBe("true");
+
+    await act(() => quickOption("Dim").click());
+
+    expect(api!.mode).toBe("dim");
+    expect(document.documentElement.getAttribute("data-theme-appearance")).toBe("dim");
+    expect(localStorage.getItem("elsa-studio-theme-mode")).toBe("dim");
+    expect(quickOptions().map(option => option.getAttribute("aria-checked"))).toEqual(["false", "false", "true"]);
+  });
+
+  it("keeps the quick control and the Appearance menu in sync", async () => {
+    await render();
+    await openThemeMenu();
+
+    await act(() => modeItems()[2].click());
+    expect(quickOption("Dim").getAttribute("aria-checked")).toBe("true");
+
+    await act(() => quickOption("Dark").click());
+    expect(modeItems().map(item => item.getAttribute("aria-checked"))).toEqual(["false", "true", "false", "false"]);
+
+    // High contrast is menu-only: no quick option is checked while it is active.
+    await act(() => modeItems()[3].click());
+    expect(quickOptions().some(option => option.getAttribute("aria-checked") === "true")).toBe(false);
+    expect(quickOptions().filter(option => option.tabIndex === 0)).toHaveLength(1);
+  });
+
+  it("moves through the quick modes with the arrow keys", async () => {
+    await render();
+    quickOption("Light").focus();
+
+    await act(() => quickOption("Light").dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })));
+    expect(api!.mode).toBe("dark");
+    expect(document.activeElement).toBe(quickOption("Dark"));
+
+    await act(() => quickOption("Dark").dispatchEvent(new KeyboardEvent("keydown", { key: "End", bubbles: true })));
+    expect(api!.mode).toBe("dim");
+
+    await act(() => quickOption("Dim").dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })));
+    expect(api!.mode).toBe("light");
+  });
+
+  it("offers no Dim option for a theme that only defines Light and Dark", async () => {
+    await render();
+    await act(() => api!.setMode("dim"));
+    await act(() => api!.setTheme("stone"));
+
+    expect(quickOptions().map(option => option.getAttribute("aria-label"))).toEqual(["Light", "Dark"]);
+    expect(quickOption("Dark").getAttribute("aria-checked")).toBe("true");
+
+    await act(() => quickOption("Light").click());
+    expect(api!.mode).toBe("light");
+
+    // The stored preference returns once a theme that defines Dim is picked again.
+    await act(() => api!.setMode("dim"));
+    await act(() => api!.setTheme("drift"));
+    expect(quickOptions().map(option => option.getAttribute("aria-label"))).toEqual(["Light", "Dark", "Dim"]);
+    expect(quickOption("Dim").getAttribute("aria-checked")).toBe("true");
+  });
+
   it("publishes the theme's layout on <html>, falling back to classic", async () => {
     await render();
     expect(getStudioThemeLayout()).toBe("classic");

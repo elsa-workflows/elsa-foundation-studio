@@ -4,45 +4,48 @@
   gap: 6px;
 }
 
-.theme-toggle-button {
-  display: flex;
+/* Quick mode control: Light / Dark / Dim as one segmented radiogroup, sized to match the
+   theme-selector button beside it. Segments the theme does not define are not rendered. */
+.theme-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 40px;
+  padding: 3px;
+  border: 1px solid var(--studio-border);
+  border-radius: var(--radius);
+  background: var(--studio-surface);
+}
+
+.theme-mode-toggle-option {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 100%;
   padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--card);
-  color: var(--foreground);
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius) - 2px);
+  background: transparent;
+  color: var(--studio-text-muted);
   cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: inherit;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
-.theme-toggle-button:hover {
-  background: var(--primary);
-  color: var(--primary-foreground);
-  border-color: var(--primary);
-  transform: scale(1.05);
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 20%, transparent);
+.theme-mode-toggle-option:hover {
+  background: var(--studio-surface-muted);
+  color: var(--studio-text);
 }
 
-.theme-toggle-button:active {
-  transform: scale(0.95);
+.theme-mode-toggle-option[aria-checked="true"] {
+  background: color-mix(in srgb, var(--studio-accent) 14%, var(--studio-surface));
+  border-color: var(--studio-accent);
+  color: var(--studio-text);
 }
 
-.theme-toggle-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.theme-toggle-button:disabled:hover {
-  background: var(--card);
-  color: var(--foreground);
-  border-color: var(--border);
-  transform: none;
-  box-shadow: none;
+.theme-mode-toggle-option:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
 }
 
 .theme-selector-wrapper {
