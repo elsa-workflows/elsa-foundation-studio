@@ -58,6 +58,8 @@ Features ship in:
 | `WorkflowsDashboardStudio` | `Elsa.Studio.Workflows.Dashboard` | `IShellFeature` |
 | `WeatherForecastSample` | `Elsa.Studio.Samples.WeatherForecast` | `IWebShellFeature` |
 
+The host discovers in-box features only in the assemblies listed in `StudioFeatureAssemblies` (in `Elsa.Studio.Web`), plus installed Nuplane packages. CShells stops scanning host assemblies once that list is registered, so a new in-box feature needs its assembly added there as well as to `shells.json`; otherwise CShells logs a warning at startup and skips it. `WeatherForecastSample` is the exception: the host does not reference it, and it activates once its package (`artifacts/packages/Elsa.Studio.Samples.WeatherForecast.*.nupkg`) is installed into the `packages` feed. Until then, the startup warning for it is expected.
+
 ## Build
 
 ```bash
