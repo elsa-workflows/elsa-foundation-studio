@@ -26,12 +26,12 @@ public sealed class StudioAssetCachingTests : IAsyncLifetime
     private const string HostContentModuleUrl = "/_content/" + HostAssemblyId + "/" + ModuleEntry;
     private const string PackageModuleUrl = "/_content/" + PackageId + "/" + ModuleEntry;
     private const string SpaRouteUrl = "/workflows/definitions";
-    private readonly string _root = Path.Combine(Path.GetTempPath(), $"elsa-asset-caching-{Guid.NewGuid():N}");
+    private readonly string _root = Path.Join(Path.GetTempPath(), $"elsa-asset-caching-{Guid.NewGuid():N}");
     private WebApplication _app = null!;
     private HttpClient _client = null!;
 
-    private string WebRoot => Path.Combine(_root, "wwwroot");
-    private string PackageInstallPath => Path.Combine(_root, "packages", PackageId);
+    private string WebRoot => Path.Join(_root, "wwwroot");
+    private string PackageInstallPath => Path.Join(_root, "packages", PackageId);
 
     [Theory]
     [InlineData(HostModuleUrl)]
@@ -66,10 +66,10 @@ public sealed class StudioAssetCachingTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        WriteFile(Path.Combine(WebRoot, ModuleEntry), ModuleSource);
-        WriteFile(Path.Combine(WebRoot, "_content", HostAssemblyId, ModuleEntry), ModuleSource);
-        WriteFile(Path.Combine(WebRoot, "studio", "index.html"), "<!doctype html>");
-        WriteFile(Path.Combine(PackageInstallPath, "staticwebassets", ModuleEntry), ModuleSource);
+        WriteFile(Path.Join(WebRoot, ModuleEntry), ModuleSource);
+        WriteFile(Path.Join(WebRoot, "_content", HostAssemblyId, ModuleEntry), ModuleSource);
+        WriteFile(Path.Join(WebRoot, "studio", "index.html"), "<!doctype html>");
+        WriteFile(Path.Join(PackageInstallPath, "staticwebassets", ModuleEntry), ModuleSource);
 
         var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions
         {
