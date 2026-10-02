@@ -240,7 +240,7 @@ textarea:focus {
 
 /* Sign-in status screen. Rendered outside ThemeProvider, so it carries its own light/dark palette
    (following the OS preference) and only borrows the host primary/danger accents. */
-.studio-shell.studio-auth-signing-in {
+:root .studio-shell.studio-auth-signing-in {
   --auth-bg: oklch(0.975 0.006 245);
   --auth-glow: oklch(0.86 0.07 240 / 0.55);
   --auth-dot: oklch(0.3 0.03 250 / 0.13);
@@ -267,7 +267,7 @@ textarea:focus {
 }
 
 @media (prefers-color-scheme: dark) {
-  .studio-shell.studio-auth-signing-in {
+  :root .studio-shell.studio-auth-signing-in {
     --auth-bg: oklch(0.17 0.02 255);
     --auth-glow: oklch(0.5 0.14 240 / 0.34);
     --auth-dot: oklch(0.95 0.02 240 / 0.12);
@@ -283,7 +283,7 @@ textarea:focus {
 }
 
 /* Quiet dot grid that fades out towards the edges. */
-.studio-shell.studio-auth-signing-in::before {
+:root .studio-shell.studio-auth-signing-in::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -311,7 +311,7 @@ textarea:focus {
 
 .studio-auth-card--error {
   width: min(420px, 100%);
-  border-color: color-mix(in srgb, var(--studio-danger) 38%, var(--auth-border));
+  border-color: color-mix(in srgb, var(--auth-danger-text) 38%, var(--auth-border));
 }
 
 .studio-auth-brand-mark {
@@ -425,10 +425,10 @@ textarea:focus {
   }
 }
 
-/* The bar is 45% of the track wide: travelling from -100% of itself to the far edge is 100% / 45% + 100%. */
+/* The bar is 45% of the track wide, so the track is 100% / 45% = 222% of the bar: that offset puts the bar just past the far edge. */
 @keyframes studio-auth-sweep {
   to {
-    transform: translateX(322%);
+    transform: translateX(222%);
   }
 }
 
