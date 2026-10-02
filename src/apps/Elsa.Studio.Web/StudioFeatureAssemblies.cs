@@ -5,6 +5,8 @@ using Elsa.Studio.ConsoleStream;
 using Elsa.Studio.Dashboard;
 using Elsa.Studio.Diagnostics.OpenTelemetry;
 using Elsa.Studio.Diagnostics.StructuredLogs;
+using Elsa.Studio.ExpressionEditors.JavaScript;
+using Elsa.Studio.ExpressionEditors.Liquid;
 using Elsa.Studio.FeatureManagement;
 using Elsa.Studio.Secrets;
 using Elsa.Studio.Weaver.Workflows;
@@ -35,5 +37,7 @@ internal static class StudioFeatureAssemblies
                 typeof(WeaverWorkflowsStudioFeature).Assembly,
                 typeof(WorkflowsStudioFeature).Assembly,
                 typeof(SecretsStudioFeature).Assembly,
+                typeof(JavaScriptExpressionEditorStudioFeature).Assembly,
+                typeof(LiquidExpressionEditorStudioFeature).Assembly,
                 typeof(ThemeStoreCoreStudioFeature).Assembly);
 }
