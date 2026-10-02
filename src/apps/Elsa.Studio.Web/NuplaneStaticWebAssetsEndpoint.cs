@@ -54,7 +54,7 @@ internal static class NuplaneStaticWebAssetsEndpoint
     private static IResult ServeFile(IFileInfo file) =>
         file.PhysicalPath is { Length: > 0 } physicalPath
             ? Results.File(physicalPath, GetContentType(physicalPath), enableRangeProcessing: true)
-            : Results.Stream(file.CreateReadStream(), GetContentType(file.Name), lastModified: file.LastModified);
+            : Results.Stream(file.CreateReadStream(), GetContentType(file.Name));
 
     internal static bool IsChildPath(string parentPath, string childPath)
     {

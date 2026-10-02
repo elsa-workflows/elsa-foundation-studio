@@ -18,11 +18,14 @@ namespace Elsa.Studio.Tests;
 /// </summary>
 public sealed class StudioAssetCachingTests : IAsyncLifetime
 {
+    private const string HostAssemblyId = "Acme.Studio.Host";
     private const string PackageId = "Acme.Studio.Module";
     private const string ModuleEntry = "studio/modules/acme/module.js";
     private const string ModuleSource = "export const register = () => {};";
     private const string HostModuleUrl = "/" + ModuleEntry;
+    private const string HostContentModuleUrl = "/_content/" + HostAssemblyId + "/" + ModuleEntry;
     private const string PackageModuleUrl = "/_content/" + PackageId + "/" + ModuleEntry;
+    private const string SpaRouteUrl = "/workflows/definitions";
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"elsa-asset-caching-{Guid.NewGuid():N}");
     private WebApplication _app = null!;
     private HttpClient _client = null!;
@@ -32,9 +35,10 @@ public sealed class StudioAssetCachingTests : IAsyncLifetime
 
     [Theory]
     [InlineData(HostModuleUrl)]
+    [InlineData(HostContentModuleUrl)] // A module's static web assets, as the manifest addresses them.
     [InlineData(PackageModuleUrl)] // Served by the Nuplane package endpoint.
     [InlineData("/studio/index.html")]
-    [InlineData("/workflows/definitions")] // SPA fallback to studio/index.html.
+    [InlineData(SpaRouteUrl)] // SPA fallback to studio/index.html.
     public async Task ServedAssetsMustBeRevalidated(string path)
     {
         using var response = await _client.GetAsync(path);
@@ -46,7 +50,9 @@ public sealed class StudioAssetCachingTests : IAsyncLifetime
 
     [Theory]
     [InlineData(HostModuleUrl)]
+    [InlineData(HostContentModuleUrl)]
     [InlineData(PackageModuleUrl)]
+    [InlineData(SpaRouteUrl)]
     public async Task RevalidatingAnUnchangedAssetIsANotModified(string path)
     {
         using var first = await _client.GetAsync(path);
@@ -61,6 +67,7 @@ public sealed class StudioAssetCachingTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         WriteFile(Path.Combine(WebRoot, ModuleEntry), ModuleSource);
+        WriteFile(Path.Combine(WebRoot, "_content", HostAssemblyId, ModuleEntry), ModuleSource);
         WriteFile(Path.Combine(WebRoot, "studio", "index.html"), "<!doctype html>");
         WriteFile(Path.Combine(PackageInstallPath, "staticwebassets", ModuleEntry), ModuleSource);
 
@@ -84,6 +91,7 @@ public sealed class StudioAssetCachingTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
+        _client.Dispose();
         await _app.DisposeAsync();
 
         if (Directory.Exists(_root))
@@ -98,12 +106,26 @@ public sealed class StudioAssetCachingTests : IAsyncLifetime
 
     private sealed class SinglePackageNuplaneAdmin(string packageId, string installPath) : INuplaneAdminOperations
     {
-        public Task<ActivePackagesSnapshot> GetPackagesAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult(new ActivePackagesSnapshot(DateTimeOffset.UtcNow, DateTimeOffset.UtcNow,
-            [
-                new ActivePackage(packageId, "1.0.0", "feed", "source", installPath, DateTimeOffset.UtcNow, "correlation",
-                    "graph", "generation", ActivePackageRole.Root, [], [], true)
-            ], "correlation"));
+        // Only PackageId and InstallPath matter to the asset endpoint; the rest is placeholder.
+        public Task<ActivePackagesSnapshot> GetPackagesAsync(CancellationToken cancellationToken = default)
+        {
+            var now = DateTimeOffset.UtcNow;
+            var package = new ActivePackage(
+                PackageId: packageId,
+                Version: "1.0.0",
+                FeedName: "feed",
+                SourceName: "source",
+                InstallPath: installPath,
+                ActivatedAtUtc: now,
+                ActivationCorrelationId: "correlation",
+                GraphId: "graph",
+                GraphGenerationId: "generation",
+                PackageRole: ActivePackageRole.Root,
+                RootPackageIds: [],
+                DependencyOfPackageIds: [],
+                Discoverable: true);
+            return Task.FromResult(new ActivePackagesSnapshot(now, now, [package], "correlation"));
+        }
 
         public Task<OperationalStateSnapshot> GetStateAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
