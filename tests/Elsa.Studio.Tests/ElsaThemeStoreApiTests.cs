@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Elsa.Studio.Web;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -189,6 +190,18 @@ public sealed class ElsaThemeStoreApiTests : IAsyncLifetime
         var theme = CustomTheme();
         (await _client.PutAsJsonAsync($"/_elsa/theme-store/themes/{theme.Id}", theme)).EnsureSuccessStatusCode();
         (await _client.PutAsJsonAsync("/_elsa/theme-store/default", new { ThemeId = theme.Id })).EnsureSuccessStatusCode();
+
+        Assert.Equal(theme.Id, (await GetStoreAsync()).DefaultThemeId);
+    }
+
+    [Fact]
+    public async Task ConfiguredDirectoryThemeDefaultIsKept()
+    {
+        var theme = CustomTheme();
+        var themesFile = Path.Combine(_contentRoot, "themes.json");
+        await File.WriteAllTextAsync(themesFile, JsonSerializer.Serialize(new { themes = new[] { theme } }, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+        _themeConfig.ThemesDirectory = themesFile;
+        _themeConfig.DefaultThemeId = theme.Id;
 
         Assert.Equal(theme.Id, (await GetStoreAsync()).DefaultThemeId);
     }
