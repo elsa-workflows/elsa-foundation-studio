@@ -160,18 +160,20 @@ public sealed class ElsaThemeStoreApiTests : IAsyncLifetime
         return (await response.Content.ReadFromJsonAsync<ThemeStoreResponse>())!;
     }
 
-    [Fact]
-    public async Task StoredDefaultThatIsNoLongerAThemeIsReportedAsUnset()
+    [Theory]
+    [MemberData(nameof(RetiredThemeIds))]
+    public async Task StoredRetiredDefaultIsReportedAsUnset(string themeId)
     {
-        await File.WriteAllTextAsync(Path.Combine(_contentRoot, "studio-theme-store.json"), """{"themes":[],"defaultThemeId":"retired-theme","assets":[]}""");
+        await File.WriteAllTextAsync(Path.Combine(_contentRoot, "studio-theme-store.json"), $$"""{"themes":[],"defaultThemeId":"{{themeId}}","assets":[]}""");
 
         Assert.Equal("", (await GetStoreAsync()).DefaultThemeId);
     }
 
-    [Fact]
-    public async Task ConfiguredDefaultThatIsNoLongerAThemeIsReportedAsUnset()
+    [Theory]
+    [MemberData(nameof(RetiredThemeIds))]
+    public async Task ConfiguredRetiredDefaultIsReportedAsUnset(string themeId)
     {
-        _themeConfig.DefaultThemeId = "retired-theme";
+        _themeConfig.DefaultThemeId = themeId;
 
         Assert.Equal("", (await GetStoreAsync()).DefaultThemeId);
     }
