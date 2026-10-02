@@ -66,3 +66,17 @@ Record runner class, browser version, fixture revision, p95 activation, and p95 
 ## Expected outcome
 
 All package, repository, browser, accessibility, and backend contract checks pass. JavaScript and Liquid expose only their advertised capabilities, compact and expanded results match for each advertised capability, exact source is never lost, and every unavailable/unauthorized/incompatible state is distinguishable.
+
+## Program #2310 live milestone proof
+
+Historical fixture runs do not satisfy the program gate. For each milestone, record the exact Studio and Foundation heads and rebuild both products. Start from a persisted workflow containing an activity input plus scoped workflow inputs, variables and predecessor outputs. Exercise the real syntax picker and property inspector for JavaScript and Liquid across every currently supported workflow and activity-definition authoring surface, then repeat the applicable path with one language/editor/provider independently absent, unauthorized and incompatible.
+
+The final proof also covers light, dark and dim presentation; narrow inspector widths; long and multiline source; compact/expanded source, cursor and undo continuity; local and authoritative completion/hover/signature/diagnostic states; explicit formatting; keyboard escape/help/completion; and the supported screen-reader scenarios. Keep any milestone failed until this normal-host journey passes on the reviewed heads.
+
+After T026 adds the supervised normal-host harness, run it with:
+
+```bash
+pnpm test:browser:expression-normal-host
+```
+
+The command must build/start matching Studio and Foundation hosts, create its own disposable persisted workflow, retain only value-free failure diagnostics, and stop both hosts on success or failure. T028 is part of the same gate and must prove the test turns red when an editor feature or Foundation tooling capability is removed.
