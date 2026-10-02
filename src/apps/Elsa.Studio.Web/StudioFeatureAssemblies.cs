@@ -7,6 +7,7 @@ using Elsa.Studio.Diagnostics.OpenTelemetry;
 using Elsa.Studio.Diagnostics.StructuredLogs;
 using Elsa.Studio.ExpressionEditors.JavaScript;
 using Elsa.Studio.ExpressionEditors.Liquid;
+using Elsa.Studio.ExtensionBuilder;
 using Elsa.Studio.FeatureManagement;
 using Elsa.Studio.Secrets;
 using Elsa.Studio.Weaver.Workflows;
@@ -30,6 +31,7 @@ internal static class StudioFeatureAssemblies
                 typeof(ConsoleStreamStudioFeature).Assembly,
                 typeof(DiagnosticsOpenTelemetryStudioFeature).Assembly,
                 typeof(DiagnosticsStructuredLogsStudioFeature).Assembly,
+                typeof(ExtensionBuilderStudioFeature).Assembly,
                 typeof(FeatureManagementStudioFeature).Assembly,
                 typeof(DashboardStudioFeature).Assembly,
                 typeof(AttentionStudioFeature).Assembly,
