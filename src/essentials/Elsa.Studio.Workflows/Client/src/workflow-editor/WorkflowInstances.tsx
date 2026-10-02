@@ -1404,14 +1404,14 @@ function AuthoredInputSource({
           <Renderer context={rendererContext} />
         </ExpressionSourceRendererBoundary>
       ) : fallback ?? <p>No authored source is available for this pinned Source Reference.</p>}
-      {!compiledBindingShown ? (
-        <p className="wf-instance-note">The compiled binding of a masked input is not shown.</p>
-      ) : row.compiledBinding ? (
+      {!row.compiledBinding ? (
+        <p className="wf-instance-note">No compiled binding is available.</p>
+      ) : compiledBindingShown ? (
         <details>
           <summary>Compiled binding ({row.compiledBinding.source || "Unknown"})</summary>
           <GenericExpressionSource expressionType={row.compiledBinding.source || "Unknown"} value={compiledBindingDetails(row.compiledBinding)} expanded />
         </details>
-      ) : <p className="wf-instance-note">No compiled binding is available.</p>}
+      ) : <p className="wf-instance-note">The compiled binding of a masked input is not shown.</p>}
     </>
   );
 }

@@ -747,17 +747,20 @@ describe("WorkflowActivityExecutionDetails", () => {
   describe("a declared sensitive or secret-only input", () => {
     const authoredSource = "variables.storedWords";
     const sourceBinding = { inputKey: "token-key", inputName: "Token", source: "Expression", expression: { language: "JavaScript", expression: authoredSource } };
+    const withheldBindingNote = "The compiled binding of a masked input is not shown.";
 
     const renderDeclaredInput = (
       declared: Partial<StudioActivityInputDescriptor>,
       authored: { expressionType: string; value: unknown; isSensitive?: boolean },
-      inputBindings: ExecutableGraphNodeFacts["inputBindings"] = []
+      inputBindings: ExecutableGraphNodeFacts["inputBindings"] = [],
+      expressionEditors: StudioExpressionEditorContribution[] = []
     ) => {
       vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([]));
       return render(
         <WorkflowActivityExecutionDetails
           context={context}
           activity={activity}
+          expressionEditors={expressionEditors}
           activityCatalog={[{ ...catalog[0]!, inputs: [{ referenceKey: "token-key", name: "Token", typeName: "System.String", ...declared }] }]}
           executableNodeFacts={{
             executableNodeId: "node-1",
@@ -802,6 +805,8 @@ describe("WorkflowActivityExecutionDetails", () => {
 
       await waitFor(() => expect(container.textContent).toContain("api-tokens"));
       expect(container.textContent).not.toContain("Protected source");
+      // Nothing is withheld when there is no compiled binding.
+      expect(container.textContent).not.toContain(withheldBindingNote);
     });
 
     const extraField = "extra-field-words";
@@ -817,6 +822,28 @@ describe("WorkflowActivityExecutionDetails", () => {
       const container = renderDeclaredInput(declared, { expressionType: "Secret", value }, [compiledCarrying]);
 
       await waitFor(() => expect(container.textContent).toContain("api-tokens"));
+      expect(container.innerHTML).not.toContain(extraField);
+      expect(container.textContent).toContain(withheldBindingNote);
+    });
+
+    // Prints everything the masked row hands it, as a source renderer for the Secret syntax from any module could.
+    const secretSourceRenderer: StudioExpressionEditorContribution = {
+      id: "test.secret-source",
+      supports: context => context.syntax === "Secret",
+      surfaces: {},
+      sourceRenderer: {
+        compact: ({ context }) => <output>{String(context.value)} {JSON.stringify(context)}</output>,
+        expanded: ({ context }) => <output>Secret source: {String(context.value)} {JSON.stringify(context)}</output>
+      }
+    };
+
+    it.each([
+      ["an object", carrying],
+      ["JSON text", JSON.stringify(carrying)]
+    ])("hands a source renderer only the name of a masked input's Secret Reference held as %s", async (_shape, value) => {
+      const container = renderDeclaredInput({ isSensitive: true }, { expressionType: "Secret", value }, [], [secretSourceRenderer]);
+
+      await waitFor(() => expect(container.textContent).toContain("Secret source: api-tokens"));
       expect(container.innerHTML).not.toContain(extraField);
     });
 

@@ -2,9 +2,14 @@ import { describe, expect, it } from "vitest";
 import { readSecretReference, type SecretReferenceView } from "../maskedInput";
 
 // The secret picker's own reader, from the Secrets extension. Loaded at run time: a static import would pull that
-// extension's sources, which declare the SDK only for themselves, into this package's type check.
+// extension's sources, which declare the SDK only for themselves, into this package's type check. A module that
+// fails to load leaves it missing, so a moved file fails the named assertion below instead of the whole file.
 const secretPickerModule = "../../../../../extensions/Elsa.Studio.Secrets/Client/src/SecretPickerEditor";
-const { toReference } = (await import(/* @vite-ignore */ secretPickerModule)) as { toReference(value: unknown): unknown };
+const secretPicker = (await import(/* @vite-ignore */ secretPickerModule).catch(() => undefined)) as { toReference?: unknown } | undefined;
+const pickerReader = () => {
+  expect(typeof secretPicker?.toReference, `toReference exported by ${secretPickerModule}`).toBe("function");
+  return secretPicker!.toReference as (value: unknown) => unknown;
+};
 
 const extraField = "extra-field-words";
 const reference = (name: string, typeName: string | null = null, scope: string | null = null): SecretReferenceView => ({ name, typeName, scope });
@@ -27,7 +32,7 @@ describe("readSecretReference", () => {
     ["a plain string", "tokens", null]
   ] as Array<[string, unknown, SecretReferenceView | null]>)("matches the secret picker on %s", (_label, value, expected) => {
     expect(readSecretReference("Secret", value)).toEqual(expected);
-    expect(toReference(value)).toEqual(expected);
+    expect(pickerReader()(value)).toEqual(expected);
   });
 
   it.each([

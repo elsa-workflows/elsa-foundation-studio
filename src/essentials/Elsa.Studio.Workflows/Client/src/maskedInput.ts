@@ -29,8 +29,9 @@ export interface SecretReferenceView {
 /**
  * Reads the Secret Reference an authored expression holds: the exact Secret syntax holding an object with a
  * non-empty name, as the secret picker writes it, or that object as JSON text on a wire-shaped node. The result is
- * normalized as the secret picker's own reader normalizes it (`toReference` in the Secrets extension, held to the
- * same cases by a shared test table), so any other field is dropped. Anything else under the Secret syntax, such as
+ * normalized as the secret picker's own reader normalizes it (`toReference` in the Secrets extension, which this
+ * module cannot import because the SDK boundary is type-only and an essentials module does not import an
+ * extension's code; a shared test table holds the two to the same cases), so any other field is dropped. Anything else under the Secret syntax, such as
  * a plain string the backend accepts at save and refuses only at publish, names no secret: `null`.
  */
 export function readSecretReference(expressionType: string | null | undefined, value: unknown): SecretReferenceView | null {
