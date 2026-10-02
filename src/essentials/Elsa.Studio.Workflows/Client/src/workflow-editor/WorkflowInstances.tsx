@@ -8,7 +8,7 @@ import { getActivityExecutionInspection, getExecutable, getExecutableInputSource
 import type { ActivityCatalogItem, ActivityExecutionInspection, ActivityExecutionInspectionValueSnapshot, ActivityExecutionStateSummary, ActivityNode, IncidentStateSummary, WorkflowDefinitionVersionDetails, WorkflowExecutableDetails, WorkflowInstanceDetails, WorkflowInstanceSummary } from "../workflowTypes";
 import { formatActivitySummary } from "../activitySummary";
 import { secretSyntax } from "../activityProperties";
-import { isMaskedInput } from "../protectedInput";
+import { isMaskedInput } from "../maskedInput";
 import { resolveActivityLabel } from "../activityPresentation";
 import {
   applyRuntimeOverlays,

@@ -7,13 +7,12 @@ import { read } from "./themeTestUtils";
 // the declarations they consume. A flag the canonical SDK exposes but a copy omits is invisible to that
 // extension's editors, so each copy must carry the activity-declared sensitivity flags, and each copy that
 // declares the property editor context must carry the edited activity's id.
-const canonicalSdk = "../sdk/index.ts";
-const typingCopies = {
+const typingSources = {
+  "canonical SDK": "../sdk/index.ts",
   "Secrets copy": "../../../../../extensions/Elsa.Studio.Secrets/Client/src/studio-sdk.d.ts",
   "JavaScript copy": "../../../../../extensions/Elsa.Studio.ExpressionEditors.JavaScript/Client/src/studio-sdk.d.ts",
   "Liquid copy": "../../../../../extensions/Elsa.Studio.ExpressionEditors.Liquid/Client/src/studio-sdk.d.ts"
 };
-const typingSources = { "canonical SDK": canonicalSdk, ...typingCopies };
 
 /** The text between the braces of `interface <name>`, or empty when it is not declared. */
 function interfaceBody(source: string, name: string) {
@@ -38,15 +37,18 @@ describe("StudioActivityInputDescriptor typing copies", () => {
 });
 
 const editorContextBody = (path: string) => interfaceBody(read(path), "StudioActivityPropertyEditorContext");
-const activityIdMember = /^\s*activityId\?: string \| null;/m;
+// The canonical SDK and each copy whose extension consumes the property editor context. A source that stops or
+// starts declaring it changes this set, so it cannot drop out of the activityId check silently.
+const editorContextSources: Array<keyof typeof typingSources> = ["canonical SDK", "Secrets copy"];
 
 describe("StudioActivityPropertyEditorContext typing copies", () => {
-  it("is declared with activityId? in the canonical SDK", () => {
-    expect(editorContextBody(canonicalSdk)).toMatch(activityIdMember);
+  it("is declared by exactly the expected sources", () => {
+    const declaring = Object.entries(typingSources).filter(([, path]) => editorContextBody(path) !== "").map(([label]) => label);
+
+    expect(declaring).toEqual(editorContextSources);
   });
 
-  // A copy declares the context only when its extension consumes it.
-  it.each(Object.entries(typingCopies).filter(([, path]) => editorContextBody(path) !== ""))("%s declares activityId?", (_label, path) => {
-    expect(editorContextBody(path)).toMatch(activityIdMember);
+  it.each(editorContextSources)("%s declares activityId?", label => {
+    expect(editorContextBody(typingSources[label])).toMatch(/^\s*activityId\?: string \| null;/m);
   });
 });

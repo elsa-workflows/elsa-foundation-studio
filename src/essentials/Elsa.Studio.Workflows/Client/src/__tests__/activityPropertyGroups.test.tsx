@@ -1,7 +1,7 @@
 import React from "react";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import type {
   StudioActivityDescriptor,
   StudioActivityInputDescriptor,
@@ -859,12 +859,22 @@ describe("property editor context", () => {
 
 describe("masked inputs", () => {
   const storedValue = "stored-value-words";
+  const hiddenNotice = "This value is hidden because the input is sensitive. It is preserved and read-only here.";
   // The panel asks nothing of the masked editor but its id; this one renders nothing of the value.
   const maskedEditor: StudioActivityPropertyEditorContribution = {
     id: "studio.property.password",
     supports: () => true,
     component: () => <span>Value set</span>
   };
+  // Shows everything it is given, as any editor but the masked one would.
+  const revealingEditor: StudioActivityPropertyEditorContribution = {
+    id: "test.revealing",
+    supports: () => true,
+    component: ({ value }) => <input type="text" aria-label="Revealing editor" value={JSON.stringify(value)} readOnly />
+  };
+  // The real Object editor: its expanded surface prints the stored JSON.
+  const objectEditor = createObjectExpressionEditorContribution(() => [revealingEditor]);
+  const sensitive: Partial<StudioActivityInputDescriptor> = { isSensitive: true };
   const token = (type: string, value: unknown) => ({ typeName: "System.String", expression: { type, value } });
   const renderToken = (
     stored: ReturnType<typeof token>,
@@ -874,7 +884,7 @@ describe("masked inputs", () => {
     const changes: ActivityNode[] = [];
     const container = renderPanel([input("ApiToken", { isWrapped: true, ...overrides })], {
       editors: [maskedEditor],
-      expressionEditors: [secretPicker],
+      expressionEditors: [secretPicker, objectEditor],
       expressionDescriptors: [...backendExpressionDescriptors, secretDescriptor],
       onChange: next => changes.push(next),
       activity: activity({ apiToken: stored }),
@@ -887,43 +897,36 @@ describe("masked inputs", () => {
     openAndSelect(rendered.container, "JavaScript");
     return rendered;
   };
+  const openExpandedEditor = (container: HTMLElement) => clickButton(container, "Open expanded ApiToken editor");
+  const expandedEditor = () => document.querySelector<HTMLElement>("[role='dialog']");
+  const expandAffordance = (container: HTMLElement) =>
+    container.querySelector(".wf-expression-expand-button, .wf-property-expand-row, .wf-dictionary-open-expanded");
+  const rowPicker = (container: HTMLElement) => container.querySelector(".wf-syntax-picker-trigger");
   const inlineSource = (container: HTMLElement) => container.querySelector<HTMLInputElement>("input[aria-label='ApiToken expression']")!.value;
   const replaceButton = () => [...document.querySelectorAll<HTMLButtonElement>("[role='alertdialog'] button")]
     .find(button => button.textContent === "Replace value") ?? null;
-  const pick = (trigger: HTMLButtonElement | null, label: string) => {
-    expect(trigger, "syntax picker").not.toBeNull();
-    flushSync(() => trigger!.click());
-    const option = [...document.querySelectorAll<HTMLButtonElement>("[role='option']")].find(candidate => candidate.textContent === label);
-    expect(option, `${label} option`).toBeDefined();
-    flushSync(() => option!.click());
-  };
   const clearTextFields = () => document.querySelectorAll("textarea, input[type='text']");
   // A React-controlled field's value is not in innerHTML, so each field's value is checked as well.
-  const expectNowhere = (text: string) => {
-    expect(document.body.innerHTML).not.toContain(text);
-    for (const field of document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("input, textarea")) {
-      expect(field.value).not.toContain(text);
-    }
-  };
   const isShown = (text: string) => document.body.innerHTML.includes(text)
     || [...document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("input, textarea")].some(field => field.value.includes(text));
+  const expectNowhere = (text: string) => expect(isShown(text), `"${text}" is shown`).toBe(false);
   const masked: Array<[string, Partial<StudioActivityInputDescriptor>]> = [
-    ["a sensitive input", { isSensitive: true }],
+    ["a sensitive input", sensitive],
     ["a password-hinted input", { uiHint: "password" }]
   ];
-  // Shows everything it is given, as any editor but the masked one would.
-  const revealingEditor: StudioActivityPropertyEditorContribution = {
-    id: "test.revealing",
-    supports: () => true,
-    component: ({ value }) => <input type="text" aria-label="Revealing editor" value={JSON.stringify(value)} readOnly />
-  };
+  // Masked inputs whose Object syntax holds the stored value itself: Object JSON is data deserialized into the input.
+  const objectShapes = [
+    { shape: "scalar", declared: sensitive, objectValue: { token: storedValue }, objectDefault: {}, literalDefault: "" },
+    { shape: "POCO-typed", declared: { ...sensitive, typeName: "Contoso.Settings" }, objectValue: { token: storedValue }, objectDefault: {}, literalDefault: "" },
+    { shape: "json-hinted", declared: { ...sensitive, uiHint: "json", typeName: "String", collectionKind: "List" }, objectValue: [storedValue], objectDefault: [], literalDefault: [] },
+    { shape: "malformed-collection", declared: { ...sensitive, typeName: "String", collectionKind: "List" }, objectValue: { header: storedValue }, objectDefault: [], literalDefault: [] }
+  ];
 
   it("never offers to expand a sensitive multiline input into a clear-text editor", () => {
-    const { container } = renderToken(token("Literal", storedValue), { isSensitive: true, uiHint: "multiline" });
-    const expand = container.querySelector<HTMLButtonElement>("button[aria-label='Open expanded ApiToken editor']");
+    const { container } = renderToken(token("Literal", storedValue), { ...sensitive, uiHint: "multiline" });
 
     expect(container.textContent).toContain("Value set");
-    expect(expand).toBeNull();
+    expect(expandAffordance(container)).toBeNull();
   });
 
   it.each(masked)("does not carry the stored literal of %s into a text syntax, inline or expanded", (_label, overrides) => {
@@ -935,11 +938,11 @@ describe("masked inputs", () => {
     expect(changes).toHaveLength(1);
     expect(changes[0]?.apiToken).toEqual(token("JavaScript", ""));
     expect(inlineSource(container)).toBe("");
-    expect(document.body.innerHTML).not.toContain(storedValue);
+    expectNowhere(storedValue);
 
-    clickButton(container, "Open expanded ApiToken editor");
+    openExpandedEditor(container);
     expect(container.querySelector<HTMLTextAreaElement>("textarea[aria-label='ApiToken expanded value']")!.value).toBe("");
-    expect(document.body.innerHTML).not.toContain(storedValue);
+    expectNowhere(storedValue);
   });
 
   it.each(masked)("switches %s with nothing stored straight to a text syntax", (_label, overrides) => {
@@ -957,114 +960,156 @@ describe("masked inputs", () => {
     expect(inlineSource(container)).toBe(storedValue);
   });
 
-  // Every syntax switch a masked input can make, from the row and from the expanded editor (which opens only
-  // over a text syntax), with a registry whose only editor shows everything. A switch into Literal makes the
-  // authored value the stored literal; it must be kept, yet shown nowhere, and no clear-text field may be left
-  // editing it. An expression source or a Secret Reference name may show before the switch.
+  // Every syntax switch a masked input can make, from the row and from the expanded editor (which opens only over
+  // a text syntax), with a registry whose only editor shows everything. The value stored under Literal or Object
+  // must be kept, yet shown nowhere, and no clear-text field may be left editing it. An expression source or a
+  // Secret Reference name may show; only those syntaxes offer the expanded editor.
   const surfaces = {
-    row: {
-      open: (_container: HTMLElement) => {},
-      picker: (container: HTMLElement) => container.querySelector<HTMLButtonElement>(".wf-syntax-picker-trigger")
-    },
-    "expanded editor": {
-      open: (container: HTMLElement) => clickButton(container, "Open expanded ApiToken editor"),
-      picker: () => document.querySelector<HTMLButtonElement>("[role='dialog'] .wf-syntax-picker-trigger")
-    }
+    row: { open: (_container: HTMLElement) => {}, scope: (container: HTMLElement): ParentNode => container },
+    "expanded editor": { open: openExpandedEditor, scope: (_container: HTMLElement): ParentNode => expandedEditor()! }
   };
-  const authored: Record<string, unknown> = { Literal: storedValue, JavaScript: storedValue, Liquid: storedValue, Secret: { name: storedValue } };
-  const syntaxWalk: Array<[keyof typeof surfaces, string, string, boolean, boolean, unknown, number]> = [
-    // surface, from, to, shown before, asks first, stored after, clear-text fields after (an expression source field)
-    ["row", "Literal", "JavaScript", false, true, "", 1],
-    ["row", "JavaScript", "Literal", true, false, storedValue, 0],
-    ["row", "Literal", "Liquid", false, true, "", 1],
-    ["row", "Liquid", "Literal", true, false, storedValue, 0],
-    ["row", "Literal", "Secret", false, true, null, 0],
-    ["row", "Secret", "Literal", true, true, "", 0],
-    ["expanded editor", "JavaScript", "Literal", true, false, storedValue, 0],
-    ["expanded editor", "Liquid", "Literal", true, false, storedValue, 0],
-    ["expanded editor", "JavaScript", "Secret", true, true, null, 0],
-    ["expanded editor", "Liquid", "Secret", true, true, null, 0]
+  type Step = {
+    shape: string;
+    declared: Partial<StudioActivityInputDescriptor>;
+    surface: keyof typeof surfaces;
+    from: string;
+    authored: unknown;
+    to: string;
+    expandableBefore: boolean;
+    shownBefore: boolean;
+    asksFirst: boolean;
+    storedAfter: unknown;
+    expandableAfter: boolean;
+    clearTextFieldsAfter: number;
+  };
+  const scalarSteps: Step[] = [
+    { shape: "scalar", declared: sensitive, surface: "row", from: "Literal", authored: storedValue, to: "JavaScript", expandableBefore: false, shownBefore: false, asksFirst: true, storedAfter: "", expandableAfter: true, clearTextFieldsAfter: 1 },
+    { shape: "scalar", declared: sensitive, surface: "row", from: "JavaScript", authored: storedValue, to: "Literal", expandableBefore: true, shownBefore: true, asksFirst: false, storedAfter: storedValue, expandableAfter: false, clearTextFieldsAfter: 0 },
+    { shape: "scalar", declared: sensitive, surface: "row", from: "Literal", authored: storedValue, to: "Liquid", expandableBefore: false, shownBefore: false, asksFirst: true, storedAfter: "", expandableAfter: true, clearTextFieldsAfter: 1 },
+    { shape: "scalar", declared: sensitive, surface: "row", from: "Liquid", authored: storedValue, to: "Literal", expandableBefore: true, shownBefore: true, asksFirst: false, storedAfter: storedValue, expandableAfter: false, clearTextFieldsAfter: 0 },
+    { shape: "scalar", declared: sensitive, surface: "row", from: "Literal", authored: storedValue, to: "Secret", expandableBefore: false, shownBefore: false, asksFirst: true, storedAfter: null, expandableAfter: false, clearTextFieldsAfter: 0 },
+    { shape: "scalar", declared: sensitive, surface: "row", from: "Secret", authored: { name: storedValue }, to: "Literal", expandableBefore: false, shownBefore: true, asksFirst: true, storedAfter: "", expandableAfter: false, clearTextFieldsAfter: 0 },
+    { shape: "scalar", declared: sensitive, surface: "expanded editor", from: "JavaScript", authored: storedValue, to: "Literal", expandableBefore: true, shownBefore: true, asksFirst: false, storedAfter: storedValue, expandableAfter: false, clearTextFieldsAfter: 0 },
+    { shape: "scalar", declared: sensitive, surface: "expanded editor", from: "Liquid", authored: storedValue, to: "Literal", expandableBefore: true, shownBefore: true, asksFirst: false, storedAfter: storedValue, expandableAfter: false, clearTextFieldsAfter: 0 },
+    { shape: "scalar", declared: sensitive, surface: "expanded editor", from: "JavaScript", authored: storedValue, to: "Secret", expandableBefore: true, shownBefore: true, asksFirst: true, storedAfter: null, expandableAfter: false, clearTextFieldsAfter: 0 },
+    { shape: "scalar", declared: sensitive, surface: "expanded editor", from: "Liquid", authored: storedValue, to: "Secret", expandableBefore: true, shownBefore: true, asksFirst: true, storedAfter: null, expandableAfter: false, clearTextFieldsAfter: 0 }
   ];
+  // A malformed collection's well-formed default reads back as Literal, so it never offers expansion.
+  const objectSteps: Step[] = objectShapes.flatMap(({ shape, declared, objectValue, objectDefault, literalDefault }) => [
+    { shape, declared, surface: "row", from: "Literal", authored: storedValue, to: "Object", expandableBefore: false, shownBefore: false, asksFirst: true, storedAfter: objectDefault, expandableAfter: false, clearTextFieldsAfter: 0 },
+    { shape, declared, surface: "row", from: "Object", authored: objectValue, to: "Literal", expandableBefore: false, shownBefore: false, asksFirst: true, storedAfter: literalDefault, expandableAfter: false, clearTextFieldsAfter: 0 },
+    { shape, declared, surface: "row", from: "Object", authored: objectValue, to: "JavaScript", expandableBefore: false, shownBefore: false, asksFirst: true, storedAfter: "", expandableAfter: true, clearTextFieldsAfter: 1 },
+    { shape, declared, surface: "row", from: "JavaScript", authored: storedValue, to: "Object", expandableBefore: true, shownBefore: true, asksFirst: true, storedAfter: objectDefault, expandableAfter: false, clearTextFieldsAfter: 0 },
+    { shape, declared, surface: "expanded editor", from: "JavaScript", authored: storedValue, to: "Object", expandableBefore: true, shownBefore: true, asksFirst: true, storedAfter: objectDefault, expandableAfter: false, clearTextFieldsAfter: 0 }
+  ]);
 
-  it.each(syntaxWalk)("from the %s, switching %s to %s never shows the stored literal", (surface, from, to, shownBefore, asksFirst, storedAfter, clearTextFieldsAfter) => {
-    const { container, changes } = renderToken(token(from, authored[from]), { isSensitive: true }, { editors: [revealingEditor] });
-    surfaces[surface].open(container);
-    expect(isShown(storedValue)).toBe(shownBefore);
+  it.each([...scalarSteps, ...objectSteps])("$shape: from the $surface, switching $from to $to never shows the stored value", step => {
+    const { container, changes } = renderToken(token(step.from, step.authored), step.declared, { editors: [revealingEditor] });
+    expect(expandAffordance(container) !== null).toBe(step.expandableBefore);
+    surfaces[step.surface].open(container);
+    expect(isShown(storedValue)).toBe(step.shownBefore);
 
-    pick(surfaces[surface].picker(container), to);
-    expect(replaceButton() !== null).toBe(asksFirst);
+    openAndSelect(surfaces[step.surface].scope(container), step.to);
+    expect(replaceButton() !== null).toBe(step.asksFirst);
     flushSync(() => replaceButton()?.click());
 
-    expect(changes.at(-1)?.apiToken).toEqual(token(to, storedAfter));
+    expect(changes.at(-1)?.apiToken).toEqual(token(step.to, step.storedAfter));
     expectNowhere(storedValue);
-    expect(document.querySelector("[role='dialog']")).toBeNull();
-    expect(clearTextFields()).toHaveLength(clearTextFieldsAfter);
-    expect(container.querySelector(".wf-syntax-picker-trigger")?.textContent).toBe(to);
+    expect(expandedEditor()).toBeNull();
+    expect(expandAffordance(container) !== null).toBe(step.expandableAfter);
+    expect(clearTextFields()).toHaveLength(step.clearTextFieldsAfter);
   });
 
   it.each([
-    ["an undo", "node-1"],
-    ["selecting another activity of the same type", "node-2"]
-  ])("closes the expanded editor when %s lands the input on a stored literal", (_change, nodeId) => {
-    const { container } = renderToken(token("JavaScript", "author-code"), { isSensitive: true });
-    clickButton(container, "Open expanded ApiToken editor");
-    expect(document.querySelector("[role='dialog']")).not.toBeNull();
+    { change: "an undo", nodeId: "node-1", shape: "scalar", declared: sensitive, lands: token("Literal", storedValue) },
+    { change: "selecting another activity of the same type", nodeId: "node-2", shape: "scalar", declared: sensitive, lands: token("Literal", storedValue) },
+    ...objectShapes.map(({ shape, declared, objectValue }) => ({ change: "an undo", nodeId: "node-1", shape, declared, lands: token("Object", objectValue) }))
+  ])("closes the expanded editor when $change lands a $shape input on its stored $lands.expression.type value", ({ nodeId, declared, lands }) => {
+    const { container } = renderToken(token("JavaScript", "author-code"), declared, { editors: [revealingEditor] });
+    openExpandedEditor(container);
+    expect(expandedEditor()).not.toBeNull();
 
-    flushSync(() => replaceActivity(activity({ nodeId, apiToken: token("Literal", storedValue) })));
+    flushSync(() => replaceActivity(activity({ nodeId, apiToken: lands })));
 
     expectNowhere(storedValue);
-    expect(document.querySelector("[role='dialog']")).toBeNull();
+    expect(expandedEditor()).toBeNull();
     expect(clearTextFields()).toHaveLength(0);
   });
 
-  it("returns focus to the row when the expanded editor closes under it, and does not reopen it by itself", async () => {
-    const { container } = renderToken(token("JavaScript", "author-code"), { isSensitive: true });
-    clickButton(container, "Open expanded ApiToken editor");
+  it("returns focus to the row when a switch inside the expanded editor closes it", async () => {
+    const { container } = renderToken(token("JavaScript", "author-code"), sensitive);
+    openExpandedEditor(container);
+
+    openAndSelect(expandedEditor()!, "Literal");
+    await nextFrame();
+
+    expect(expandedEditor()).toBeNull();
+    expect(document.activeElement).toBe(rowPicker(container));
+  });
+
+  it("returns focus to the row when an undo closes the expanded editor, and does not reopen it by itself", async () => {
+    const { container } = renderToken(token("JavaScript", "author-code"), sensitive);
+    openExpandedEditor(container);
 
     flushSync(() => replaceActivity(activity({ apiToken: token("Literal", storedValue) })));
     await nextFrame();
-    expect(document.activeElement).toBe(container.querySelector(".wf-syntax-picker-trigger"));
+    expect(document.activeElement).toBe(rowPicker(container));
 
-    pick(container.querySelector<HTMLButtonElement>(".wf-syntax-picker-trigger"), "JavaScript");
+    openAndSelect(container, "JavaScript");
     flushSync(() => replaceButton()!.click());
     expect(container.querySelector<HTMLInputElement>("input[aria-label='ApiToken expression']")).not.toBeNull();
-    expect(document.querySelector("[role='dialog']")).toBeNull();
+    expect(expandedEditor()).toBeNull();
+  });
+
+  it("leaves focus on another activity selected while the expanded editor is open", async () => {
+    const canvasNode = document.body.appendChild(document.createElement("button"));
+    onTestFinished(() => canvasNode.remove());
+    const { container } = renderToken(token("JavaScript", "author-code"), sensitive);
+    container.querySelector<HTMLButtonElement>("button[aria-label='Open expanded ApiToken editor']")!.focus();
+    openExpandedEditor(container);
+    canvasNode.focus();
+
+    flushSync(() => replaceActivity(activity({ nodeId: "node-2", apiToken: token("Literal", storedValue) })));
+    await nextFrame();
+
+    expect(expandedEditor()).toBeNull();
+    expect(document.activeElement).toBe(canvasNode);
+  });
+
+  // The expanded editor's open state follows the row's expandability for every input, masked or not.
+  it("closes an ordinary input's expanded editor when a switch inside it leaves the row unexpandable", () => {
+    const { container, changes } = renderToken(token("JavaScript", "author-code"), { uiHint: "dropdown" }, { editors: [revealingEditor] });
+    openExpandedEditor(container);
+
+    openAndSelect(expandedEditor()!, "Literal");
+
+    expect(changes.at(-1)?.apiToken).toEqual(token("Literal", "author-code"));
+    expect(expandedEditor()).toBeNull();
+    expect(container.querySelector<HTMLInputElement>("input[aria-label='Revealing editor']")?.value).toBe('"author-code"');
   });
 
   it.each([
-    ["a sensitive list", { collectionKind: "List" }, [storedValue]],
-    ["a sensitive dictionary", { collectionKind: "Dictionary" }, { header: storedValue }]
-  ] as Array<[string, Partial<StudioActivityInputDescriptor>, unknown]>)("does not give %s to the masked editor, which edits a single value", (_label, overrides, stored) => {
-    const { container } = renderToken(token("Literal", stored), { isSensitive: true, typeName: "String", ...overrides });
+    { label: "a password-hinted number", declared: { uiHint: "password", typeName: "Int32" }, stored: token("Literal", 731904), shown: "731904", editors: [revealingEditor] },
+    { label: "a sensitive text input another editor claims ahead of the masked one", declared: sensitive, stored: token("Literal", storedValue), shown: storedValue, editors: [revealingEditor, maskedEditor] },
+    { label: "a sensitive list the masked editor claims", declared: { ...sensitive, typeName: "String", collectionKind: "List" }, stored: token("Literal", [storedValue]), shown: storedValue, editors: [maskedEditor, revealingEditor] },
+    { label: "a sensitive dictionary the masked editor claims", declared: { ...sensitive, typeName: "String", collectionKind: "Dictionary" }, stored: token("Literal", { header: storedValue }), shown: storedValue, editors: [maskedEditor, revealingEditor] },
+    { label: "a sensitive input under a syntax without a descriptor", declared: sensitive, stored: token("CSharp", storedValue), shown: storedValue, editors: [maskedEditor] },
+    ...objectShapes.map(({ shape, declared, objectValue }) => ({ label: `a ${shape} input's Object value`, declared, stored: token("Object", objectValue), shown: storedValue, editors: [revealingEditor] }))
+  ] as Array<{ label: string; declared: Partial<StudioActivityInputDescriptor>; stored: ReturnType<typeof token>; shown: string; editors: StudioActivityPropertyEditorContribution[] }>)(
+    "gives the stored value of $label to the masked editor for a single literal value, or to nothing",
+    ({ declared, stored, shown, editors }) => {
+      const { container, changes } = renderToken(stored, declared, { editors });
 
-    expect(container.textContent).toContain("No editor is available for Literal.");
-    expect(container.textContent).not.toContain("Value set");
-  });
-
-  it("does not give the masked editor a value under a syntax it has no descriptor for", () => {
-    const { container, changes } = renderToken(token("CSharp", "author-code"), { isSensitive: true });
-
-    expect(container.textContent).toContain("No editor is available for CSharp.");
-    expect(container.textContent).not.toContain("Value set");
-    expect(changes).toEqual([]);
-  });
-
-  it.each([
-    ["a password-hinted number", { uiHint: "password", typeName: "Int32" }, 731904, "731904"],
-    ["a sensitive text input another editor claims", { isSensitive: true }, storedValue, storedValue],
-    ["a sensitive list", { isSensitive: true, typeName: "String", collectionKind: "List" }, [storedValue], storedValue],
-    ["a sensitive dictionary", { isSensitive: true, typeName: "String", collectionKind: "Dictionary" }, { header: storedValue }, storedValue]
-  ] as Array<[string, Partial<StudioActivityInputDescriptor>, unknown, string]>)("gives the literal of %s to the masked editor or to nothing", (_label, overrides, stored, shown) => {
-    const { container, changes } = renderToken(token("Literal", stored), overrides, { editors: [revealingEditor] });
-
-    expectNowhere(shown);
-    expect(container.textContent).toContain("No editor is available for Literal.");
-    expect(container.querySelector(".wf-expression-expand-button, .wf-property-expand-row, .wf-dictionary-open-expanded")).toBeNull();
-    expect(changes).toEqual([]);
-  });
+      expectNowhere(shown);
+      expect(container.textContent).toContain(hiddenNotice);
+      expect(container.textContent).not.toContain("Value set");
+      expect(expandAffordance(container)).toBeNull();
+      expect(changes).toEqual([]);
+    }
+  );
 
   const switchToJavaScriptAndReplace = (container: HTMLElement) => {
-    pick(container.querySelector<HTMLButtonElement>(".wf-syntax-picker-trigger"), "JavaScript");
+    openAndSelect(container, "JavaScript");
     expect(replaceButton()).not.toBeNull();
     flushSync(() => replaceButton()!.click());
   };
@@ -1078,7 +1123,7 @@ describe("masked inputs", () => {
     ["Literal diagnostics", { id: "test.diagnostics", supports: context => context.syntax === "Literal", surfaces: {}, diagnostics: (_context, value) => [{ message: String(value) }] }, withExpressionTypes, () => {}],
     ["a JavaScript default built from its document", { id: "test.javascript", supports: context => context.syntax === "JavaScript", surfaces: { inline: EchoExpressionEditor }, createDefaultValue: context => context.document?.source }, withExpressionTypes, switchToJavaScriptAndReplace]
   ] as Array<[string, StudioExpressionEditorContribution, StudioExpressionDescriptor[], (container: HTMLElement) => void]>)("gives nothing of a masked literal to %s", (_label, contribution, expressionDescriptors, act) => {
-    const { container } = renderToken(token("Literal", storedValue), { isSensitive: true }, { expressionEditors: [secretPicker, contribution], expressionDescriptors });
+    const { container } = renderToken(token("Literal", storedValue), sensitive, { expressionEditors: [secretPicker, contribution], expressionDescriptors });
 
     act(container);
 
@@ -1108,11 +1153,14 @@ function TestReferenceEditor({ value, disabled, initialFocus }: React.ComponentP
   return <input ref={ref} aria-label="Secret reference" value={JSON.stringify(value)} disabled={disabled} readOnly />;
 }
 
-function openAndSelect(container: HTMLElement, label: string) {
-  flushSync(() => container.querySelector<HTMLButtonElement>(".wf-syntax-picker-trigger")?.click());
+function openAndSelect(scope: ParentNode, label: string) {
+  const trigger = scope.querySelector<HTMLButtonElement>(".wf-syntax-picker-trigger");
+  expect(trigger, "syntax picker").not.toBeNull();
+  flushSync(() => trigger!.click());
   const option = [...document.querySelectorAll<HTMLButtonElement>("[role='option']")]
     .find(candidate => candidate.textContent === label);
-  flushSync(() => option?.click());
+  expect(option, `${label} option`).toBeDefined();
+  flushSync(() => option!.click());
 }
 
 async function nextFrame() {

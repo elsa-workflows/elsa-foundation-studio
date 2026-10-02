@@ -22,7 +22,7 @@ import {
   withSyntax
 } from "../activityProperties";
 import { canonicalizeStateForWire, expandStateFromWire } from "../activityInputWire";
-import { clearSecretOnlyInput, isMaskedInput, planInputSyntaxTransition } from "../protectedInput";
+import { clearSecretOnlyInput, isMaskedInput, planInputSyntaxTransition, showsMaskedValue } from "../maskedInput";
 import { updateActivity } from "../workflowAdapter";
 import type { ActivityNode } from "../workflowTypes";
 
@@ -227,9 +227,28 @@ describe("masked inputs", () => {
     ["an ordinary literal into a text syntax by carrying it", {}, "literal", "text", stored, { requiresConfirmation: false, nextValue: stored }],
     ["a masked literal between literal syntaxes by carrying it", sensitive, "literal", "literal", stored, { requiresConfirmation: false, nextValue: stored }],
     ["masked source between text syntaxes by carrying it", sensitive, "text", "text", stored, { requiresConfirmation: false, nextValue: stored }],
-    ["masked source into Literal by carrying it", sensitive, "text", "literal", stored, { requiresConfirmation: false, nextValue: stored }]
+    ["masked source into Literal by carrying it", sensitive, "text", "literal", stored, { requiresConfirmation: false, nextValue: stored }],
+    ["a masked literal into Object from the target's default, asking first", sensitive, "literal", "structured", stored, { requiresConfirmation: true, nextValue: "target-default" }],
+    ["a masked Object value into Literal from the target's default, asking first", sensitive, "structured", "literal", { token: stored }, { requiresConfirmation: true, nextValue: "target-default" }],
+    ["a masked Object value, as JSON text from the wire, into a text syntax from the target's default, asking first", sensitive, "structured", "text", `{"token":"${stored}"}`, { requiresConfirmation: true, nextValue: "target-default" }],
+    ["an empty masked Object value into a text syntax without asking", sensitive, "structured", "text", {}, { requiresConfirmation: false, nextValue: "target-default" }],
+    ["a masked Object value into a reference from the target's default, asking first", sensitive, "structured", "reference", `{"token":"${stored}"}`, { requiresConfirmation: true, nextValue: "target-default" }],
+    ["masked source into Object from the target's default, asking first", sensitive, "text", "structured", stored, { requiresConfirmation: true, nextValue: "target-default" }]
   ] as Array<[string, Partial<StudioActivityInputDescriptor>, Mode, Mode, unknown, object]>)("plans %s", (_label, declared, source, target, value, expected) => {
     expect(planInputSyntaxTransition({ ...textDescriptor, ...declared }, source, target, value, "target-default")).toEqual(expected);
+  });
+
+  // An allow-list: a mode added later, like one without a descriptor, masks what it stores.
+  it.each([
+    ["text", true],
+    ["reference", true],
+    ["literal", false],
+    ["structured", false],
+    [undefined, false],
+    // An editing mode added after this was written.
+    ["tabular" as Mode, false]
+  ] as Array<[Mode | undefined, boolean]>)("shows a masked input's stored value under the %s editing mode: %s", (mode, shown) => {
+    expect(showsMaskedValue(mode)).toBe(shown);
   });
 });
 

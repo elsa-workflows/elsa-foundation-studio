@@ -8,9 +8,10 @@ import {
   type ExpressionModeTransition
 } from "./activityProperties";
 
-// Rules for protected inputs: masked inputs, whose stored literal the properties panel, the canvas summary and the
-// run inspector never show in clear text, and secret-only inputs, which bind only a Secret Reference. Kept out of
-// `activityProperties.ts`, which ships in the Workflows entry chunk: only those deferred surfaces need these.
+// Rules for masked inputs: an input with a password hint, or one the activity declares sensitive or secret-only.
+// Secret-only inputs are a subset of masked inputs that bind only a Secret Reference; the properties panel gives
+// them their own branch, the secret picker. Kept out of `activityProperties.ts`, which ships in the Workflows entry
+// chunk: only deferred surfaces (the properties panel, the canvas summary and the run inspector) use these.
 
 /** Whether the input is masked: it carries a password hint, or the activity declares it sensitive or secret-only. */
 export function isMaskedInput(descriptor: StudioActivityInputDescriptor) {
@@ -18,9 +19,19 @@ export function isMaskedInput(descriptor: StudioActivityInputDescriptor) {
 }
 
 /**
- * Plans switching an input from one editing mode to another. A masked literal is never carried into another
- * syntax, where it would show as clear text: the target starts from its default, and discarding a stored value
- * asks first, like any other lossy switch. Every other switch is planned by `planExpressionModeTransition`.
+ * Whether a masked input may show what it stores under an expression of this editing mode: only author code
+ * (`text`: JavaScript, Liquid) and a reference by name (`reference`: Variable, Input, Secret). Under every other
+ * mode, `literal`, `structured` such as Object, a syntax without a descriptor and any mode added later, the stored
+ * value is the input's value itself and stays masked.
+ */
+export function showsMaskedValue(editingMode: StudioExpressionDescriptor["editingMode"] | undefined) {
+  return editingMode === "text" || editingMode === "reference";
+}
+
+/**
+ * Plans switching an input from one editing mode to another. A masked value is never carried into a syntax that
+ * shows what it stores: the target starts from its default, and discarding a stored value asks first, like any
+ * other lossy switch. Every other switch is planned by `planExpressionModeTransition`.
  */
 export function planInputSyntaxTransition(
   descriptor: StudioActivityInputDescriptor,
@@ -29,7 +40,7 @@ export function planInputSyntaxTransition(
   value: unknown,
   targetDefaultValue: unknown
 ): ExpressionModeTransition {
-  if (isMaskedInput(descriptor) && sourceMode === "literal" && targetMode !== "literal") {
+  if (isMaskedInput(descriptor) && !showsMaskedValue(sourceMode) && showsMaskedValue(targetMode)) {
     return { requiresConfirmation: !isEmptyExpressionValue(value), nextValue: targetDefaultValue };
   }
   return planExpressionModeTransition(sourceMode, targetMode, descriptor.typeName, value, targetDefaultValue);

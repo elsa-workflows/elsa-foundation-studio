@@ -102,7 +102,7 @@ describe("formatActivitySummary for masked and secret-only inputs", () => {
     expect(formatActivitySummary(wireNode("Literal", storedValue), catalog([secretOnlyInput]))).toBe("Protected value");
   });
 
-  it("still names a Secret Reference and falls back to the kind when nothing is authored", () => {
+  it("names a Secret Reference held as JSON text on a wire-shaped node, and falls back to the kind when nothing is authored", () => {
     expect(formatActivitySummary(wireNode("Secret", '{"name":"tokens"}'), catalog([secretOnlyInput]))).toContain("tokens");
     expect(formatActivitySummary(node({ text: wrapped("Literal", "   ") }), catalog([sensitiveInput]))).toBeUndefined();
   });

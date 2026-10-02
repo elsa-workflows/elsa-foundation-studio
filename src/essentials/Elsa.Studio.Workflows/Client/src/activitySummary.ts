@@ -1,7 +1,7 @@
 import type { StudioActivityInputDescriptor } from "@elsa-workflows/studio-sdk";
 import type { ActivityCatalogItem, ActivityNode } from "./workflowTypes";
 import { getInputPropertyName, readWrappedInputValue, secretSyntax } from "./activityProperties";
-import { isMaskedInput } from "./protectedInput";
+import { isMaskedInput } from "./maskedInput";
 import { describeInferredSource } from "./conversionSource";
 
 /**
