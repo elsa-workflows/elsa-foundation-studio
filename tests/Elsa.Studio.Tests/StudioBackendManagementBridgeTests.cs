@@ -4,11 +4,8 @@ using Elsa.Studio.Api.Models;
 using Elsa.Studio.Api.Options;
 using Elsa.Studio.Web;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using static Elsa.Studio.Tests.RecordingBackend;
 
 namespace Elsa.Studio.Tests;
@@ -23,9 +20,9 @@ public sealed class StudioBackendManagementBridgeTests : IAsyncDisposable
 {
     private const string StatusRoute = "/_elsa/studio/backend-management/status";
     private const string RegistryRoute = "/_elsa/studio/backend-management/registry";
-    private const string BackendBaseUrl = "https://backend.example";
+    private const string BackendBaseUrl = BridgeTestHost.BackendBaseUrl;
     private const string BackendServerBaseUrl = "http://elsa-server:8080";
-    private const string ManagementKey = "s3cr3t-management-key";
+    private const string ManagementKey = BridgeTestHost.ManagementKey;
     private const string ModuleListJson = """{ "modules": [] }""";
     private const string ValidBearer = "a-valid-backend-bearer";
 
@@ -273,20 +270,7 @@ public sealed class StudioBackendManagementBridgeTests : IAsyncDisposable
         string? backendServerBaseUrl = null,
         bool authEnabled = false)
     {
-        var settings = new Dictionary<string, string?>
-        {
-            [StudioBackendManagementOptions.BackendBaseUrlConfigurationKey] = backendBaseUrl,
-            [StudioBackendManagementOptions.BackendServerBaseUrlConfigurationKey] = backendServerBaseUrl,
-            [StudioBackendManagementOptions.ManagementApiKeyConfigurationKey] = managementKey,
-            ["Studio:Auth:Enabled"] = authEnabled ? "true" : "false"
-        };
-
-        var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { EnvironmentName = Environments.Production });
-        builder.WebHost.UseTestServer();
-        builder.Configuration.AddInMemoryCollection(settings);
-
-        builder.Services.AddStudioBridgeAuth(builder.Configuration);
-        builder.Services.AddStudioBackendManagementBridge(builder.Configuration);
+        var builder = BridgeTestHost.CreateBuilder(backendBaseUrl, managementKey, authEnabled, backendServerBaseUrl);
 
         // Route both the typed management client and the named auth client through the recording backend stub so the
         // test asserts real HTTP behaviour (status codes, headers, outbound-call counts) at the wire.

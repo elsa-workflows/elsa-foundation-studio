@@ -42,12 +42,12 @@ public sealed class StudioExtensionBuilderCapabilitiesTests : IAsyncDisposable
         // The management key rides only on the Studio->backend call, against the Extension Builder capabilities path.
         var recorded = Assert.Single(backend.Requests);
         Assert.Equal(BackendCapabilitiesPath, recorded.PathAndQuery);
-        Assert.Equal(ExtensionBuilderBridgeHost.ManagementKey, recorded.ManagementKey);
+        Assert.Equal(BridgeTestHost.ManagementKey, recorded.ManagementKey);
     }
 
     [Theory]
-    [InlineData(ExtensionBuilderBridgeHost.BackendBaseUrl, null)] // no management key
-    [InlineData(null, ExtensionBuilderBridgeHost.ManagementKey)]  // no backend base URL
+    [InlineData(BridgeTestHost.BackendBaseUrl, null)] // no management key
+    [InlineData(null, BridgeTestHost.ManagementKey)]  // no backend base URL
     public async Task ReturnsUnconfiguredCapabilitiesWithZeroOutboundCallsWhenConfigIncomplete(string? backendBaseUrl, string? managementKey)
     {
         var backend = RespondingWith(_ => JsonOk(TrustedCapabilitiesJson));
@@ -138,7 +138,7 @@ public sealed class StudioExtensionBuilderCapabilitiesTests : IAsyncDisposable
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.DoesNotContain(ExtensionBuilderBridgeHost.ManagementKey, body);
+        Assert.DoesNotContain(BridgeTestHost.ManagementKey, body);
     }
 
     private static async Task<StudioExtensionBuilderCapabilitiesResult> GetCapabilitiesAsync(HttpClient client)
@@ -163,8 +163,8 @@ public sealed class StudioExtensionBuilderCapabilitiesTests : IAsyncDisposable
 
     private async Task<HttpClient> StartHostAsync(
         RecordingBackend backend,
-        string? backendBaseUrl = ExtensionBuilderBridgeHost.BackendBaseUrl,
-        string? managementKey = ExtensionBuilderBridgeHost.ManagementKey,
+        string? backendBaseUrl = BridgeTestHost.BackendBaseUrl,
+        string? managementKey = BridgeTestHost.ManagementKey,
         bool authEnabled = false)
     {
         _app = await ExtensionBuilderBridgeHost.StartAsync(backend, backendBaseUrl, managementKey, authEnabled);

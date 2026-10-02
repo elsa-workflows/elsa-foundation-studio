@@ -20,6 +20,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using static Elsa.Studio.Tests.ExtensionBuilder.ExtensionBuilderBridgeHost;
 using static Elsa.Studio.Tests.RecordingBackend;
 
 namespace Elsa.Studio.Tests.ExtensionBuilder;
@@ -36,16 +37,8 @@ public sealed class ExtensionBuilderOptionalityTests : IAsyncDisposable
     private const string CapabilitiesRoute = StudioExtensionBuilderBridge.RouteGroup + StudioExtensionBuilderBridge.CapabilitiesRoute;
     private const string RelayRoute = StudioExtensionBuilderBridge.RouteGroup + "/workspaces";
     private const string StatusRoute = StudioBackendManagementRoutes.RouteGroup + "/status";
-    private const string ExtensionBuilderReadBearer = "user-extension-builder-read";
-    private const string ModuleReadBearer = "user-module-read";
     private const string StaticAssetRoute = "/studio/asset.txt";
     private const string StaticAssetContent = "asset";
-
-    private static readonly IReadOnlyDictionary<string, string[]> BearerPermissions = new Dictionary<string, string[]>
-    {
-        [ExtensionBuilderReadBearer] = [ExtensionBuilderPermissions.Read],
-        [ModuleReadBearer] = [StudioBridgeAuth.ModuleManagementReadPermission]
-    };
 
     // The feature keys the shipped shells.json enables for the Default shell — the default Studio composition.
     private static readonly string[] DefaultShellFeatures = ReadDefaultShellFeatures();
@@ -129,7 +122,7 @@ public sealed class ExtensionBuilderOptionalityTests : IAsyncDisposable
         Assert.Equal(HttpStatusCode.OK, relay.StatusCode);
         Assert.Equal(StudioBackendManagementStatus.Available, capabilities.GetProperty("status").GetString());
         Assert.Equal(2, backend.ManagementRequests.Count);
-        Assert.All(backend.ManagementRequests, recorded => Assert.Equal(ExtensionBuilderBridgeHost.ManagementKey, recorded.ManagementKey));
+        Assert.All(backend.ManagementRequests, recorded => Assert.Equal(BridgeTestHost.ManagementKey, recorded.ManagementKey));
         Assert.Equal(StudioExtensionBuilderBridge.BackendRoot + "/workspaces", backend.ManagementRequests[0].PathAndQuery);
     }
 
@@ -193,10 +186,9 @@ public sealed class ExtensionBuilderOptionalityTests : IAsyncDisposable
 
     private async Task<HttpClient> StartHostBridgeOnlyAsync()
     {
-        var builder = ExtensionBuilderBridgeHost.CreateBuilder();
-        builder.Services.RouteBackendClientsThrough(RespondingWith(_ => JsonOk("""{ "modules": [] }""")));
-        builder.Services.AddHttpClient(nameof(StudioBackendManagementClient))
-            .ConfigurePrimaryHttpMessageHandler(() => RespondingWith(_ => JsonOk("""{ "modules": [] }""")));
+        var backend = RespondingWith(_ => JsonOk("""{ "modules": [] }"""));
+        var builder = BridgeTestHost.CreateBuilder();
+        builder.Services.AddHttpClient(nameof(StudioBackendManagementClient)).ConfigurePrimaryHttpMessageHandler(() => backend);
 
         var app = builder.Build();
         app.UseAuthentication();
@@ -221,7 +213,7 @@ public sealed class ExtensionBuilderOptionalityTests : IAsyncDisposable
         if (withFailingFeature)
             shellSettings[$"CShells:Shells:Default:Features:{FailingShellFeature.Name}"] = "true";
 
-        var builder = ExtensionBuilderBridgeHost.CreateBuilder(authEnabled: authEnabled, extraSettings: shellSettings);
+        var builder = BridgeTestHost.CreateBuilder(authEnabled: authEnabled, extraSettings: shellSettings);
         builder.Services.RouteBackendClientsThrough(backend);
         builder.Services.AddCShellsAspNetCore(shells =>
         {

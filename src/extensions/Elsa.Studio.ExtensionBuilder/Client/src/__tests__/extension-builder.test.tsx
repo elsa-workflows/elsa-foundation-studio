@@ -3,7 +3,7 @@ import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { derivePackageId, ExtensionBuilderPage } from "../extension-builder";
-import { type ExtensionRepositorySummary, type ExtensionRuntimeStatus } from "../extensionBuilderApi";
+import type { ExtensionRepositorySummary, ExtensionRuntimeStatus } from "../extensionBuilderApi";
 import { StudioHttpError, type ElsaStudioModuleApi } from "@elsa-workflows/studio-sdk";
 
 describe("extension builder page", () => {

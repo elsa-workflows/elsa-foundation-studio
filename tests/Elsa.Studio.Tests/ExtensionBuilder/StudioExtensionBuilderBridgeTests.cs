@@ -7,6 +7,7 @@ using Elsa.Studio.Web;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Time.Testing;
+using static Elsa.Studio.Tests.ExtensionBuilder.ExtensionBuilderBridgeHost;
 using static Elsa.Studio.Tests.RecordingBackend;
 
 namespace Elsa.Studio.Tests.ExtensionBuilder;
@@ -20,21 +21,8 @@ namespace Elsa.Studio.Tests.ExtensionBuilder;
 /// </summary>
 public sealed class StudioExtensionBuilderBridgeTests : IAsyncDisposable
 {
-    private const string ManagementKey = ExtensionBuilderBridgeHost.ManagementKey;
+    private const string ManagementKey = BridgeTestHost.ManagementKey;
     private const string BrowserBearer = "browser-bearer-never-for-the-backend";
-
-    // Bearers the stub backend session endpoint recognizes, mapped to the permission set it reports for each. These
-    // exercise the Extension Builder read/manage policies plus the independence from module-management permissions.
-    private const string ExtensionBuilderReadBearer = "user-extension-builder-read";
-    private const string ExtensionBuilderManageBearer = "user-extension-builder-manage";
-    private const string ModuleReadBearer = "user-module-read";
-
-    private static readonly IReadOnlyDictionary<string, string[]> BearerPermissions = new Dictionary<string, string[]>
-    {
-        [ExtensionBuilderReadBearer] = [ExtensionBuilderPermissions.Read],
-        [ExtensionBuilderManageBearer] = [ExtensionBuilderPermissions.Manage],
-        [ModuleReadBearer] = [StudioBridgeAuth.ModuleManagementReadPermission]
-    };
 
     private WebApplication? _app;
 
@@ -65,7 +53,7 @@ public sealed class StudioExtensionBuilderBridgeTests : IAsyncDisposable
     public async Task ForwardsOperationWithManagementKeyAndWithoutBrowserAuthorization(string operationName)
     {
         var op = Op(operationName);
-        var backend = RecordingBackend.RespondingWith(_ => BackendSuccessFor(op));
+        var backend = RespondingWith(_ => BackendSuccessFor(op));
         var client = await StartBridgeHostAsync(backend);
         client.DefaultRequestHeaders.Authorization = new("Bearer", BrowserBearer);
 
@@ -90,7 +78,7 @@ public sealed class StudioExtensionBuilderBridgeTests : IAsyncDisposable
     public async Task ReturnsUnconfiguredWithZeroOutboundCallsWhenNoManagementKey(string operationName)
     {
         var op = Op(operationName);
-        var backend = RecordingBackend.RespondingWith(_ => JsonOk("{}"));
+        var backend = RespondingWith(_ => JsonOk("{}"));
         var client = await StartBridgeHostAsync(backend, managementKey: null);
 
         var response = await SendAsync(client, op);
@@ -110,7 +98,7 @@ public sealed class StudioExtensionBuilderBridgeTests : IAsyncDisposable
     [Fact]
     public async Task ReturnsUnconfiguredWithZeroOutboundCallsWhenNoBackendBaseUrl()
     {
-        var backend = RecordingBackend.RespondingWith(_ => JsonOk("{}"));
+        var backend = RespondingWith(_ => JsonOk("{}"));
         var client = await StartBridgeHostAsync(backend, backendBaseUrl: null);
 
         var response = await SendAsync(client, Op("list-workspaces"));
@@ -126,7 +114,7 @@ public sealed class StudioExtensionBuilderBridgeTests : IAsyncDisposable
     public async Task RejectsUnauthenticatedBrowserRequestWhenStudioAuthEnabled(string operationName)
     {
         var op = Op(operationName);
-        var backend = RecordingBackend.RespondingWith(WithSessionEndpoint(BearerPermissions, _ => BackendSuccessFor(op)));
+        var backend = RespondingWith(WithSessionEndpoint(BearerPermissions, _ => BackendSuccessFor(op)));
         var client = await StartBridgeHostAsync(backend, authEnabled: true);
 
         var response = await SendAsync(client, op);
@@ -193,7 +181,7 @@ public sealed class StudioExtensionBuilderBridgeTests : IAsyncDisposable
     [InlineData(HttpStatusCode.InternalServerError, StudioBackendManagementStatus.Degraded)]
     public async Task MapsBareBackendStatusToManagement503(HttpStatusCode backendStatus, string expected)
     {
-        var backend = RecordingBackend.RespondingWith(_ => new HttpResponseMessage(backendStatus));
+        var backend = RespondingWith(_ => new HttpResponseMessage(backendStatus));
         var response = await SendThroughBridgeAsync(backend, "list-workspaces");
         var error = await ReadErrorAsync(response);
 
@@ -215,7 +203,7 @@ public sealed class StudioExtensionBuilderBridgeTests : IAsyncDisposable
     [InlineData("promote-build", HttpStatusCode.OK, """{ "status": "rejected", "reason": "artifact failed validation" }""")]
     public async Task RelaysBackendJsonResponseVerbatim(string operationName, HttpStatusCode backendStatus, string json)
     {
-        var backend = RecordingBackend.RespondingWith(_ => RecordingBackend.Json(backendStatus, json));
+        var backend = RespondingWith(_ => RecordingBackend.Json(backendStatus, json));
         var response = await SendThroughBridgeAsync(backend, operationName);
 
         Assert.Equal(backendStatus, response.StatusCode);
@@ -228,7 +216,7 @@ public sealed class StudioExtensionBuilderBridgeTests : IAsyncDisposable
     {
         // A 2xx that isn't JSON on a JSON operation means the relay hit something other than the surface (e.g. an SPA
         // fallback page) — the backend body is never echoed.
-        var backend = RecordingBackend.RespondingWith(_ => TextOk("<html>not the surface</html>"));
+        var backend = RespondingWith(_ => TextOk("<html>not the surface</html>"));
         var response = await SendThroughBridgeAsync(backend, "list-workspaces");
         var error = await ReadErrorAsync(response);
 
@@ -243,7 +231,7 @@ public sealed class StudioExtensionBuilderBridgeTests : IAsyncDisposable
         // A backend 500 on a mutation is plane A: Studio answers 503 degraded with its OWN body — the backend's error
         // body (potentially a stack trace) is never echoed to the browser.
         const string backendSecret = "backend-stack-trace-secret";
-        var backend = RecordingBackend.RespondingWith(_ => RecordingBackend.Json(HttpStatusCode.InternalServerError, $$"""{ "error": "{{backendSecret}}" }"""));
+        var backend = RespondingWith(_ => RecordingBackend.Json(HttpStatusCode.InternalServerError, $$"""{ "error": "{{backendSecret}}" }"""));
 
         var response = await SendThroughBridgeAsync(backend, "rollback-project");
         var body = await response.Content.ReadAsStringAsync();
@@ -257,7 +245,7 @@ public sealed class StudioExtensionBuilderBridgeTests : IAsyncDisposable
     [Fact]
     public async Task MapsTransportFailureToUnreachable503()
     {
-        var backend = RecordingBackend.Throwing(new HttpRequestException("connection refused"));
+        var backend = Throwing(new HttpRequestException("connection refused"));
         var response = await SendThroughBridgeAsync(backend, "list-workspaces");
         var error = await ReadErrorAsync(response);
 
@@ -270,7 +258,7 @@ public sealed class StudioExtensionBuilderBridgeTests : IAsyncDisposable
     {
         var op = Op("list-workspaces");
         var timeProvider = new FakeTimeProvider();
-        var backend = RecordingBackend.RespondingWithAsync(async (_, cancellationToken) =>
+        var backend = RespondingWithAsync(async (_, cancellationToken) =>
         {
             // Hang until the relay's budget cancels the outbound call.
             await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, cancellationToken);
@@ -300,7 +288,7 @@ public sealed class StudioExtensionBuilderBridgeTests : IAsyncDisposable
     [Fact]
     public async Task PreservesEncodedPathSegmentsOnTheBackendCall()
     {
-        var backend = RecordingBackend.RespondingWith(_ => JsonOk("{}"));
+        var backend = RespondingWith(_ => JsonOk("{}"));
         var client = await StartBridgeHostAsync(backend);
 
         var response = await client.GetAsync(StudioExtensionBuilderBridge.RouteGroup + "/workspaces/ws-1/files/Activities/My%20File%23x.cs");
@@ -315,7 +303,7 @@ public sealed class StudioExtensionBuilderBridgeTests : IAsyncDisposable
     {
         // GetEncodedPathAndQuery prepends the PathBase a Studio host is mounted under; the relay must still forward
         // only the operation suffix to the backend root.
-        var backend = RecordingBackend.RespondingWith(_ => JsonOk("{}"));
+        var backend = RespondingWith(_ => JsonOk("{}"));
         var client = await StartBridgeHostAsync(backend, pathBase: "/mounted");
 
         var response = await client.GetAsync("/mounted" + StudioExtensionBuilderBridge.RouteGroup + "/workspaces/ws-1");
@@ -330,7 +318,7 @@ public sealed class StudioExtensionBuilderBridgeTests : IAsyncDisposable
     {
         // Route matching is case-insensitive but GetEncodedPathAndQuery preserves the browser's casing; the suffix
         // locator must not silently slice a garbage path when the route-group casing differs.
-        var backend = RecordingBackend.RespondingWith(_ => JsonOk("{}"));
+        var backend = RespondingWith(_ => JsonOk("{}"));
         var client = await StartBridgeHostAsync(backend);
 
         var response = await client.GetAsync(StudioExtensionBuilderBridge.RouteGroup.ToUpperInvariant() + "/workspaces/ws-1");
@@ -344,7 +332,7 @@ public sealed class StudioExtensionBuilderBridgeTests : IAsyncDisposable
     public async Task RelaysBuildLogAsPlainTextVerbatim()
     {
         const string log = "restore ok\nbuild ok\n1 warning";
-        var backend = RecordingBackend.RespondingWith(_ => TextOk(log));
+        var backend = RespondingWith(_ => TextOk(log));
         var client = await StartBridgeHostAsync(backend);
 
         var response = await SendAsync(client, Op("get-build-log"));
@@ -358,7 +346,7 @@ public sealed class StudioExtensionBuilderBridgeTests : IAsyncDisposable
     public async Task RelaysBuildArtifactStreamWithContentDispositionPreserved()
     {
         var artifactBytes = new byte[] { 0x50, 0x4b, 0x03, 0x04, 0x2a };
-        var backend = RecordingBackend.RespondingWith(_ =>
+        var backend = RespondingWith(_ =>
         {
             var content = new ByteArrayContent(artifactBytes);
             content.Headers.ContentType = new("application/octet-stream");
@@ -461,7 +449,7 @@ public sealed class StudioExtensionBuilderBridgeTests : IAsyncDisposable
         StudioExtensionBuilderBridge.BridgeOperation op,
         string bearer)
     {
-        var backend = RecordingBackend.RespondingWith(WithSessionEndpoint(BearerPermissions, _ => BackendSuccessFor(op)));
+        var backend = RespondingWith(WithSessionEndpoint(BearerPermissions, _ => BackendSuccessFor(op)));
         var client = await StartBridgeHostAsync(backend, authEnabled: true);
         using var request = BuildBrowserRequest(op);
         request.Headers.Authorization = new("Bearer", bearer);
@@ -499,7 +487,7 @@ public sealed class StudioExtensionBuilderBridgeTests : IAsyncDisposable
 
     private async Task<HttpClient> StartBridgeHostAsync(
         RecordingBackend backend,
-        string? backendBaseUrl = ExtensionBuilderBridgeHost.BackendBaseUrl,
+        string? backendBaseUrl = BridgeTestHost.BackendBaseUrl,
         string? managementKey = ManagementKey,
         bool authEnabled = false,
         TimeProvider? timeProvider = null,

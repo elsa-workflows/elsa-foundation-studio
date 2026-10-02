@@ -1,37 +1,40 @@
-using Elsa.Studio.Api.Options;
 using Elsa.Studio.ExtensionBuilder;
 using Elsa.Studio.Web;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.TestHost;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 
 namespace Elsa.Studio.Tests.ExtensionBuilder;
 
 /// <summary>
-/// The slim TestServer host the Extension Builder bridge tests run against: the host's bridge infrastructure
-/// (<see cref="StudioBridgeAuth"/> gate + <see cref="StudioBackendManagementBridgeServiceCollectionExtensions"/>
-/// options) plus the extension's own registration and endpoint mapping — exactly what the
+/// The slim TestServer host the Extension Builder bridge tests run against: <see cref="BridgeTestHost"/>'s bridge
+/// infrastructure plus the extension's own registration and endpoint mapping — exactly what the
 /// <see cref="ExtensionBuilderStudioFeature"/> contributes, minus the CShells shell around it. Every Studio→backend
 /// client (capabilities, relay, bearer introspection) is routed through the supplied <see cref="RecordingBackend"/> so
 /// the tests assert real HTTP behaviour at the wire.
 /// </summary>
 internal static class ExtensionBuilderBridgeHost
 {
-    public const string BackendBaseUrl = "https://backend.example";
-    public const string ManagementKey = "s3cr3t-management-key";
+    public const string ExtensionBuilderReadBearer = "user-extension-builder-read";
+    public const string ExtensionBuilderManageBearer = "user-extension-builder-manage";
+    public const string ModuleReadBearer = "user-module-read";
+
+    /// <summary>The host-control permissions the stub backend's session endpoint reports for each test bearer.</summary>
+    public static readonly IReadOnlyDictionary<string, string[]> BearerPermissions = new Dictionary<string, string[]>
+    {
+        [ExtensionBuilderReadBearer] = [ExtensionBuilderPermissions.Read],
+        [ExtensionBuilderManageBearer] = [ExtensionBuilderPermissions.Manage],
+        [ModuleReadBearer] = [StudioBridgeAuth.ModuleManagementReadPermission]
+    };
 
     public static async Task<WebApplication> StartAsync(
         RecordingBackend backend,
-        string? backendBaseUrl = BackendBaseUrl,
-        string? managementKey = ManagementKey,
+        string? backendBaseUrl = BridgeTestHost.BackendBaseUrl,
+        string? managementKey = BridgeTestHost.ManagementKey,
         bool authEnabled = false,
         TimeProvider? timeProvider = null,
         string? pathBase = null)
     {
-        var builder = CreateBuilder(backendBaseUrl, managementKey, authEnabled);
+        var builder = BridgeTestHost.CreateBuilder(backendBaseUrl, managementKey, authEnabled);
         builder.Services.AddStudioExtensionBuilderBridge();
         if (timeProvider is not null)
             builder.Services.AddSingleton(timeProvider);
@@ -47,31 +50,6 @@ internal static class ExtensionBuilderBridgeHost
 
         await app.StartAsync();
         return app;
-    }
-
-    /// <summary>
-    /// A TestServer builder carrying the host's bridge infrastructure (auth gate + backend options) configured with the
-    /// given backend coordinates, auth switch, and any extra configuration (e.g. CShells shell settings).
-    /// </summary>
-    public static WebApplicationBuilder CreateBuilder(
-        string? backendBaseUrl = BackendBaseUrl,
-        string? managementKey = ManagementKey,
-        bool authEnabled = false,
-        IDictionary<string, string?>? extraSettings = null)
-    {
-        var settings = new Dictionary<string, string?>(extraSettings ?? new Dictionary<string, string?>())
-        {
-            [StudioBackendManagementOptions.BackendBaseUrlConfigurationKey] = backendBaseUrl,
-            [StudioBackendManagementOptions.ManagementApiKeyConfigurationKey] = managementKey,
-            ["Studio:Auth:Enabled"] = authEnabled ? "true" : "false"
-        };
-
-        var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { EnvironmentName = Environments.Production });
-        builder.WebHost.UseTestServer();
-        builder.Configuration.AddInMemoryCollection(settings);
-        builder.Services.AddStudioBridgeAuth(builder.Configuration);
-        builder.Services.AddStudioBackendManagementBridge(builder.Configuration);
-        return builder;
     }
 
     /// <summary>

@@ -5,7 +5,7 @@ namespace Elsa.Studio.Web;
 
 /// <summary>
 /// Activates the default Studio shell before endpoint routing runs, so the endpoints a shell feature maps (theme
-/// management, the optional Extension Builder bridge, …) are matched by routing — and therefore gated by the
+/// management, a module's bridge, …) are matched by routing — and therefore gated by the
 /// authorization middleware — on the very first request as well as every later one.
 ///
 /// <para>Without this, CShells activates a cold shell inside its own middleware, which runs <i>after</i> authorization,
