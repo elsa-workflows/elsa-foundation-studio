@@ -60,6 +60,8 @@ Features ship in:
 | `WeatherForecastSample` | `Elsa.Studio.Samples.WeatherForecast` | `IWebShellFeature` |
 | `ExtensionBuilderStudio` | `Elsa.Studio.ExtensionBuilder` | `IWebShellFeature` (opt-in, not in the default `shells.json`) |
 
+The host discovers in-box features only in the assemblies listed in `StudioFeatureAssemblies` (in `Elsa.Studio.Web`), plus installed Nuplane packages. CShells stops scanning host assemblies once that list is registered, so every new in-box feature needs its assembly added there, opt-in features such as `ExtensionBuilderStudio` included. Otherwise CShells skips the feature with a startup warning when `shells.json` enables it, and Feature Management cannot enable it. `WeatherForecastSample` is the exception: the host does not reference it, and it activates once its package (`artifacts/packages/Elsa.Studio.Samples.WeatherForecast.*.nupkg`) is installed into the `packages` feed. Until then, the startup warning for it is expected.
+
 ### Opting into Extension Builder
 
 Extension Builder is not enabled by default: a default Studio has no Extension Builder navigation item, route or
@@ -84,8 +86,6 @@ The page relays every operation through the Studio management bridge (`/_elsa/st
 so the host needs `Studio:BackendServerBaseUrl` (or `Studio:BackendBaseUrl`) and `Studio:BackendModuleManagementApiKey`
 configured, and the backend must expose the Extension Builder surface. Against a backend without it, the page shows its
 explicit "backend management unavailable" state.
-
-The host discovers in-box features only in the assemblies registered by `WithStudioFeatureAssemblies()` (`Elsa.Studio.Web/StudioFeatureAssemblies.cs`), plus installed Nuplane packages. CShells stops scanning host assemblies once that list is registered, so a new in-box feature needs its assembly added there as well as to `shells.json`; otherwise CShells logs a warning at startup and skips it. `WeatherForecastSample` is the exception: the host does not reference it, and it activates once its package (`artifacts/packages/Elsa.Studio.Samples.WeatherForecast.*.nupkg`) is installed into the `packages` feed. Until then, the startup warning for it is expected.
 
 ## Build
 

@@ -4,8 +4,6 @@ using CShells.Features;
 using Elsa.Studio.Web;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.FileProviders;
-using Microsoft.Extensions.Hosting;
 using Nuplane.Loading;
 
 namespace Elsa.Studio.Tests;
@@ -48,7 +46,7 @@ public sealed class WebHostShellFeatureDiscoveryTests : IAsyncLifetime
         });
     }
 
-    // Reads the Web host's shells.json through the host's own store, so "enabled" means exactly what it means at runtime.
+    // Reads the host's own shells.json through the store Feature Management uses, so "enabled" means exactly what it means at runtime.
     private static async Task<HashSet<string>> ReadEnabledFeaturesAsync()
     {
         var environment = new TestHostEnvironment(Path.Join(AppContext.BaseDirectory, "WebHost"));
@@ -69,14 +67,6 @@ public sealed class WebHostShellFeatureDiscoveryTests : IAsyncLifetime
 
         var snapshot = await provider.GetRequiredService<IRuntimeFeatureCatalog>().GetSnapshotAsync();
         return snapshot.FeatureDescriptors.Select(descriptor => descriptor.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
-    }
-
-    private sealed class TestHostEnvironment(string contentRootPath) : IHostEnvironment
-    {
-        public string ApplicationName { get; set; } = "Elsa.Studio.Tests";
-        public string EnvironmentName { get; set; } = Environments.Development;
-        public string ContentRootPath { get; set; } = contentRootPath;
-        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
 
     private sealed class EmptyPackageAssemblyCatalog : IPackageAssemblyCatalog
