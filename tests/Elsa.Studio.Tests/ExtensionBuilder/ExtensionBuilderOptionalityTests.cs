@@ -228,7 +228,7 @@ public sealed class ExtensionBuilderOptionalityTests : IAsyncDisposable
         app.UseRouting();
         app.UseAuthentication();
         app.UseAuthorization();
-        // Program.cs's UseStaticFiles sits here, ahead of the shell middleware MapShells adds.
+        // Program.cs's UseStudioStaticFiles sits here, ahead of the shell middleware MapShells adds.
         app.Map(StaticAssetRoute, asset => asset.Run(context => context.Response.WriteAsync(StaticAssetContent)));
         app.MapStudioBackendManagementBridge();
         app.MapShells();

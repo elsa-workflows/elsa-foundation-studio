@@ -14,9 +14,9 @@ namespace Elsa.Studio.Web;
 /// the first request to a gated shell endpoint after a cold start would execute without its policy being evaluated.
 /// Activating the shell first means routing sees the real endpoint and authorization enforces its policy.</para>
 ///
-/// <para>Activation is best-effort: if it fails for any reason other than the caller aborting the request, the failure
-/// is logged and the request continues, so a broken shell cannot turn static files or the SPA into 500s. CShells' own
-/// middleware answers shell requests downstream as before.</para>
+/// <para>Activation is best-effort: if it fails for any non-fatal reason other than the caller aborting the request,
+/// the failure is logged and the request continues, so a broken shell cannot turn static files or the SPA into 500s.
+/// CShells' own middleware answers shell requests downstream as before.</para>
 /// </summary>
 internal static class StudioShellActivation
 {
@@ -35,6 +35,7 @@ internal static class StudioShellActivation
             {
                 throw;
             }
+            // Out of memory is not best-effort material; let it escape.
             catch (Exception ex) when (ex is not OutOfMemoryException)
             {
                 context.RequestServices.GetRequiredService<ILoggerFactory>()
