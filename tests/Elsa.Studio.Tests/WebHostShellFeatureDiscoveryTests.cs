@@ -43,7 +43,7 @@ public sealed class WebHostShellFeatureDiscoveryTests
     // Reads the host's own shells.json through the store Feature Management uses, so "enabled" means exactly what it means at runtime.
     private static async Task<IEnumerable<string>> ReadEnabledFeaturesAsync()
     {
-        var environment = new TestHostEnvironment(Path.Combine(AppContext.BaseDirectory, "WebHost"));
+        var environment = new TestHostEnvironment(Path.Join(AppContext.BaseDirectory, "WebHost"));
         var store = new StudioShellFeatureConfigurationStore(environment, new ConfigurationBuilder().Build());
         var snapshot = await store.LoadAsync();
         return snapshot.Features.Keys;
