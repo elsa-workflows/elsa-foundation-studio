@@ -37,7 +37,7 @@ for (let grew = true; grew;) {
   }
 }
 
-const stylesheets = (readdirSync(srcDir, { recursive: true }) as string[])
+const stylesheets = readdirSync(srcDir, { recursive: true })
   .filter(file => file.endsWith(".css"))
   .map(file => ({ file, css: read(new URL(file, srcDir)) }));
 const styles = stylesheets.find(({ file }) => file === "styles.css")!.css;
