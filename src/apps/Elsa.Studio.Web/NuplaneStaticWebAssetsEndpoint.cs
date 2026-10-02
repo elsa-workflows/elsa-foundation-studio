@@ -20,10 +20,13 @@ internal static class NuplaneStaticWebAssetsEndpoint
         [FromRoute] string assetPath,
         [FromServices] INuplaneAdminOperations nuplaneAdmin,
         [FromServices] IWebHostEnvironment environment,
+        HttpResponse response,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(packageId) || string.IsNullOrWhiteSpace(assetPath))
             return Results.NotFound();
+
+        StudioAssetCaching.ApplyRevalidation(response);
 
         var staticWebAsset = environment.WebRootFileProvider.GetFileInfo($"_content/{packageId}/{assetPath}");
         if (staticWebAsset.Exists)
