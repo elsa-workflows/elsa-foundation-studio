@@ -35,7 +35,7 @@ internal static class StudioShellActivation
             {
                 throw;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OutOfMemoryException)
             {
                 context.RequestServices.GetRequiredService<ILoggerFactory>()
                     .CreateLogger(typeof(StudioShellActivation))
