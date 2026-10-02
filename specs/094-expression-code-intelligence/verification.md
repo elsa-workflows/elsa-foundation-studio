@@ -1,6 +1,10 @@
 # Expression Code Intelligence — Verification
 
-Last reconciled: 2026-07-28
+Last reconciled: 2026-10-02 for Program #2310 planning; current-head execution evidence pending
+
+## Program #2310 status
+
+The 2026-07-28 evidence below is retained as historical baseline evidence. It is not current-head normal-host proof. Studio PRs #546 and #545 now protect default-host feature discovery, but no persisted-workflow browser walkthrough has yet proved matching Studio/Foundation composition, actual location-scoped metadata, runtime-compatible JavaScript/Liquid help, the three themes, formatting, or the final accessibility/continuity matrix. T026-T038 remain open and all four program milestones remain incomplete.
 
 ## Passing evidence
 
