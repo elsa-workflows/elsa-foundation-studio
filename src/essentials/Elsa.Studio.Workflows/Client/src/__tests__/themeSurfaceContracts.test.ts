@@ -22,44 +22,39 @@ function calls(css: string, fn: RegExp) {
   return found;
 }
 
-// The host's glass/material surface recipes that are gradient or image stacks, not colours,
-// following aliases such as `--studio-material-row-bg: var(--studio-material-panel-bg-soft)`.
+// Material surface recipes (`--studio-material-*-bg`, `-bg-strong`, `-bg-soft`) are textured,
+// layered stacks by contract, even where the host's neutral fallback is a flat colour: a material
+// theme supplies its own recipe for any rung it restyles. Any token that is a gradient or image
+// today counts too.
 const hostTokens = declarations(read(new URL("../../../../../apps/Elsa.Studio.Web/Client/src/app/ui/tokens.css", import.meta.url)))
-  .filter(({ name }) => /^--studio-(glass|material)-/.test(name));
-const imageTokens = new Set(hostTokens.filter(({ value }) => /gradient\(|url\(/.test(value)).map(({ name }) => name));
-for (let grew = true; grew;) {
-  grew = false;
-  for (const { name, value } of hostTokens) {
-    if (!imageTokens.has(name) && [...imageTokens].some(token => value.includes(`var(${token})`))) {
-      imageTokens.add(name);
-      grew = true;
-    }
-  }
-}
+  .filter(({ name }) => name.startsWith("--studio-material-"));
+const imageTokens = new Set(hostTokens
+  .filter(({ name, value }) => /-bg(-strong|-soft)?$/.test(name) || /gradient\(|url\(/.test(value))
+  .map(({ name }) => name));
 
 const stylesheets = readdirSync(srcDir, { recursive: true })
   .filter(file => file.endsWith(".css"))
   .map(file => ({ file, css: read(new URL(file, srcDir)) }));
 const styles = stylesheets.find(({ file }) => file === "styles.css")!.css;
 
-// The glass and material remaps of the module's own --wf-* / --xy-* tokens.
-const themeScopes = [...styles.matchAll(/html\[data-theme(?:="black-glass"|-material)\] \.wf-page,[^{]*\{([^}]*)\}/g)]
+// The material remap of the module's own --wf-* / --xy-* tokens.
+const materialScopes = [...styles.matchAll(/html\[data-theme-material\] \.wf-page,[^{]*\{([^}]*)\}/g)]
   .map(([, body]) => declarations(body));
-for (const { name, value } of themeScopes.flat()) {
+for (const { name, value } of materialScopes.flat()) {
   if (/gradient\(|url\(/.test(value) || [...imageTokens].some(token => value.trim() === `var(${token})`)) imageTokens.add(name);
 }
 
 const usesImageToken = (css: string) => [...imageTokens].some(token => css.includes(`var(${token})`));
 
-describe("glass and material theme surface contracts", () => {
-  it("knows which module surfaces become gradient stacks", () => {
+describe("material theme surface contracts", () => {
+  it("knows which module surfaces can become gradient stacks", () => {
     expect([...imageTokens]).toEqual(expect.arrayContaining([
-      "--studio-glass-bg", "--studio-material-panel-bg", "--studio-material-row-bg",
+      "--studio-material-panel-bg", "--studio-material-panel-bg-soft", "--studio-material-row-bg",
       "--wf-panel", "--wf-panel-muted", "--wf-surface", "--wf-row"
     ]));
   });
 
-  it("never passes a gradient-valued surface to color-mix() or a gradient colour stop", () => {
+  it("never passes a gradient-capable surface to color-mix() or a gradient colour stop", () => {
     // color-mix() and gradient stops only accept colours: a gradient argument invalidates the
     // whole declaration at computed-value time and the element loses its background entirely.
     const offenders = stylesheets.flatMap(({ file, css }) =>
@@ -70,7 +65,7 @@ describe("glass and material theme surface contracts", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("never paints a gradient-valued surface into a colour-only property", () => {
+  it("never paints a gradient-capable surface into a colour-only property", () => {
     const colourProperty = /^(?:color|background-color|border(?:-[\w-]+)?|outline(?:-color)?|box-shadow|text-shadow|fill|stroke|caret-color|accent-color|column-rule(?:-color)?)$/;
     const offenders = stylesheets.flatMap(({ file, css }) =>
       [...css.matchAll(/([\w-]+)\s*:([^;{}]+);/g)]
@@ -80,15 +75,14 @@ describe("glass and material theme surface contracts", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("gives every gradient-valued panel tier a flat colour tone in the same theme scope", () => {
-    expect(themeScopes).toHaveLength(2);
-    for (const scope of themeScopes) {
-      const value = (name: string) => scope.find(declaration => declaration.name === name)?.value.trim();
-      for (const tier of ["--wf-panel", "--wf-panel-muted"]) {
-        const tone = value(`${tier}-tone`);
-        expect(tone, `${tier}-tone`).toBeDefined();
-        expect(usesImageToken(tone!), `${tier}-tone: ${tone}`).toBe(false);
-      }
+  it("gives every gradient-capable panel tier a flat colour tone in the material scope", () => {
+    expect(materialScopes).toHaveLength(1);
+    const [scope] = materialScopes;
+    const value = (name: string) => scope.find(declaration => declaration.name === name)?.value.trim();
+    for (const tier of ["--wf-panel", "--wf-panel-muted"]) {
+      const tone = value(`${tier}-tone`);
+      expect(tone, `${tier}-tone`).toBeDefined();
+      expect(usesImageToken(tone!), `${tier}-tone: ${tone}`).toBe(false);
     }
   });
 });
