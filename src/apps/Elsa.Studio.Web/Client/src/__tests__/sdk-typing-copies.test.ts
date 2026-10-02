@@ -5,7 +5,8 @@ import { read } from "./themeTestUtils";
 
 // The SDK package is type-only at the module boundary, so three extensions keep hand-maintained copies of
 // the declarations they consume. A flag the canonical SDK exposes but a copy omits is invisible to that
-// extension's editors, so each copy must carry the activity-declared sensitivity flags (FR-015).
+// extension's editors, so each copy must carry the activity-declared sensitivity flags, and each copy that
+// declares the property editor context must carry the edited activity's id.
 const typingSources = {
   "canonical SDK": "../sdk/index.ts",
   "Secrets copy": "../../../../../extensions/Elsa.Studio.Secrets/Client/src/studio-sdk.d.ts",
@@ -32,5 +33,13 @@ describe("StudioActivityInputDescriptor typing copies", () => {
 
     expect(body).toMatch(/^\s*isSensitive\?: boolean \| null;/m);
     expect(body).toMatch(/^\s*isCredential\?: boolean \| null;/m);
+  });
+});
+
+const editorContextBody = (path: string) => interfaceBody(read(path), "StudioActivityPropertyEditorContext");
+
+describe("StudioActivityPropertyEditorContext typing copies", () => {
+  it.each(Object.entries(typingSources).filter(([, path]) => editorContextBody(path) !== ""))("%s declares activityId?", (_label, path) => {
+    expect(editorContextBody(path)).toMatch(/^\s*activityId\?: string \| null;/m);
   });
 });

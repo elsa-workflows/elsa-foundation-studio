@@ -257,6 +257,7 @@ describe("studio registry", () => {
     // secret picker, never a property editor), a non-text type keeps its typed editor, and a collection
     // keeps its repeater.
     expect(resolved(input({ isSensitive: true, isCredential: true }))).not.toBe("studio.property.password");
+    expect(resolved(input({ uiHint: "password", isCredential: true }))).not.toBe("studio.property.password");
     expect(resolved(input({ uiHint: "password", typeName: "System.Int32" }))).toBe("studio.property.number");
     expect(resolved(input({ isSensitive: false, isCredential: false }))).toBe("studio.property.singleline");
     expect(resolved(input({ typeName: "System.Collections.Generic.ICollection`1", isSensitive: true }), "collection")).toBeUndefined();

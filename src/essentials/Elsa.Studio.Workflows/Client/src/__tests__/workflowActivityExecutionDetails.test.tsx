@@ -1,7 +1,7 @@
 import React from "react";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
-import type { StudioEndpointContext, StudioExpressionEditorContribution } from "@elsa-workflows/studio-sdk";
+import type { StudioActivityInputDescriptor, StudioEndpointContext, StudioExpressionEditorContribution } from "@elsa-workflows/studio-sdk";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getActivityExecutionDescendants, getActivityExecutionInspection, getActivityExecutionLayout } from "../api/runtime";
 import { getActivityExecutionValuePayload } from "../api/activityExecutionValuePayload";
@@ -744,36 +744,62 @@ describe("WorkflowActivityExecutionDetails", () => {
     expect(container.textContent).toContain("Authored source is hidden by source permissions.");
   });
 
-  it.each([
-    ["sensitive", { isSensitive: true }],
-    ["secret-only", { isCredential: true }]
-  ])("keeps the authored source of a declared %s input hidden when the backend did not flag the record", async (_label, declared) => {
-    vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([]));
+  describe("a declared sensitive or secret-only input", () => {
     const authoredSource = "variables.storedWords";
+    const sourceBinding = { inputKey: "token-key", inputName: "Token", source: "Expression", expression: { language: "JavaScript", expression: authoredSource } };
 
-    const container = render(
-      <WorkflowActivityExecutionDetails
-        context={context}
-        activity={activity}
-        activityCatalog={[{ ...catalog[0]!, inputs: [{ referenceKey: "token-key", name: "Token", typeName: "System.String", ...declared }] }]}
-        executableNodeFacts={{
-          executableNodeId: "node-1",
-          authoredActivityId: "write-line",
-          activityType: activity.activityType,
-          activityTypeVersion: activity.activityTypeVersion,
-          structureKind: null,
-          available: true,
-          outputCaptures: [],
-          authoredInputsAccess: "visible",
-          authoredInputs: [{ executableNodeId: "node-1", inputKey: "token-key", expressionType: "JavaScript", value: authoredSource }],
-          inputBindings: [{ inputKey: "token-key", inputName: "Token", source: "Expression", expression: { language: "JavaScript", expression: authoredSource } }]
-        }}
-      />
-    );
+    const renderDeclaredInput = (
+      declared: Partial<StudioActivityInputDescriptor>,
+      authored: { expressionType: string; value: unknown; isSensitive?: boolean },
+      inputBindings: ExecutableGraphNodeFacts["inputBindings"] = []
+    ) => {
+      vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([]));
+      return render(
+        <WorkflowActivityExecutionDetails
+          context={context}
+          activity={activity}
+          activityCatalog={[{ ...catalog[0]!, inputs: [{ referenceKey: "token-key", name: "Token", typeName: "System.String", ...declared }] }]}
+          executableNodeFacts={{
+            executableNodeId: "node-1",
+            authoredActivityId: "write-line",
+            activityType: activity.activityType,
+            activityTypeVersion: activity.activityTypeVersion,
+            structureKind: null,
+            available: true,
+            outputCaptures: [],
+            authoredInputsAccess: "visible",
+            authoredInputs: [{ executableNodeId: "node-1", inputKey: "token-key", ...authored }],
+            inputBindings
+          }}
+        />
+      );
+    };
 
-    await waitFor(() => expect(container.textContent).toContain("Protected source"));
-    expect(container.textContent).toContain("Authored source is protected because this input is sensitive.");
-    expect(container.innerHTML).not.toContain(authoredSource);
+    it.each([
+      ["sensitive", "JavaScript", { isSensitive: true }],
+      ["sensitive", "Literal", { isSensitive: true }],
+      ["secret-only", "JavaScript", { isCredential: true }]
+    ])("keeps the authored %s source hidden under %s when the backend did not flag the record", async (_label, expressionType, declared) => {
+      const container = renderDeclaredInput(declared, { expressionType, value: authoredSource }, [sourceBinding]);
+
+      await waitFor(() => expect(container.textContent).toContain("Protected source"));
+      expect(container.textContent).toContain("Authored source is protected because this input is sensitive.");
+      expect(container.innerHTML).not.toContain(authoredSource);
+    });
+
+    it("names the Secret Reference a secret-only input is bound to, as the canvas summary does", async () => {
+      const container = renderDeclaredInput({ isSensitive: true, isCredential: true }, { expressionType: "Secret", value: { name: "api-tokens" } });
+
+      await waitFor(() => expect(container.textContent).toContain("api-tokens"));
+      expect(container.textContent).not.toContain("Protected source");
+    });
+
+    it("keeps a Secret Reference hidden when the backend flagged the record", async () => {
+      const container = renderDeclaredInput({ isCredential: true }, { expressionType: "Secret", value: { name: "api-tokens" }, isSensitive: true });
+
+      await waitFor(() => expect(container.textContent).toContain("Protected source"));
+      expect(container.innerHTML).not.toContain("api-tokens");
+    });
   });
 
   it("shows an empty state when no input snapshots exist", async () => {

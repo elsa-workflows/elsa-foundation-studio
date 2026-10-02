@@ -38,6 +38,7 @@ import {
   describeCollectionForInput,
   describeDictionaryForInput,
   getLiteralDefaultValue,
+  isEmptyExpressionValue,
   isRepeaterOptOut,
   planExpressionModeTransition,
   readWrappedInput,
@@ -48,7 +49,7 @@ import {
   writeInputValue,
   type WrappedActivityInputValue
 } from "./activityProperties";
-import { clearSecretOnlyInput } from "./secretOnlyInput";
+import { clearSecretOnlyInput, isProtectedInput } from "./secretOnlyInput";
 import {
   builtInConversionProfiles,
   conversionModeDescriptors,
@@ -636,13 +637,18 @@ function PropertyRow({
     if (!wrapped || nextSyntax === syntax) return;
     const nextDescriptor = expressionDescriptors.find(descriptor => descriptor.type === nextSyntax);
     if (!nextDescriptor || getUnavailableReason(nextDescriptor)) return;
-    const transition = planExpressionModeTransition(
-      editingMode ?? "structured",
-      nextDescriptor.editingMode,
-      input.typeName,
-      value,
-      getTargetDefaultValue(nextDescriptor)
-    );
+    const targetDefaultValue = getTargetDefaultValue(nextDescriptor);
+    // A masked literal is never carried into another syntax, where it would show as clear text: the target
+    // starts from its default, and discarding a stored value asks first, like any other lossy switch.
+    const transition = isMaskedInput(input) && editingMode === "literal" && nextDescriptor.editingMode !== "literal"
+      ? { requiresConfirmation: !isEmptyExpressionValue(value), nextValue: targetDefaultValue }
+      : planExpressionModeTransition(
+        editingMode ?? "structured",
+        nextDescriptor.editingMode,
+        input.typeName,
+        value,
+        targetDefaultValue
+      );
     if (transition.requiresConfirmation) {
       setExpanded(false);
       setPendingTransition({ descriptor: nextDescriptor, nextValue: transition.nextValue });
@@ -1652,11 +1658,16 @@ function isSingleLineTextInput(input: StudioActivityInputDescriptor, editorId: s
   return inlineTextTypeNames.has(normalizedType) || input.uiHint?.toLowerCase() === "singleline";
 }
 
+// A masked input never shows its stored value in the clear: it carries a password hint or is protected.
+function isMaskedInput(input: StudioActivityInputDescriptor) {
+  return input.uiHint?.toLowerCase() === "password" || isProtectedInput(input);
+}
+
 function isExpandableTextInput(input: StudioActivityInputDescriptor, editorId: string | undefined) {
   const uiHint = input.uiHint?.toLowerCase();
   if (uiHint === "checkbox" || uiHint === "dropdown") return false;
   // A masked input never opens into a clear-text editor, whatever its hint.
-  if (uiHint === "password" || input.isSensitive === true) return false;
+  if (isMaskedInput(input)) return false;
   if (editorId && !inlineSyntaxEditorIds.has(editorId) && uiHint !== "multiline") return false;
 
   const normalizedType = input.typeName.split(",", 1)[0]?.trim().toLowerCase();

@@ -694,7 +694,7 @@ describe("secret-only inputs", () => {
   const authorization = input("Authorization", { isWrapped: true, isSensitive: true, isCredential: true, defaultSyntax: "Literal" });
   const legacyLiteral = "plain-old-words";
 
-  const renderSecretOnly = (options: Parameters<typeof renderPanel>[1] = {}) => renderPanel([authorization, input("Url", { isWrapped: true })], {
+  const renderSecretOnly = (options: Parameters<typeof renderPanel>[1] = {}, overrides: Partial<StudioActivityInputDescriptor> = {}) => renderPanel([{ ...authorization, ...overrides }, input("Url", { isWrapped: true })], {
     editors: [literalEditor],
     expressionEditors: [secretPicker],
     expressionDescriptors: [...backendExpressionDescriptors, secretDescriptor],
@@ -723,6 +723,23 @@ describe("secret-only inputs", () => {
     flushSync(() => document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
     expect(syntaxOptions(rowOf(container, "Url"))).toEqual(expect.arrayContaining(["Literal", "JavaScript", "Secret"]));
     expect(rowOf(container, "Url").querySelector("[aria-label='Literal editor']")).not.toBeNull();
+  });
+
+  // Each layout has its own syntax picker. A dictionary layout is reached only when the Secret descriptor
+  // reports literal mode, since a secret-only input's syntax is always Secret.
+  const layouts: Array<[string, string, Partial<StudioActivityInputDescriptor>, StudioExpressionDescriptor["editingMode"]]> = [
+    ["inline", ".wf-expression-field .wf-syntax-picker-trigger", {}, "reference"],
+    ["block", ".wf-syntax-picker-trigger:not(.inline)", { uiHint: "multiline" }, "reference"],
+    ["dictionary", ".wf-dictionary-expression-toolbar .wf-syntax-picker-trigger", { typeName: "System.Collections.Generic.IDictionary`2[System.String,System.String]" }, "literal"]
+  ];
+
+  it.each(layouts)("offers only the Secret syntax in the %s layout", (_layout, picker, overrides, secretMode) => {
+    const container = renderSecretOnly({ expressionDescriptors: [...backendExpressionDescriptors, { ...secretDescriptor, editingMode: secretMode }] }, overrides);
+    const row = rowOf(container, "Authorization");
+
+    expect(row.querySelectorAll(".wf-syntax-picker-trigger")).toHaveLength(1);
+    expect(row.querySelector(picker)).not.toBeNull();
+    expect(syntaxOptions(row)).toEqual(["Secret"]);
   });
 
   it("does not display a value stored before the rule as text", () => {
@@ -795,7 +812,7 @@ describe("secret-only inputs", () => {
     expect(JSON.stringify(changes.at(-1))).not.toContain(legacyLiteral);
   });
 
-  it("offers no conversion control, and nothing on the row but picking or clearing a Secret writes a binding", () => {
+  it("offers no conversion or expand control, and its row writes only a picked Secret or a clear", () => {
     const changes: ActivityNode[] = [];
     const container = renderSecretOnly({
       onChange: next => changes.push(next),
@@ -804,26 +821,23 @@ describe("secret-only inputs", () => {
       })
     });
     const row = rowOf(container, "Authorization");
+    const click = (label: string) => flushSync(() => row.querySelector<HTMLButtonElement>(`button[aria-label='${label}']`)!.click());
+
+    // An authored conversion would otherwise show its chip, and the toggle shows on every wrapped input.
     expect(row.querySelector(".wf-conversion-toggle, .wf-conversion-chip, .wf-conversion-control")).toBeNull();
+    expect(row.querySelector("button[aria-label='Open expanded Authorization editor']")).toBeNull();
     // A secret picker that asks to expand does not open the expanded editor, which carries its own conversion control.
-    flushSync(() => row.querySelector<HTMLButtonElement>("button[aria-label='Expand secret']")!.click());
-    expect(row.querySelector("[role='dialog']")).toBeNull();
-
-    // Exercise every other control the row offers, including whatever those controls reveal.
-    const picking = new Set(["Pick secret", "Clear secret"]);
-    const clicked = new Set<Element>();
-    for (let pass = 0; pass < 3; pass++) {
-      const controls = [...row.querySelectorAll("button"), ...document.querySelectorAll("[role='option']")]
-        .filter(control => !clicked.has(control) && !picking.has(control.getAttribute("aria-label") ?? ""));
-      for (const control of controls) {
-        clicked.add(control);
-        flushSync(() => (control as HTMLElement).click());
-      }
-    }
-
-    expect(clicked.size).toBeGreaterThan(0);
+    click("Expand secret");
+    expect(document.querySelector("[role='dialog'], .wf-conversion-control")).toBeNull();
     expect(changes).toEqual([]);
-    expect(document.querySelector(".wf-conversion-control, textarea")).toBeNull();
+
+    click("Pick secret");
+    expect(changes).toHaveLength(1);
+    expect(changes[0]?.authorization).toMatchObject({ expression: { type: "Secret", value: { name: "tokens" } } });
+
+    click("Clear secret");
+    expect(changes).toHaveLength(2);
+    expect(changes[1]).not.toHaveProperty("authorization");
     expect(document.body.innerHTML).not.toContain(legacyLiteral);
   });
 });
@@ -846,9 +860,24 @@ describe("masked inputs", () => {
   const storedValue = "stored-value-words";
   const maskedEditor: StudioActivityPropertyEditorContribution = {
     id: "studio.property.password",
-    supports: descriptor => descriptor.isSensitive === true,
+    supports: descriptor => descriptor.isSensitive === true || descriptor.uiHint === "password",
     component: () => <span>Value set</span>
   };
+  const switchToJavaScript = (overrides: Partial<StudioActivityInputDescriptor>, stored: unknown = storedValue) => {
+    const changes: ActivityNode[] = [];
+    const container = renderPanel([input("ApiToken", { isWrapped: true, ...overrides })], {
+      editors: [maskedEditor],
+      onChange: next => changes.push(next),
+      activity: activity({ apiToken: { typeName: "System.String", expression: { type: "Literal", value: stored } } })
+    });
+    openAndSelect(container, "JavaScript");
+    return { container, changes };
+  };
+  const inlineSource = (container: HTMLElement) => container.querySelector<HTMLInputElement>("input[aria-label='ApiToken expression']")!.value;
+  const masked: Array<[string, Partial<StudioActivityInputDescriptor>]> = [
+    ["a sensitive input", { isSensitive: true }],
+    ["a password-hinted input", { uiHint: "password" }]
+  ];
 
   it("never offers to expand a sensitive multiline input into a clear-text editor", () => {
     const container = renderPanel([input("ApiToken", { isWrapped: true, isSensitive: true, uiHint: "multiline" })], {
@@ -859,8 +888,39 @@ describe("masked inputs", () => {
 
     expect(container.textContent).toContain("Value set");
     expect(expand).toBeNull();
-    flushSync(() => expand?.click());
+  });
+
+  it.each(masked)("does not carry the stored literal of %s into a text syntax, inline or expanded", (_label, overrides) => {
+    const { container, changes } = switchToJavaScript(overrides);
+    // Discarding a stored value asks first, like any other lossy switch.
+    expect(changes).toEqual([]);
+    const replace = [...container.querySelectorAll<HTMLButtonElement>("[role='alertdialog'] button")]
+      .find(button => button.textContent === "Replace value")!;
+    flushSync(() => replace.click());
+
+    expect(changes).toHaveLength(1);
+    expect(changes[0]?.apiToken).toEqual({ typeName: "System.String", expression: { type: "JavaScript", value: "" } });
+    expect(inlineSource(container)).toBe("");
     expect(document.body.innerHTML).not.toContain(storedValue);
+
+    flushSync(() => container.querySelector<HTMLButtonElement>("button[aria-label='Open expanded ApiToken editor']")!.click());
+    expect(container.querySelector<HTMLTextAreaElement>("textarea[aria-label='ApiToken expanded value']")!.value).toBe("");
+    expect(document.body.innerHTML).not.toContain(storedValue);
+  });
+
+  it.each(masked)("switches %s with nothing stored straight to a text syntax", (_label, overrides) => {
+    const { container, changes } = switchToJavaScript(overrides, "");
+
+    expect(container.querySelector("[role='alertdialog']")).toBeNull();
+    expect(changes[0]?.apiToken).toEqual({ typeName: "System.String", expression: { type: "JavaScript", value: "" } });
+  });
+
+  it("still carries an ordinary input's literal into a text syntax", () => {
+    const { container, changes } = switchToJavaScript({});
+
+    expect(container.querySelector("[role='alertdialog']")).toBeNull();
+    expect(changes[0]?.apiToken).toEqual({ typeName: "System.String", expression: { type: "JavaScript", value: storedValue } });
+    expect(inlineSource(container)).toBe(storedValue);
   });
 });
 

@@ -73,10 +73,10 @@ export const builtInPropertyEditors: StudioActivityPropertyEditorContribution[] 
     id: "studio.property.password",
     order: 135,
     // Ahead of multiline and singleline so a hint that would show the text in the clear never wins over
-    // masking. A sensitive input that takes only a Secret Reference is never offered a text editor here;
-    // the properties panel gives it the secret picker.
-    supports: (descriptor, context) => isElementScope(context) && isTextDescriptor(descriptor)
-      && (hasUiHint(descriptor, "password") || (descriptor.isSensitive === true && descriptor.isCredential !== true)),
+    // masking. A secret-only input is never claimed here, whatever its hint: the properties panel gives it
+    // the secret picker.
+    supports: (descriptor, context) => isElementScope(context) && isTextDescriptor(descriptor) && descriptor.isCredential !== true
+      && (hasUiHint(descriptor, "password") || descriptor.isSensitive === true),
     component: PasswordEditor
   },
   {
@@ -199,7 +199,7 @@ function PasswordField({ descriptor, value, disabled, onChange }: StudioActivity
   const [draft, setDraft] = useState("");
   const [storedValue, setStoredValue] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
-  const valueSetRef = useRef<HTMLDivElement>(null);
+  const replaceRef = useRef<HTMLButtonElement>(null);
   const focusTarget = useRef<"field" | "replace" | null>(null);
   const name = accessibleName(descriptor);
   const hasStoredValue = value != null && String(value) !== "";
@@ -218,7 +218,7 @@ function PasswordField({ descriptor, value, disabled, onChange }: StudioActivity
     const target = focusTarget.current;
     focusTarget.current = null;
     if (target === "field") inputRef.current?.focus();
-    if (target === "replace") valueSetRef.current?.querySelector("button")?.focus();
+    if (target === "replace") replaceRef.current?.focus();
   }, [replacing]);
 
   // Leaving a replacement before typing anything goes back to "Value set": the stored value is untouched.
@@ -230,9 +230,10 @@ function PasswordField({ descriptor, value, disabled, onChange }: StudioActivity
 
   if (!replacing && hasStoredValue) {
     return (
-      <div ref={valueSetRef} className="studio-property-secret-value">
+      <div className="studio-property-secret-value">
         <span>Value set</span>
         <StudioButton
+          ref={replaceRef}
           size="sm"
           aria-label={`Replace ${name}`}
           disabled={disabled}
