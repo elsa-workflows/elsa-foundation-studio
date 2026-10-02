@@ -1,9 +1,10 @@
 using System.Reflection;
-using System.Text.Json.Nodes;
 using CShells.DependencyInjection;
 using CShells.Features;
 using Elsa.Studio.Web;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting.Internal;
 using Nuplane.Loading;
 
 namespace Elsa.Studio.Tests;
@@ -17,13 +18,28 @@ public sealed class WebHostShellFeatureDiscoveryTests
     [Fact]
     public async Task EveryFeatureEnabledInShellsJson_ResolvesToDiscoverableFeatureType()
     {
+        var enabled = await ReadEnabledFeaturesAsync();
         var discovered = await DiscoverFeatureIdsAsync();
 
-        var undiscoverable = ReadEnabledFeatures()
+        var undiscoverable = enabled
             .Except(PackageLoadedFeatures, StringComparer.OrdinalIgnoreCase)
             .Where(feature => !discovered.Contains(feature));
 
+        Assert.NotEmpty(enabled);
         Assert.Empty(undiscoverable);
+    }
+
+    [Fact]
+    public async Task PackageLoadedFeatures_AreEnabledButNotInBox()
+    {
+        var enabled = await ReadEnabledFeaturesAsync();
+        var discovered = await DiscoverFeatureIdsAsync();
+
+        Assert.All(PackageLoadedFeatures, feature =>
+        {
+            Assert.Contains(feature, enabled);
+            Assert.DoesNotContain(feature, discovered);
+        });
     }
 
     // Uses the host's own assembly registration, with no Nuplane packages installed, so the result matches a fresh start.
@@ -40,15 +56,13 @@ public sealed class WebHostShellFeatureDiscoveryTests
         return snapshot.FeatureDescriptors.Select(descriptor => descriptor.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
-    // Mirrors StudioShellFeatureConfigurationStore: an entry is enabled unless its value is literally false.
-    private static IEnumerable<string> ReadEnabledFeatures()
+    // Reads the Web host's shells.json through the host's own store, so "enabled" means exactly what it means at runtime.
+    private static async Task<IEnumerable<string>> ReadEnabledFeaturesAsync()
     {
-        var shellsPath = Path.Combine(AppContext.BaseDirectory, "WebHost", "shells.json");
-        var features = JsonNode.Parse(File.ReadAllText(shellsPath))!["CShells"]!["Shells"]!["Default"]!["Features"]!.AsObject();
-
-        return features
-            .Where(feature => feature.Value is not JsonValue value || !value.TryGetValue<bool>(out var enabled) || enabled)
-            .Select(feature => feature.Key);
+        var environment = new HostingEnvironment { ContentRootPath = Path.Combine(AppContext.BaseDirectory, "WebHost") };
+        var store = new StudioShellFeatureConfigurationStore(environment, new ConfigurationBuilder().Build());
+        var snapshot = await store.LoadAsync();
+        return snapshot.Features.Keys;
     }
 
     private sealed class EmptyPackageAssemblyCatalog : IPackageAssemblyCatalog
