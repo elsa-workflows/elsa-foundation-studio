@@ -26,6 +26,8 @@ internal static class NuplaneStaticWebAssetsEndpoint
         if (string.IsNullOrWhiteSpace(packageId) || string.IsNullOrWhiteSpace(assetPath))
             return Results.NotFound();
 
+        // Before the lookups on purpose: a 404 is heuristically cacheable too, and an asset missing now may exist after
+        // the next rebuild or package install.
         StudioAssetCaching.ApplyRevalidation(response);
 
         var staticWebAsset = environment.WebRootFileProvider.GetFileInfo($"_content/{packageId}/{assetPath}");
@@ -52,7 +54,7 @@ internal static class NuplaneStaticWebAssetsEndpoint
     private static IResult ServeFile(IFileInfo file) =>
         file.PhysicalPath is { Length: > 0 } physicalPath
             ? Results.File(physicalPath, GetContentType(physicalPath), enableRangeProcessing: true)
-            : Results.Stream(file.CreateReadStream(), GetContentType(file.Name));
+            : Results.Stream(file.CreateReadStream(), GetContentType(file.Name), lastModified: file.LastModified);
 
     internal static bool IsChildPath(string parentPath, string childPath)
     {

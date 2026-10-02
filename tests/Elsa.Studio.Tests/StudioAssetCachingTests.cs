@@ -13,14 +13,16 @@ using Nuplane.Reconciliation;
 namespace Elsa.Studio.Tests;
 
 /// <summary>
-/// Module entry points (<c>module.js</c>, <c>module*.css</c>) and the shell's bundles have stable, unhashed URLs while
-/// the chunks they import are content-hashed and replaced on every build. If the browser reuses a cached entry point
-/// without asking, it imports chunks that no longer exist — so every Studio asset must be revalidated before reuse.
+/// Stable-URL entry points import content-hashed chunks that a rebuild deletes, so every served asset must be revalidated
+/// before reuse — see <see cref="StudioAssetCaching"/>.
 /// </summary>
 public sealed class StudioAssetCachingTests : IAsyncLifetime
 {
     private const string PackageId = "Acme.Studio.Module";
     private const string ModuleEntry = "studio/modules/acme/module.js";
+    private const string ModuleSource = "export const register = () => {};";
+    private const string HostModuleUrl = "/" + ModuleEntry;
+    private const string PackageModuleUrl = "/_content/" + PackageId + "/" + ModuleEntry;
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"elsa-asset-caching-{Guid.NewGuid():N}");
     private WebApplication _app = null!;
     private HttpClient _client = null!;
@@ -29,44 +31,38 @@ public sealed class StudioAssetCachingTests : IAsyncLifetime
     private string PackageInstallPath => Path.Combine(_root, "packages", PackageId);
 
     [Theory]
-    [InlineData("/" + ModuleEntry)]
+    [InlineData(HostModuleUrl)]
+    [InlineData(PackageModuleUrl)] // Served by the Nuplane package endpoint.
     [InlineData("/studio/index.html")]
     [InlineData("/workflows/definitions")] // SPA fallback to studio/index.html.
-    public async Task HostStaticAssetsMustBeRevalidated(string path)
+    public async Task ServedAssetsMustBeRevalidated(string path)
     {
-        var response = await _client.GetAsync(path);
+        using var response = await _client.GetAsync(path);
 
         response.EnsureSuccessStatusCode();
         Assert.True(response.Headers.CacheControl?.NoCache, $"Expected Cache-Control: no-cache on {path}.");
         Assert.NotNull(response.Content.Headers.LastModified);
     }
 
-    [Fact]
-    public async Task RevalidatingAnUnchangedAssetIsANotModified()
+    [Theory]
+    [InlineData(HostModuleUrl)]
+    [InlineData(PackageModuleUrl)]
+    public async Task RevalidatingAnUnchangedAssetIsANotModified(string path)
     {
-        var first = await _client.GetAsync("/" + ModuleEntry);
-        using var revalidation = new HttpRequestMessage(HttpMethod.Get, "/" + ModuleEntry);
+        using var first = await _client.GetAsync(path);
+        using var revalidation = new HttpRequestMessage(HttpMethod.Get, path);
         revalidation.Headers.IfModifiedSince = first.Content.Headers.LastModified;
 
-        var second = await _client.SendAsync(revalidation);
+        using var second = await _client.SendAsync(revalidation);
 
         Assert.Equal(HttpStatusCode.NotModified, second.StatusCode);
     }
 
-    [Fact]
-    public async Task NuplanePackageAssetsMustBeRevalidated()
-    {
-        var response = await _client.GetAsync($"/_content/{PackageId}/{ModuleEntry}");
-
-        response.EnsureSuccessStatusCode();
-        Assert.True(response.Headers.CacheControl?.NoCache, "Expected Cache-Control: no-cache on a Nuplane package asset.");
-    }
-
     public async Task InitializeAsync()
     {
-        WriteFile(Path.Combine(WebRoot, ModuleEntry), "export const register = () => {};");
+        WriteFile(Path.Combine(WebRoot, ModuleEntry), ModuleSource);
         WriteFile(Path.Combine(WebRoot, "studio", "index.html"), "<!doctype html>");
-        WriteFile(Path.Combine(PackageInstallPath, "staticwebassets", ModuleEntry), "export const register = () => {};");
+        WriteFile(Path.Combine(PackageInstallPath, "staticwebassets", ModuleEntry), ModuleSource);
 
         var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions
         {
