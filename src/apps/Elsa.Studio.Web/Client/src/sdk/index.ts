@@ -488,6 +488,10 @@ export interface StudioActivityInputDescriptor extends StudioActivityPropertyDes
   isReadOnly?: boolean | null;
   storageDriverType?: string | null;
   uiSpecifications?: StudioActivityInputUISpecifications | null;
+  /** Activity-declared: the value must not be shown or logged. Absent on older backends. */
+  isSensitive?: boolean | null;
+  /** Activity-declared: accepts only a Secret Reference. Implies isSensitive. Absent on older backends. */
+  isCredential?: boolean | null;
 }
 
 export function readActivityInputOptionsProvider(input: StudioActivityInputDescriptor): StudioActivityInputOptionsProviderDescriptor | null {

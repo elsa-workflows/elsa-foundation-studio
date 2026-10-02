@@ -678,6 +678,133 @@ describe("activity property organization", () => {
   });
 });
 
+describe("secret-only (credential) inputs", () => {
+  const secretDescriptor: StudioExpressionDescriptor = { type: "Secret", displayName: "Secret", editingMode: "reference" };
+  const literalEditor: StudioActivityPropertyEditorContribution = {
+    id: "studio.property.singleline",
+    supports: () => true,
+    component: ({ value, onChange }) => <input type="text" aria-label="Literal editor" value={String(value ?? "")} onChange={event => onChange(event.target.value)} />
+  };
+  const secretPicker: StudioExpressionEditorContribution = {
+    id: "secret.picker",
+    supports: context => context.syntax === "Secret",
+    surfaces: { inline: SecretPickerStub },
+    createDefaultValue: () => null
+  };
+  const authorization = input("Authorization", { isWrapped: true, isSensitive: true, isCredential: true, defaultSyntax: "Literal" });
+  const legacyLiteral = "plain-old-words";
+
+  const renderCredential = (options: Parameters<typeof renderPanel>[1] = {}) => renderPanel([authorization, input("Url", { isWrapped: true })], {
+    editors: [literalEditor],
+    expressionEditors: [secretPicker],
+    expressionDescriptors: [...backendExpressionDescriptors, secretDescriptor],
+    ...options
+  });
+  const rowOf = (container: HTMLElement, label: string) =>
+    [...container.querySelectorAll<HTMLElement>(".wf-property-row")].find(row => row.querySelector("label")?.textContent === label)!;
+  const syntaxOptions = (row: HTMLElement) => {
+    flushSync(() => row.querySelector<HTMLButtonElement>(".wf-syntax-picker-trigger")?.click());
+    return [...document.querySelectorAll("[role='option']")].map(option => option.textContent);
+  };
+
+  it("defaults to the secret picker ahead of the descriptor's default syntax and offers no literal editor", () => {
+    const row = rowOf(renderCredential(), "Authorization");
+
+    expect(row.querySelector(".wf-syntax-picker-trigger")?.textContent).toBe("Secret");
+    expect(row.querySelector("[aria-label='Secret picker']")).not.toBeNull();
+    expect(row.querySelector("[aria-label='Literal editor']")).toBeNull();
+    expect(row.querySelector("input[type='text'], textarea")).toBeNull();
+  });
+
+  it("offers only the Secret syntax in the picker, while other inputs keep every syntax", () => {
+    const container = renderCredential();
+
+    expect(syntaxOptions(rowOf(container, "Authorization"))).toEqual(["Secret"]);
+    flushSync(() => document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+    expect(syntaxOptions(rowOf(container, "Url"))).toEqual(expect.arrayContaining(["Literal", "JavaScript", "Secret"]));
+    expect(rowOf(container, "Url").querySelector("[aria-label='Literal editor']")).not.toBeNull();
+  });
+
+  it("does not display a value stored before the rule as text", () => {
+    const container = renderCredential({
+      activity: activity({ authorization: { typeName: "System.String", expression: { type: "Literal", value: legacyLiteral } } })
+    });
+    const row = rowOf(container, "Authorization");
+
+    expect(container.innerHTML).not.toContain(legacyLiteral);
+    expect(row.querySelector(".wf-syntax-picker-trigger")?.textContent).toBe("Secret");
+    expect(row.querySelector("[aria-label='Literal editor']")).toBeNull();
+    expect(row.querySelector("[aria-label='Secret picker']")?.getAttribute("data-value")).toBe("null");
+  });
+
+  it("shows the existing unavailable state, never a literal editor, when the Secret descriptor is absent", () => {
+    const container = renderCredential({ expressionEditors: [], expressionDescriptors: backendExpressionDescriptors });
+    const row = rowOf(container, "Authorization");
+
+    expect(row.textContent).toContain("No editor is available for Secret.");
+    expect(row.querySelector("[aria-label='Literal editor']")).toBeNull();
+    expect(row.querySelector("input[type='text'], textarea")).toBeNull();
+  });
+
+  it("shows the existing unavailable state when the Secret descriptor exists but no secret picker is registered", () => {
+    const container = renderCredential({ expressionEditors: [] });
+    const row = rowOf(container, "Authorization");
+
+    expect(row.textContent).toContain("No editor is available for Secret.");
+    expect(row.querySelector("[aria-label='Literal editor']")).toBeNull();
+  });
+
+  it.each(["literal", "text"] as const)("never falls back to a literal, text or expanded editor when the Secret descriptor reports %s mode", mode => {
+    const container = renderCredential({
+      expressionEditors: [],
+      expressionDescriptors: [...backendExpressionDescriptors, { ...secretDescriptor, editingMode: mode }]
+    });
+    const row = rowOf(container, "Authorization");
+
+    expect(row.textContent).toContain("No editor is available for Secret.");
+    expect(row.querySelector("[aria-label='Literal editor']")).toBeNull();
+    expect(row.querySelector("input[type='text'], textarea")).toBeNull();
+    expect(row.querySelector("button[aria-label='Open expanded Authorization editor']")).toBeNull();
+  });
+
+  it("shows no literal editor for a credential input the backend marks unwrapped", () => {
+    const container = renderPanel([input("Authorization", { isCredential: true })], { editors: [literalEditor] });
+
+    expect(container.textContent).toContain("No editor is available for Secret.");
+    expect(container.querySelector("[aria-label='Literal editor']")).toBeNull();
+  });
+
+  it("writes a picked Secret under the Secret syntax and unbinds the input when it is cleared", () => {
+    const changes: ActivityNode[] = [];
+    const container = renderCredential({
+      onChange: next => changes.push(next),
+      activity: activity({
+        authorization: { typeName: "System.String", expression: { type: "Literal", value: legacyLiteral } },
+        url: { typeName: "System.String", expression: { type: "Literal", value: "https://example.test" } }
+      })
+    });
+    const row = rowOf(container, "Authorization");
+    const click = (label: string) => flushSync(() => row.querySelector<HTMLButtonElement>(`button[aria-label='${label}']`)?.click());
+
+    click("Pick secret");
+    expect(changes.at(-1)?.authorization).toEqual({ typeName: "System.String", expression: { type: "Secret", value: { name: "tokens" } } });
+
+    click("Clear secret");
+    expect(changes.at(-1)).not.toHaveProperty("authorization");
+    expect(changes.at(-1)?.url).toEqual({ typeName: "System.String", expression: { type: "Literal", value: "https://example.test" } });
+    expect(JSON.stringify(changes.at(-1))).not.toContain(legacyLiteral);
+  });
+});
+
+function SecretPickerStub({ value, onChange }: React.ComponentProps<NonNullable<StudioExpressionEditorContribution["surfaces"]["inline"]>>) {
+  return (
+    <div aria-label="Secret picker" data-value={JSON.stringify(value)}>
+      <button type="button" aria-label="Pick secret" onClick={() => onChange({ name: "tokens" })} />
+      <button type="button" aria-label="Clear secret" onClick={() => onChange(null)} />
+    </div>
+  );
+}
+
 function TestReferenceEditor({ value, disabled, initialFocus }: React.ComponentProps<NonNullable<StudioExpressionEditorContribution["surfaces"]["inline"]>>) {
   const ref = React.useRef<HTMLInputElement>(null);
   React.useEffect(() => {

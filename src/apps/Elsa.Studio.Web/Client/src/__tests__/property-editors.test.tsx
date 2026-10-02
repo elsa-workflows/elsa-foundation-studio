@@ -270,3 +270,98 @@ describe("enum text fallback", () => {
     expect(resolves("studio.property.dropdown", enumWithOptions)).toBe(true);
   });
 });
+
+describe("masked password activity property editor", () => {
+  const descriptor: StudioActivityInputDescriptor = { name: "ApiToken", displayName: "API token", typeName: "System.String", uiHint: "password" };
+  const storedValue = "stored-value-words";
+
+  // Mirrors the panel: the parent feeds each emitted value back in as the new `value`.
+  function Host({ initial, onChange, disabled }: { initial?: unknown; onChange(value: unknown): void; disabled?: boolean }) {
+    const [value, setValue] = React.useState(initial);
+    const Editor = builtInPropertyEditors.find(editor => editor.id === "studio.property.password")!.component;
+    return (
+      <Editor
+        descriptor={descriptor}
+        value={value}
+        disabled={disabled}
+        context={{ activity: {}, expressionDescriptors: [] }}
+        onChange={next => { setValue(next); onChange(next); }}
+      />
+    );
+  }
+
+  const renderHost = (props: Parameters<typeof Host>[0]) => flushSync(() => root.render(<Host {...props} />));
+  const field = () => container.querySelector<HTMLInputElement>("input");
+  const replaceButton = () => container.querySelector<HTMLButtonElement>("button")!;
+
+  it("claims a password hint or a sensitive non-credential text input in element scope", () => {
+    expect(resolves("studio.property.password", descriptor)).toBe(true);
+    expect(resolves("studio.property.password", { name: "x", typeName: "System.String", isSensitive: true })).toBe(true);
+    expect(resolves("studio.property.password", { name: "x", typeName: "System.String", isSensitive: true, isCredential: true })).toBe(false);
+    expect(resolves("studio.property.password", { name: "x", typeName: "System.String" })).toBe(false);
+    expect(resolves("studio.property.password", { name: "x", typeName: "System.Int32", uiHint: "password" })).toBe(false);
+    expect(resolves("studio.property.password", descriptor, "collection")).toBe(false);
+  });
+
+  it("masks what is typed, labels the field and opts out of password-manager autofill", () => {
+    const onChange = vi.fn();
+    renderHost({ onChange });
+
+    const input = field()!;
+    expect(input.type).toBe("password");
+    expect(input.getAttribute("aria-label")).toBe("API token");
+    expect(input.autocomplete).toBe("new-password");
+
+    typeInto(input, "typed-words");
+    expect(onChange).toHaveBeenLastCalledWith("typed-words");
+    // The field stays in place while the parent feeds the typed value back in.
+    expect(field()).toBe(input);
+    expect(field()!.type).toBe("password");
+  });
+
+  it("never renders a stored value and offers to replace it instead", () => {
+    const onChange = vi.fn();
+    renderHost({ initial: storedValue, onChange });
+
+    expect(field()).toBeNull();
+    expect(container.innerHTML).not.toContain(storedValue);
+    expect(container.textContent).toContain("Value set");
+    expect(replaceButton().textContent).toBe("Replace");
+    expect(replaceButton().getAttribute("aria-label")).toBe("Replace API token");
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("starts an empty field on Replace and leaves the stored value alone until something is typed", () => {
+    const onChange = vi.fn();
+    renderHost({ initial: storedValue, onChange });
+
+    flushSync(() => replaceButton().click());
+    expect(field()!.value).toBe("");
+    expect(field()!.type).toBe("password");
+    expect(container.innerHTML).not.toContain(storedValue);
+    // Opening Replace and walking away must not erase the stored value.
+    expect(onChange).not.toHaveBeenCalled();
+
+    typeInto(field()!, "new-words");
+    expect(onChange).toHaveBeenLastCalledWith("new-words");
+    expect(field()!.value).toBe("new-words");
+  });
+
+  it("emits an empty value only when the author deliberately empties a replacement", () => {
+    const onChange = vi.fn();
+    renderHost({ initial: storedValue, onChange });
+    flushSync(() => replaceButton().click());
+    typeInto(field()!, "x");
+
+    typeInto(field()!, "");
+
+    expect(onChange).toHaveBeenLastCalledWith("");
+    expect(field()).not.toBeNull();
+  });
+
+  it("disables Replace when the input is read-only", () => {
+    renderHost({ initial: storedValue, onChange: vi.fn(), disabled: true });
+
+    expect(replaceButton().disabled).toBe(true);
+  });
+});

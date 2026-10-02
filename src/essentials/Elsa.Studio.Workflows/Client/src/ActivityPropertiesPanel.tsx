@@ -30,6 +30,7 @@ import type { ActivityNode, VisibleVariableView, WorkflowDefinitionState } from 
 import type { StudioEndpointContext } from "@elsa-workflows/studio-sdk";
 import type { ScopedVariableAnalysisStatus } from "./api/workflowDesign";
 import {
+  acceptsOnlySecretReference,
   formatTypeName,
   getInputPropertyName,
   getLiteralEditorValue,
@@ -37,9 +38,11 @@ import {
   describeCollectionForInput,
   describeDictionaryForInput,
   getLiteralDefaultValue,
+  isEmptyExpressionValue,
   isRepeaterOptOut,
   planExpressionModeTransition,
   readWrappedInput,
+  secretSyntax,
   withConversion,
   withLiteralValue,
   withExpression,
@@ -396,6 +399,11 @@ function PropertyRow({
   onChange
 }: PropertyRowProps) {
   const readOnly = input.isReadOnly === true;
+  // An input that takes only a Secret Reference offers the secret picker and nothing else (FR-016).
+  const secretOnly = acceptsOnlySecretReference(input);
+  const syntaxDescriptors = secretOnly
+    ? expressionDescriptors.filter(descriptor => descriptor.type === secretSyntax)
+    : expressionDescriptors;
   const dynamicOptions = useActivityInputOptions(endpointContext, workflowState, activity, activityDescriptor, input);
   const provider = readOptionsProvider(input);
   const effectiveInput = provider ? {
@@ -407,7 +415,7 @@ function PropertyRow({
   const editor = resolveEditor(editors, effectiveInput, context);
   const EditorComponent = editor?.component;
   const wrapped = input.isWrapped !== false ? readWrappedInput(activity, input) : null;
-  const syntax = wrapped?.expression.type ?? "Literal";
+  const syntax = wrapped?.expression.type ?? (secretOnly ? secretSyntax : "Literal");
   const expressionDescriptor = expressionDescriptors.find(descriptor => descriptor.type === syntax);
   const editingMode = expressionDescriptor?.editingMode;
   const value = getLiteralEditorValue(activity, input);
@@ -506,7 +514,7 @@ function PropertyRow({
   ));
   const useDictionarySyntaxPicker = Boolean(wrapped && dictionaryType != null);
   const useToggleLayout = editor?.id === "studio.property.checkbox" && editingMode === "literal";
-  const canExpandEditor = Boolean(wrapped && (
+  const canExpandEditor = Boolean(wrapped && !secretOnly && (
     dictionaryType != null ||
     editingMode === "text" ||
     (!isCollectionEditor && editingMode === "structured" && !!inlineExpressionEditor?.surfaces.expanded) ||
@@ -570,6 +578,13 @@ function PropertyRow({
     const currentWrapped = current.input.isWrapped !== false
       ? readWrappedInput(current.activity, current.input)
       : null;
+    // Emptying a secret-only input unbinds it: no entry is written, so nothing pretends to be a value.
+    if (acceptsOnlySecretReference(current.input) && isEmptyExpressionValue(nextValue)) {
+      const { [getInputPropertyName(current.input)]: _unbound, ...rest } = current.activity;
+      void _unbound;
+      current.onChange(rest as ActivityNode);
+      return;
+    }
     const next = currentWrapped ? withLiteralValue(currentWrapped, nextValue) : nextValue;
     current.onChange(writeInputValue(current.activity, current.input, next));
   }, []);
@@ -679,7 +694,11 @@ function PropertyRow({
       onChange={setRaw}
     />
   ) : null;
-  const valueEditor = editingMode === "text" && inlineExpressionContext ? (
+  // A secret-only input never falls back to a text or literal editor: without a secret picker it shows the
+  // same unavailable state any syntax without an editor shows.
+  const valueEditor = secretOnly ? (
+    contributedExpressionEditor ?? <UnavailableExpressionEditor syntax={syntax} />
+  ) : editingMode === "text" && inlineExpressionContext ? (
     contributedExpressionEditor ?? (
       <GenericTextExpressionEditor
         descriptor={effectiveInput}
@@ -725,7 +744,7 @@ function PropertyRow({
         <SyntaxPicker
           label={`${input.displayName || input.name} expression syntax`}
           value={syntax}
-          descriptors={expressionDescriptors}
+          descriptors={syntaxDescriptors}
           getUnavailableReason={getUnavailableReason}
           disabled={readOnly}
           onChange={setSyntax}
@@ -740,7 +759,7 @@ function PropertyRow({
           <SyntaxPicker
             label={`${input.displayName || input.name} expression syntax`}
             value={syntax}
-            descriptors={expressionDescriptors}
+            descriptors={syntaxDescriptors}
             getUnavailableReason={getUnavailableReason}
             disabled={readOnly}
             variant="inline"
@@ -764,7 +783,7 @@ function PropertyRow({
             <SyntaxPicker
               label={`${input.displayName || input.name} expression syntax`}
               value={syntax}
-              descriptors={expressionDescriptors}
+              descriptors={syntaxDescriptors}
               getUnavailableReason={getUnavailableReason}
               disabled={readOnly}
               variant="inline"

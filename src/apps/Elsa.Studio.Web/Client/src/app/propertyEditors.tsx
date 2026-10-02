@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   readActivityInputOptionsProvider,
   type ElsaStudioModuleApi,
@@ -67,6 +67,16 @@ export const builtInPropertyEditors: StudioActivityPropertyEditorContribution[] 
     // input that rejects non-numeric text inline rather than letting it reach the server as a literal.
     supports: (descriptor, context) => isElementScope(context) && !hasOptionSource(descriptor) && isNumericDescriptor(descriptor),
     component: NumericEditor
+  },
+  {
+    id: "studio.property.password",
+    order: 135,
+    // Ahead of multiline and singleline so a hint that would show the text in the clear never wins over
+    // masking. A sensitive input that takes only a Secret Reference is never offered a text editor here;
+    // the properties panel gives it the secret picker.
+    supports: (descriptor, context) => isElementScope(context) && isTextDescriptor(descriptor)
+      && (hasUiHint(descriptor, "password") || (descriptor.isSensitive === true && descriptor.isCredential !== true)),
+    component: PasswordEditor
   },
   {
     id: "studio.property.multiline",
@@ -170,6 +180,66 @@ function SinglelineEditor({ descriptor, value, disabled, onChange }: StudioActiv
       disabled={disabled}
       placeholder={stringValue(descriptor.defaultValue) || (enumHint ? formatSimpleTypeName(descriptor.typeName) : "")}
       onChange={event => onChange(event.target.value)}
+    />
+  );
+}
+
+// Local replace/draft state belongs to one activity: the properties panel reuses a row when another
+// activity of the same type is selected, so a half-typed value must not follow the selection.
+function PasswordEditor(props: StudioActivityPropertyEditorProps) {
+  return <PasswordField key={(props.context.activity as { nodeId?: string } | null)?.nodeId} {...props} />;
+}
+
+// Masks while typing and never renders a stored value. The field only ever shows what was typed in this
+// session; a stored value is represented as "Value set" with a Replace action, and nothing is emitted until
+// the author types, so reopening an activity and saving cannot overwrite or erase what is stored.
+function PasswordField({ descriptor, value, disabled, onChange }: StudioActivityPropertyEditorProps) {
+  const [replacing, setReplacing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const focusRequested = useRef(false);
+  const name = accessibleName(descriptor);
+
+  useEffect(() => {
+    if (!replacing || !focusRequested.current) return;
+    focusRequested.current = false;
+    inputRef.current?.focus();
+  }, [replacing]);
+
+  if (!replacing && value != null && String(value) !== "") {
+    return (
+      <div className="studio-property-secret-value">
+        <span>Value set</span>
+        <button
+          type="button"
+          aria-label={`Replace ${name}`}
+          disabled={disabled}
+          onClick={() => {
+            focusRequested.current = true;
+            setReplacing(true);
+          }}
+        >
+          Replace
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <input
+      ref={inputRef}
+      type="password"
+      aria-label={name}
+      value={draft}
+      disabled={disabled}
+      spellCheck={false}
+      autoComplete="new-password"
+      onChange={event => {
+        // Keep the field mounted once typing starts, even though the typed value now counts as stored.
+        setReplacing(true);
+        setDraft(event.target.value);
+        onChange(event.target.value);
+      }}
     />
   );
 }
