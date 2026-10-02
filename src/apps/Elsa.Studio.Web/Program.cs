@@ -74,6 +74,10 @@ builder.Services.AddStudioBackendManagementBridge(configuration);
 
 var app = builder.Build();
 
+// The default shell must be active before routing runs so shell-mapped endpoints are matched — and gated by the
+// authorization middleware below — on the first request after a cold start too (see StudioShellActivation).
+app.UseStudioDefaultShellActivation();
+app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 
