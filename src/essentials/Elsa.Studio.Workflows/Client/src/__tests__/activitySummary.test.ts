@@ -106,4 +106,18 @@ describe("formatActivitySummary for masked and secret-only inputs", () => {
     expect(formatActivitySummary(wireNode("Secret", '{"name":"tokens"}'), catalog([secretOnlyInput]))).toContain("tokens");
     expect(formatActivitySummary(node({ text: wrapped("Literal", "   ") }), catalog([sensitiveInput]))).toBeUndefined();
   });
+
+  it("does not summarize a Secret Reference held as an object on the editor's node", () => {
+    expect(formatActivitySummary(node({ text: wrapped("Secret", { name: "tokens" }) }), catalog([secretOnlyInput]))).toBeUndefined();
+  });
+
+  // The backend accepts a malformed Secret payload at save and refuses it only at publish.
+  it.each([
+    ["a plain string on a wire-shaped node", wireNode("Secret", storedValue)],
+    ["a plain string on the editor's node", node({ text: wrapped("Secret", storedValue) })],
+    ["JSON text with a blank name", wireNode("Secret", '{"name":"  "}')]
+  ])("protects %s under the Secret syntax, which names no secret", (_label, activity) => {
+    expect(formatActivitySummary(activity, catalog([secretOnlyInput]))).toBe("Protected value");
+    expect(formatActivitySummary(activity, catalog([sensitiveInput]))).toBe("Protected value");
+  });
 });

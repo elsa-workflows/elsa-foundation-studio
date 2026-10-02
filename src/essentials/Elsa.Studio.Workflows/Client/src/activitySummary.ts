@@ -1,7 +1,7 @@
 import type { StudioActivityInputDescriptor } from "@elsa-workflows/studio-sdk";
 import type { ActivityCatalogItem, ActivityNode } from "./workflowTypes";
-import { getInputPropertyName, readWrappedInputValue, secretSyntax } from "./activityProperties";
-import { isMaskedInput } from "./maskedInput";
+import { getInputPropertyName, readWrappedInputValue } from "./activityProperties";
+import { isMaskedInput, isSecretReference } from "./maskedInput";
 import { describeInferredSource } from "./conversionSource";
 
 /**
@@ -23,7 +23,7 @@ export function formatActivitySummary(activity: ActivityNode, catalogItem: Activ
   // The summary is also the node's tooltip and is reused by the run and executable views, so a masked input (a
   // password hint, or declared sensitive or secret-only) never shows its value or expression source there. A
   // Secret Reference names a secret without holding its value, so it still summarizes as usual.
-  return summary && isMaskedInput(headline) && expression.type !== secretSyntax ? "Protected value" : summary;
+  return summary && isMaskedInput(headline) && !isSecretReference(expression.type, expression.value) ? "Protected value" : summary;
 }
 
 /**

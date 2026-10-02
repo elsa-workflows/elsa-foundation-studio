@@ -782,7 +782,10 @@ describe("WorkflowActivityExecutionDetails", () => {
       ["secret-only", "JavaScript", { isCredential: true }],
       // Only the exact Secret syntax names a Secret Reference; a casing variant is just another source.
       ["sensitive", "secret", { isSensitive: true }],
-      ["secret-only", "SECRET", { isCredential: true }]
+      ["secret-only", "SECRET", { isCredential: true }],
+      // Under the exact Secret syntax only a reference names a secret; a plain string names none.
+      ["sensitive", "Secret", { isSensitive: true }],
+      ["secret-only", "Secret", { isCredential: true }]
     ])("keeps the authored %s source hidden under %s when the backend did not flag the record", async (_label, expressionType, declared) => {
       const container = renderDeclaredInput(declared, { expressionType, value: authoredSource }, [sourceBinding]);
 
@@ -791,8 +794,11 @@ describe("WorkflowActivityExecutionDetails", () => {
       expect(container.innerHTML).not.toContain(authoredSource);
     });
 
-    it("names the Secret Reference a secret-only input is bound to, as the canvas summary does", async () => {
-      const container = renderDeclaredInput({ isSensitive: true, isCredential: true }, { expressionType: "Secret", value: { name: "api-tokens" } });
+    it.each([
+      ["an object", { name: "api-tokens" }],
+      ["JSON text", '{"name":"api-tokens"}']
+    ])("names the Secret Reference a secret-only input is bound to, held as %s", async (_shape, value) => {
+      const container = renderDeclaredInput({ isSensitive: true, isCredential: true }, { expressionType: "Secret", value });
 
       await waitFor(() => expect(container.textContent).toContain("api-tokens"));
       expect(container.textContent).not.toContain("Protected source");

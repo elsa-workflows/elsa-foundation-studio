@@ -5,6 +5,7 @@ import {
   getInputPropertyName,
   isEmptyExpressionValue,
   planExpressionModeTransition,
+  secretSyntax,
   type ExpressionModeTransition
 } from "./activityProperties";
 
@@ -16,6 +17,28 @@ import {
 /** Whether the input is masked: it carries a password hint, or the activity declares it sensitive or secret-only. */
 export function isMaskedInput(descriptor: StudioActivityInputDescriptor) {
   return descriptor.uiHint?.toLowerCase() === "password" || descriptor.isSensitive === true || acceptsOnlySecretReference(descriptor);
+}
+
+/**
+ * Whether an authored expression is a Secret Reference: the exact Secret syntax holding an object with a non-empty
+ * name, as the secret picker writes it, or that object as JSON text on a wire-shaped node. The name check matches
+ * the secret picker's own reader (`toReference` in the Secrets extension, which this module cannot import across
+ * the type-only SDK boundary). Anything else under the Secret syntax, such as a plain string the backend accepts at
+ * save and refuses only at publish, names no secret and stays masked.
+ */
+export function isSecretReference(expressionType: string | null | undefined, value: unknown) {
+  if (expressionType !== secretSyntax) return false;
+  const reference = typeof value === "string" ? parseJson(value) : value;
+  return typeof reference === "object" && reference !== null
+    && typeof (reference as { name?: unknown }).name === "string" && (reference as { name: string }).name.trim() !== "";
+}
+
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
 }
 
 /**

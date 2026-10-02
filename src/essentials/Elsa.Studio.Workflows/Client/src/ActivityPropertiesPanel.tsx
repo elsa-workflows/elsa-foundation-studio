@@ -722,12 +722,12 @@ function PropertyRow({
     contributedExpressionEditor ?? <UnavailableExpressionEditor syntax={syntax} />
   ) : valueMasked ? (
     // Only the masked editor, for a single value in a known literal mode: any other editor would show the value and
-    // the masked editor cannot edit a dictionary or a list, so everything else says the value is hidden.
+    // the masked editor cannot edit a dictionary or a list, so everything else says the value is masked.
     editingMode === "literal" && editor?.id === maskedPropertyEditorId && !dictionaryType && !collectionType
       ? renderEditor(EditorComponent, effectiveInput, value, editorDisabled, context, setRaw)
       : (
         <p className="wf-expression-editor-hint" role="status">
-          This value is hidden because the input is sensitive. It is preserved and read-only here.
+          This value is masked. It is preserved and read-only here.
         </p>
       )
   ) : editingMode === "text" && inlineExpressionContext ? (

@@ -7,8 +7,7 @@ import { listActivities } from "../api/activityDesign";
 import { getActivityExecutionInspection, getExecutable, getExecutableInputSources, getWorkflowInstance, listWorkflowInstances, type WorkflowInstanceListPage } from "../api/runtime";
 import type { ActivityCatalogItem, ActivityExecutionInspection, ActivityExecutionInspectionValueSnapshot, ActivityExecutionStateSummary, ActivityNode, IncidentStateSummary, WorkflowDefinitionVersionDetails, WorkflowExecutableDetails, WorkflowInstanceDetails, WorkflowInstanceSummary } from "../workflowTypes";
 import { formatActivitySummary } from "../activitySummary";
-import { secretSyntax } from "../activityProperties";
-import { isMaskedInput } from "../maskedInput";
+import { isMaskedInput, isSecretReference } from "../maskedInput";
 import { resolveActivityLabel } from "../activityPresentation";
 import {
   applyRuntimeOverlays,
@@ -1298,7 +1297,7 @@ function InputInspectionRowCard({
   // unless that source is a Secret Reference, which names a secret without holding its value. A record the
   // backend flagged stays hidden.
   const sourceProtected = isProtectedSourceAccess(sourceAccess) || isProtectedSourceAccess(row.authoredSource?.accessState ?? row.authoredSource?.access) || !!row.authoredSource?.isSensitive || !!row.compiledBinding?.isSensitive || !!latest?.isSensitive
-    || (!!row.declaration && isMaskedInput(row.declaration) && row.authoredSource?.expressionType !== secretSyntax);
+    || (!!row.declaration && isMaskedInput(row.declaration) && !isSecretReference(row.authoredSource?.expressionType, row.authoredSource?.value));
   const regionId = useId();
 
   return (

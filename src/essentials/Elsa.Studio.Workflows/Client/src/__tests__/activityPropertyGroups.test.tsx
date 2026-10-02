@@ -15,9 +15,10 @@ import type { ActivityNode } from "../workflowTypes";
 
 let active: { root: Root; container: HTMLElement } | null = null;
 // Replaces the rendered activity from outside the panel, as an undo or selecting another activity does.
-let replaceActivity: (next: ActivityNode) => void = () => {
+const noRenderedPanel = () => {
   throw new Error("No panel is rendered.");
 };
+let replaceActivity: (next: ActivityNode) => void = noRenderedPanel;
 
 const backendExpressionDescriptors: StudioExpressionDescriptor[] = [
   { type: "Literal", displayName: "Literal", editingMode: "literal" },
@@ -29,6 +30,7 @@ const backendExpressionDescriptors: StudioExpressionDescriptor[] = [
 ];
 
 afterEach(() => {
+  replaceActivity = noRenderedPanel;
   if (!active) return;
   flushSync(() => active!.root.unmount());
   active.container.remove();
@@ -859,7 +861,7 @@ describe("property editor context", () => {
 
 describe("masked inputs", () => {
   const storedValue = "stored-value-words";
-  const hiddenNotice = "This value is hidden because the input is sensitive. It is preserved and read-only here.";
+  const hiddenNotice = "This value is masked. It is preserved and read-only here.";
   // The panel asks nothing of the masked editor but its id; this one renders nothing of the value.
   const maskedEditor: StudioActivityPropertyEditorContribution = {
     id: "studio.property.password",
@@ -1003,7 +1005,7 @@ describe("masked inputs", () => {
     { shape, declared, surface: "expanded editor", from: "JavaScript", authored: storedValue, to: "Object", expandableBefore: true, shownBefore: true, asksFirst: true, storedAfter: objectDefault, expandableAfter: false, clearTextFieldsAfter: 0 }
   ]);
 
-  it.each([...scalarSteps, ...objectSteps])("$shape: from the $surface, switching $from to $to never shows the stored value", step => {
+  it.each([...scalarSteps, ...objectSteps])("$shape: after switching $from to $to from the $surface, the stored value is nowhere in sight and no clear-text field edits it", step => {
     const { container, changes } = renderToken(token(step.from, step.authored), step.declared, { editors: [revealingEditor] });
     expect(expandAffordance(container) !== null).toBe(step.expandableBefore);
     surfaces[step.surface].open(container);
@@ -1061,11 +1063,23 @@ describe("masked inputs", () => {
     expect(expandedEditor()).toBeNull();
   });
 
+  it("moves focus from elsewhere in the row to its syntax picker when the expanded editor closes under it", async () => {
+    const { container } = renderToken(token("JavaScript", "author-code"), sensitive);
+    openExpandedEditor(container);
+    // In the row but outside the expanded editor when the editor closes.
+    container.querySelector<HTMLButtonElement>(".wf-conversion-toggle")!.focus();
+
+    flushSync(() => replaceActivity(activity({ apiToken: token("Literal", storedValue) })));
+    await nextFrame();
+
+    expect(expandedEditor()).toBeNull();
+    expect(document.activeElement).toBe(rowPicker(container));
+  });
+
   it("leaves focus on another activity selected while the expanded editor is open", async () => {
     const canvasNode = document.body.appendChild(document.createElement("button"));
     onTestFinished(() => canvasNode.remove());
     const { container } = renderToken(token("JavaScript", "author-code"), sensitive);
-    container.querySelector<HTMLButtonElement>("button[aria-label='Open expanded ApiToken editor']")!.focus();
     openExpandedEditor(container);
     canvasNode.focus();
 
@@ -1096,7 +1110,7 @@ describe("masked inputs", () => {
     { label: "a sensitive input under a syntax without a descriptor", declared: sensitive, stored: token("CSharp", storedValue), shown: storedValue, editors: [maskedEditor] },
     ...objectShapes.map(({ shape, declared, objectValue }) => ({ label: `a ${shape} input's Object value`, declared, stored: token("Object", objectValue), shown: storedValue, editors: [revealingEditor] }))
   ] as Array<{ label: string; declared: Partial<StudioActivityInputDescriptor>; stored: ReturnType<typeof token>; shown: string; editors: StudioActivityPropertyEditorContribution[] }>)(
-    "gives the stored value of $label to the masked editor for a single literal value, or to nothing",
+    "masks the stored value of $label: the masked notice, no editor, no expanded editor and no write",
     ({ declared, stored, shown, editors }) => {
       const { container, changes } = renderToken(stored, declared, { editors });
 
