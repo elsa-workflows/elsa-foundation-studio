@@ -61,7 +61,7 @@ public sealed class ElsaThemeStoreApiTests : IAsyncLifetime
     public async Task StoreThatStillNamesRetiredThemesLoadsAndSaves()
     {
         await File.WriteAllTextAsync(
-            Path.Combine(_contentRoot, "studio-theme-store.json"),
+            Path.Join(_contentRoot, "studio-theme-store.json"),
             """{ "themes": [], "defaultThemeId": "black-glass", "assets": [], "disabledBuiltInThemeIds": ["stone", "drift", "brass-instrument"] }""");
 
         var loaded = await _client.GetFromJsonAsync<ThemeStoreResponse>("/_elsa/theme-store");
