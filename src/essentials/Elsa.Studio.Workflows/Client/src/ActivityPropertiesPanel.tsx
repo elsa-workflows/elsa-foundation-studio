@@ -38,9 +38,7 @@ import {
   describeCollectionForInput,
   describeDictionaryForInput,
   getLiteralDefaultValue,
-  isEmptyExpressionValue,
   isRepeaterOptOut,
-  planExpressionModeTransition,
   readWrappedInput,
   secretSyntax,
   withConversion,
@@ -49,7 +47,7 @@ import {
   writeInputValue,
   type WrappedActivityInputValue
 } from "./activityProperties";
-import { clearSecretOnlyInput, isProtectedInput } from "./secretOnlyInput";
+import { clearSecretOnlyInput, isMaskedInput, planInputSyntaxTransition } from "./protectedInput";
 import {
   builtInConversionProfiles,
   conversionModeDescriptors,
@@ -80,6 +78,8 @@ const inlineSyntaxEditorIds = new Set([
   "studio.property.checkbox"
 ]);
 const inlineTextTypeNames = new Set(["string", "system.string", "text", "uri", "system.uri"]);
+// The built-in masked editor: the only editor a masked literal is given.
+const maskedPropertyEditorId = "studio.property.password";
 export interface ActivityPropertiesPanelProps {
   context?: StudioEndpointContext;
   draftId?: string;
@@ -421,8 +421,15 @@ function PropertyRow({
   const syntax = wrapped?.expression.type ?? (secretOnly ? secretSyntax : "Literal");
   const expressionDescriptor = expressionDescriptors.find(descriptor => descriptor.type === syntax);
   const editingMode = expressionDescriptor?.editingMode;
+  // A masked literal is given to the masked editor or to nothing. The value editor, the expanded editor (through
+  // canExpandEditor), the expression documents and the inline expression context read this one flag from the
+  // row's current state, so no route into literal mode (a syntax switch here or in the expanded editor, an undo,
+  // another activity selected into this row) hands the literal to anything else. A syntax without a descriptor
+  // may hold a literal too, so it counts as one; only a known literal mode gets the masked editor. A secret-only
+  // input has its own branch below, which shows only the Secret syntax.
+  const literalProtected = !secretOnly && isMaskedInput(input) && (editingMode === "literal" || editingMode === undefined);
   const value = getLiteralEditorValue(activity, input);
-  const expressionSource = value == null ? "" : String(value);
+  const expressionSource = literalProtected || value == null ? "" : String(value);
   const documentVersions = useRef(new Map<string, { source: string; version: number }>());
   const propertyKey = input.referenceKey?.trim() || input.name;
   const toolingPropertyKey = `${activity.nodeId}\u001f${propertyKey}`;
@@ -487,7 +494,7 @@ function PropertyRow({
     authoringContext: targetSyntax === syntax ? toolingSnapshot.authoringContext : undefined,
     validation: targetSyntax === syntax ? toolingSnapshot.validation : undefined
   });
-  const inlineExpressionContext: StudioExpressionEditorContext | null = wrapped ? makeExpressionContext(syntax) : null;
+  const inlineExpressionContext: StudioExpressionEditorContext | null = wrapped && !literalProtected ? makeExpressionContext(syntax) : null;
   const currentRequiresAdmission = editingMode === "structured" || editingMode === "reference";
   const admittedExpressionEditor = inlineExpressionContext && currentRequiresAdmission
     ? resolveAdmittedExpressionEditor(expressionEditors, inlineExpressionContext)
@@ -517,13 +524,15 @@ function PropertyRow({
   ));
   const useDictionarySyntaxPicker = Boolean(wrapped && dictionaryType != null);
   const useToggleLayout = editor?.id === "studio.property.checkbox" && editingMode === "literal";
-  const canExpandEditor = Boolean(wrapped && !secretOnly && (
+  const canExpandEditor = Boolean(wrapped && !secretOnly && !literalProtected && (
     dictionaryType != null ||
     editingMode === "text" ||
     (!isCollectionEditor && editingMode === "structured" && !!inlineExpressionEditor?.surfaces.expanded) ||
     (!isCollectionEditor && editingMode === "literal" && isExpandableTextInput(input, editor?.id))
   ));
-  const [expanded, setExpanded] = useState(false);
+  const [expandRequested, setExpanded] = useState(false);
+  // The expanded editor is open only while the row may expand, whatever opened it and whatever changed since.
+  const expanded = expandRequested && canExpandEditor;
   const [focusRequested, setFocusRequested] = useState(false);
   const [conversionOpen, setConversionOpen] = useState(false);
   const [pendingTransition, setPendingTransition] = useState<{
@@ -544,6 +553,14 @@ function PropertyRow({
     : "";
   const latestProperty = useRef({ activity, input, onChange });
   latestProperty.current = { activity, input, onChange };
+
+  // A change that leaves the row unexpandable has already closed the expanded editor; drop the request so it does
+  // not reopen by itself, and bring focus back to the row. Runs before the field focus below, which then wins.
+  useEffect(() => {
+    if (!expandRequested || canExpandEditor) return;
+    setExpanded(false);
+    requestAnimationFrame(() => rowRef.current?.querySelector<HTMLButtonElement>(".wf-syntax-picker-trigger")?.focus());
+  }, [canExpandEditor, expandRequested]);
 
   useEffect(() => {
     if (!focusRequested) return;
@@ -637,18 +654,13 @@ function PropertyRow({
     if (!wrapped || nextSyntax === syntax) return;
     const nextDescriptor = expressionDescriptors.find(descriptor => descriptor.type === nextSyntax);
     if (!nextDescriptor || getUnavailableReason(nextDescriptor)) return;
-    const targetDefaultValue = getTargetDefaultValue(nextDescriptor);
-    // A masked literal is never carried into another syntax, where it would show as clear text: the target
-    // starts from its default, and discarding a stored value asks first, like any other lossy switch.
-    const transition = isMaskedInput(input) && editingMode === "literal" && nextDescriptor.editingMode !== "literal"
-      ? { requiresConfirmation: !isEmptyExpressionValue(value), nextValue: targetDefaultValue }
-      : planExpressionModeTransition(
-        editingMode ?? "structured",
-        nextDescriptor.editingMode,
-        input.typeName,
-        value,
-        targetDefaultValue
-      );
+    const transition = planInputSyntaxTransition(
+      input,
+      editingMode ?? "structured",
+      nextDescriptor.editingMode,
+      value,
+      getTargetDefaultValue(nextDescriptor)
+    );
     if (transition.requiresConfirmation) {
       setExpanded(false);
       setPendingTransition({ descriptor: nextDescriptor, nextValue: transition.nextValue });
@@ -704,6 +716,12 @@ function PropertyRow({
   // same unavailable state any syntax without an editor shows.
   const valueEditor = secretOnly ? (
     contributedExpressionEditor ?? <UnavailableExpressionEditor syntax={syntax} />
+  ) : literalProtected ? (
+    // Only the masked editor, for a single value in a known literal mode: any other editor would show the literal and
+    // the masked editor cannot edit a dictionary or a list, so everything else shows the unavailable state.
+    editingMode === "literal" && editor?.id === maskedPropertyEditorId && !dictionaryType && !collectionType
+      ? renderEditor(EditorComponent, effectiveInput, value, editorDisabled, context, setRaw)
+      : <UnavailableExpressionEditor syntax={syntax} />
   ) : editingMode === "text" && inlineExpressionContext ? (
     contributedExpressionEditor ?? (
       <GenericTextExpressionEditor
@@ -1658,16 +1676,9 @@ function isSingleLineTextInput(input: StudioActivityInputDescriptor, editorId: s
   return inlineTextTypeNames.has(normalizedType) || input.uiHint?.toLowerCase() === "singleline";
 }
 
-// A masked input never shows its stored value in the clear: it carries a password hint or is protected.
-function isMaskedInput(input: StudioActivityInputDescriptor) {
-  return input.uiHint?.toLowerCase() === "password" || isProtectedInput(input);
-}
-
 function isExpandableTextInput(input: StudioActivityInputDescriptor, editorId: string | undefined) {
   const uiHint = input.uiHint?.toLowerCase();
   if (uiHint === "checkbox" || uiHint === "dropdown") return false;
-  // A masked input never opens into a clear-text editor, whatever its hint.
-  if (isMaskedInput(input)) return false;
   if (editorId && !inlineSyntaxEditorIds.has(editorId) && uiHint !== "multiline") return false;
 
   const normalizedType = input.typeName.split(",", 1)[0]?.trim().toLowerCase();

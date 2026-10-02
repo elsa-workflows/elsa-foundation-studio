@@ -778,7 +778,11 @@ describe("WorkflowActivityExecutionDetails", () => {
     it.each([
       ["sensitive", "JavaScript", { isSensitive: true }],
       ["sensitive", "Literal", { isSensitive: true }],
-      ["secret-only", "JavaScript", { isCredential: true }]
+      ["password-hinted", "Literal", { uiHint: "password" }],
+      ["secret-only", "JavaScript", { isCredential: true }],
+      // Only the exact Secret syntax names a Secret Reference; a casing variant is just another source.
+      ["sensitive", "secret", { isSensitive: true }],
+      ["secret-only", "SECRET", { isCredential: true }]
     ])("keeps the authored %s source hidden under %s when the backend did not flag the record", async (_label, expressionType, declared) => {
       const container = renderDeclaredInput(declared, { expressionType, value: authoredSource }, [sourceBinding]);
 

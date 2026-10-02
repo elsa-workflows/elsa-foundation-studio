@@ -22,7 +22,7 @@ import {
   withSyntax
 } from "../activityProperties";
 import { canonicalizeStateForWire, expandStateFromWire } from "../activityInputWire";
-import { clearSecretOnlyInput } from "../secretOnlyInput";
+import { clearSecretOnlyInput, isMaskedInput, planInputSyntaxTransition } from "../protectedInput";
 import { updateActivity } from "../workflowAdapter";
 import type { ActivityNode } from "../workflowTypes";
 
@@ -203,6 +203,33 @@ describe("expression mode transitions", () => {
       requiresConfirmation: true,
       nextValue: "target-default"
     });
+  });
+});
+
+describe("masked inputs", () => {
+  type Mode = "literal" | "text" | "structured" | "reference";
+  const stored = "stored-value-words";
+  const sensitive = { isSensitive: true };
+
+  it.each([
+    ["a password hint", true, { uiHint: "password" }],
+    ["a password hint in another casing", true, { uiHint: "Password" }],
+    ["a sensitive declaration", true, sensitive],
+    ["a secret-only declaration", true, { isCredential: true }],
+    ["no hint or declaration", false, { isSensitive: false, isCredential: false }]
+  ] as Array<[string, boolean, Partial<StudioActivityInputDescriptor>]>)("treats an input with %s as masked: %s", (_label, masked, declared) => {
+    expect(isMaskedInput({ ...textDescriptor, ...declared })).toBe(masked);
+  });
+
+  it.each([
+    ["a masked literal into a text syntax from the target's default, asking first", sensitive, "literal", "text", stored, { requiresConfirmation: true, nextValue: "target-default" }],
+    ["an empty masked literal into a text syntax without asking", sensitive, "literal", "text", "", { requiresConfirmation: false, nextValue: "target-default" }],
+    ["an ordinary literal into a text syntax by carrying it", {}, "literal", "text", stored, { requiresConfirmation: false, nextValue: stored }],
+    ["a masked literal between literal syntaxes by carrying it", sensitive, "literal", "literal", stored, { requiresConfirmation: false, nextValue: stored }],
+    ["masked source between text syntaxes by carrying it", sensitive, "text", "text", stored, { requiresConfirmation: false, nextValue: stored }],
+    ["masked source into Literal by carrying it", sensitive, "text", "literal", stored, { requiresConfirmation: false, nextValue: stored }]
+  ] as Array<[string, Partial<StudioActivityInputDescriptor>, Mode, Mode, unknown, object]>)("plans %s", (_label, declared, source, target, value, expected) => {
+    expect(planInputSyntaxTransition({ ...textDescriptor, ...declared }, source, target, value, "target-default")).toEqual(expected);
   });
 });
 

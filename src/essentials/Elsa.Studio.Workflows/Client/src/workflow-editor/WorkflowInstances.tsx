@@ -8,7 +8,7 @@ import { getActivityExecutionInspection, getExecutable, getExecutableInputSource
 import type { ActivityCatalogItem, ActivityExecutionInspection, ActivityExecutionInspectionValueSnapshot, ActivityExecutionStateSummary, ActivityNode, IncidentStateSummary, WorkflowDefinitionVersionDetails, WorkflowExecutableDetails, WorkflowInstanceDetails, WorkflowInstanceSummary } from "../workflowTypes";
 import { formatActivitySummary } from "../activitySummary";
 import { secretSyntax } from "../activityProperties";
-import { isProtectedInput } from "../secretOnlyInput";
+import { isMaskedInput } from "../protectedInput";
 import { resolveActivityLabel } from "../activityPresentation";
 import {
   applyRuntimeOverlays,
@@ -1293,11 +1293,12 @@ function InputInspectionRowCard({
 }) {
   const latest = row.latestEvaluation;
   const sourceKind = row.authoredSource?.expressionType || row.compiledBinding?.source || "No source";
-  // The input's declaration counts as much as the per-record flags: a declared sensitive or secret-only input
-  // keeps its authored source hidden even when the backend did not flag the record, unless that source is a
-  // Secret Reference, which names a secret without holding its value. A record the backend flagged stays hidden.
+  // The input's declaration counts as much as the per-record flags: a masked input (a password hint, or declared
+  // sensitive or secret-only) keeps its authored source hidden even when the backend did not flag the record,
+  // unless that source is a Secret Reference, which names a secret without holding its value. A record the
+  // backend flagged stays hidden.
   const sourceProtected = isProtectedSourceAccess(sourceAccess) || isProtectedSourceAccess(row.authoredSource?.accessState ?? row.authoredSource?.access) || !!row.authoredSource?.isSensitive || !!row.compiledBinding?.isSensitive || !!latest?.isSensitive
-    || (!!row.declaration && isProtectedInput(row.declaration) && row.authoredSource?.expressionType !== secretSyntax);
+    || (!!row.declaration && isMaskedInput(row.declaration) && row.authoredSource?.expressionType !== secretSyntax);
   const regionId = useId();
 
   return (

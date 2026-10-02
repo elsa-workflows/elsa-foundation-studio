@@ -81,17 +81,20 @@ describe("formatActivitySummary", () => {
   });
 });
 
-describe("formatActivitySummary for sensitive and secret-only inputs", () => {
+describe("formatActivitySummary for masked and secret-only inputs", () => {
   const storedValue = "stored-value-words";
   const sensitiveInput = { ...textInput, isSensitive: true };
   const secretOnlyInput = { ...textInput, isSensitive: true, isCredential: true };
   const wireNode = (expressionType: string, value: unknown) => node({ inputs: [{ referenceKey: "text", value: { value, expressionType } }] });
 
-  it("never shows the value or expression source of a sensitive input", () => {
-    expect(formatActivitySummary(node({ text: wrapped("Literal", storedValue) }), catalog([sensitiveInput]))).toBe("Protected value");
-    expect(formatActivitySummary(node({ text: wrapped("JavaScript", storedValue) }), catalog([sensitiveInput]))).toBe("Protected value");
-    expect(formatActivitySummary(wireNode("Literal", storedValue), catalog([sensitiveInput]))).toBe("Protected value");
-    expect(formatActivitySummary(wireNode("Liquid", storedValue), catalog([sensitiveInput]))).toBe("Protected value");
+  it.each([
+    ["sensitive", sensitiveInput],
+    ["password-hinted", { ...textInput, uiHint: "password" }]
+  ])("never shows the value or expression source of a %s input", (_label, input) => {
+    expect(formatActivitySummary(node({ text: wrapped("Literal", storedValue) }), catalog([input]))).toBe("Protected value");
+    expect(formatActivitySummary(node({ text: wrapped("JavaScript", storedValue) }), catalog([input]))).toBe("Protected value");
+    expect(formatActivitySummary(wireNode("Literal", storedValue), catalog([input]))).toBe("Protected value");
+    expect(formatActivitySummary(wireNode("Liquid", storedValue), catalog([input]))).toBe("Protected value");
   });
 
   it("never shows a literal stored on a secret-only input", () => {

@@ -73,10 +73,11 @@ export const builtInPropertyEditors: StudioActivityPropertyEditorContribution[] 
     id: "studio.property.password",
     order: 135,
     // Ahead of multiline and singleline so a hint that would show the text in the clear never wins over
-    // masking. A secret-only input is never claimed here, whatever its hint: the properties panel gives it
-    // the secret picker.
-    supports: (descriptor, context) => isElementScope(context) && isTextDescriptor(descriptor) && descriptor.isCredential !== true
-      && (hasUiHint(descriptor, "password") || descriptor.isSensitive === true),
+    // masking. Sensitivity alone does not claim a secret-only input, a password hint does: the Workflows
+    // properties panel gives a secret-only input the secret picker (or its unavailable state) and mounts no
+    // property editor for it, so this only decides what anything else that resolves an editor for one gets.
+    supports: (descriptor, context) => isElementScope(context) && isTextDescriptor(descriptor)
+      && (hasUiHint(descriptor, "password") || (descriptor.isSensitive === true && descriptor.isCredential !== true)),
     component: PasswordEditor
   },
   {
