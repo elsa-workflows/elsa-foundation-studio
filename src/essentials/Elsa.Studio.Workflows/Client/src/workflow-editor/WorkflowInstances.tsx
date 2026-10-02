@@ -7,6 +7,7 @@ import { listActivities } from "../api/activityDesign";
 import { getActivityExecutionInspection, getExecutable, getExecutableInputSources, getWorkflowInstance, listWorkflowInstances, type WorkflowInstanceListPage } from "../api/runtime";
 import type { ActivityCatalogItem, ActivityExecutionInspection, ActivityExecutionInspectionValueSnapshot, ActivityExecutionStateSummary, ActivityNode, IncidentStateSummary, WorkflowDefinitionVersionDetails, WorkflowExecutableDetails, WorkflowInstanceDetails, WorkflowInstanceSummary } from "../workflowTypes";
 import { formatActivitySummary } from "../activitySummary";
+import { acceptsOnlySecretReference } from "../activityProperties";
 import { resolveActivityLabel } from "../activityPresentation";
 import {
   applyRuntimeOverlays,
@@ -1291,7 +1292,10 @@ function InputInspectionRowCard({
 }) {
   const latest = row.latestEvaluation;
   const sourceKind = row.authoredSource?.expressionType || row.compiledBinding?.source || "No source";
-  const sourceProtected = isProtectedSourceAccess(sourceAccess) || isProtectedSourceAccess(row.authoredSource?.accessState ?? row.authoredSource?.access) || !!row.authoredSource?.isSensitive || !!row.compiledBinding?.isSensitive || !!latest?.isSensitive;
+  // The input's declaration counts as much as the per-record flags: a declared sensitive or secret-only input
+  // keeps its authored source hidden even when the backend did not flag the record.
+  const sourceProtected = isProtectedSourceAccess(sourceAccess) || isProtectedSourceAccess(row.authoredSource?.accessState ?? row.authoredSource?.access) || !!row.authoredSource?.isSensitive || !!row.compiledBinding?.isSensitive || !!latest?.isSensitive
+    || row.declaration?.isSensitive === true || (!!row.declaration && acceptsOnlySecretReference(row.declaration));
   const regionId = useId();
 
   return (

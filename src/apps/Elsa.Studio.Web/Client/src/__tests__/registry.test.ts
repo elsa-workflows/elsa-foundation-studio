@@ -253,7 +253,7 @@ describe("studio registry", () => {
     expect(resolved(input({ isSensitive: true, uiHint: "multiline" }))).toBe("studio.property.password");
     expect(resolved(input({ isSensitive: true, uiHint: "singleline" }))).toBe("studio.property.password");
 
-    // Not claimed: sensitivity alone does not mask a credential input (the panel gives that input the
+    // Not claimed: sensitivity alone does not mask a secret-only input (the panel gives that input the
     // secret picker, never a property editor), a non-text type keeps its typed editor, and a collection
     // keeps its repeater.
     expect(resolved(input({ isSensitive: true, isCredential: true }))).not.toBe("studio.property.password");

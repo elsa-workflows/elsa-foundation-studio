@@ -678,7 +678,7 @@ describe("activity property organization", () => {
   });
 });
 
-describe("secret-only (credential) inputs", () => {
+describe("secret-only inputs", () => {
   const secretDescriptor: StudioExpressionDescriptor = { type: "Secret", displayName: "Secret", editingMode: "reference" };
   const literalEditor: StudioActivityPropertyEditorContribution = {
     id: "studio.property.singleline",
@@ -694,7 +694,7 @@ describe("secret-only (credential) inputs", () => {
   const authorization = input("Authorization", { isWrapped: true, isSensitive: true, isCredential: true, defaultSyntax: "Literal" });
   const legacyLiteral = "plain-old-words";
 
-  const renderCredential = (options: Parameters<typeof renderPanel>[1] = {}) => renderPanel([authorization, input("Url", { isWrapped: true })], {
+  const renderSecretOnly = (options: Parameters<typeof renderPanel>[1] = {}) => renderPanel([authorization, input("Url", { isWrapped: true })], {
     editors: [literalEditor],
     expressionEditors: [secretPicker],
     expressionDescriptors: [...backendExpressionDescriptors, secretDescriptor],
@@ -708,7 +708,7 @@ describe("secret-only (credential) inputs", () => {
   };
 
   it("defaults to the secret picker ahead of the descriptor's default syntax and offers no literal editor", () => {
-    const row = rowOf(renderCredential(), "Authorization");
+    const row = rowOf(renderSecretOnly(), "Authorization");
 
     expect(row.querySelector(".wf-syntax-picker-trigger")?.textContent).toBe("Secret");
     expect(row.querySelector("[aria-label='Secret picker']")).not.toBeNull();
@@ -717,7 +717,7 @@ describe("secret-only (credential) inputs", () => {
   });
 
   it("offers only the Secret syntax in the picker, while other inputs keep every syntax", () => {
-    const container = renderCredential();
+    const container = renderSecretOnly();
 
     expect(syntaxOptions(rowOf(container, "Authorization"))).toEqual(["Secret"]);
     flushSync(() => document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
@@ -726,7 +726,7 @@ describe("secret-only (credential) inputs", () => {
   });
 
   it("does not display a value stored before the rule as text", () => {
-    const container = renderCredential({
+    const container = renderSecretOnly({
       activity: activity({ authorization: { typeName: "System.String", expression: { type: "Literal", value: legacyLiteral } } })
     });
     const row = rowOf(container, "Authorization");
@@ -738,7 +738,7 @@ describe("secret-only (credential) inputs", () => {
   });
 
   it("shows the existing unavailable state, never a literal editor, when the Secret descriptor is absent", () => {
-    const container = renderCredential({ expressionEditors: [], expressionDescriptors: backendExpressionDescriptors });
+    const container = renderSecretOnly({ expressionEditors: [], expressionDescriptors: backendExpressionDescriptors });
     const row = rowOf(container, "Authorization");
 
     expect(row.textContent).toContain("No editor is available for Secret.");
@@ -747,7 +747,7 @@ describe("secret-only (credential) inputs", () => {
   });
 
   it("shows the existing unavailable state when the Secret descriptor exists but no secret picker is registered", () => {
-    const container = renderCredential({ expressionEditors: [] });
+    const container = renderSecretOnly({ expressionEditors: [] });
     const row = rowOf(container, "Authorization");
 
     expect(row.textContent).toContain("No editor is available for Secret.");
@@ -755,7 +755,7 @@ describe("secret-only (credential) inputs", () => {
   });
 
   it.each(["literal", "text"] as const)("never falls back to a literal, text or expanded editor when the Secret descriptor reports %s mode", mode => {
-    const container = renderCredential({
+    const container = renderSecretOnly({
       expressionEditors: [],
       expressionDescriptors: [...backendExpressionDescriptors, { ...secretDescriptor, editingMode: mode }]
     });
@@ -767,7 +767,7 @@ describe("secret-only (credential) inputs", () => {
     expect(row.querySelector("button[aria-label='Open expanded Authorization editor']")).toBeNull();
   });
 
-  it("shows no literal editor for a credential input the backend marks unwrapped", () => {
+  it("shows no literal editor for a secret-only input the backend marks unwrapped", () => {
     const container = renderPanel([input("Authorization", { isCredential: true })], { editors: [literalEditor] });
 
     expect(container.textContent).toContain("No editor is available for Secret.");
@@ -776,7 +776,7 @@ describe("secret-only (credential) inputs", () => {
 
   it("writes a picked Secret under the Secret syntax and unbinds the input when it is cleared", () => {
     const changes: ActivityNode[] = [];
-    const container = renderCredential({
+    const container = renderSecretOnly({
       onChange: next => changes.push(next),
       activity: activity({
         authorization: { typeName: "System.String", expression: { type: "Literal", value: legacyLiteral } },
@@ -794,13 +794,82 @@ describe("secret-only (credential) inputs", () => {
     expect(changes.at(-1)?.url).toEqual({ typeName: "System.String", expression: { type: "Literal", value: "https://example.test" } });
     expect(JSON.stringify(changes.at(-1))).not.toContain(legacyLiteral);
   });
+
+  it("offers no conversion control, and nothing on the row but picking or clearing a Secret writes a binding", () => {
+    const changes: ActivityNode[] = [];
+    const container = renderSecretOnly({
+      onChange: next => changes.push(next),
+      activity: activity({
+        authorization: { typeName: "System.String", expression: { type: "Literal", value: legacyLiteral }, conversion: { mode: "json" } }
+      })
+    });
+    const row = rowOf(container, "Authorization");
+    expect(row.querySelector(".wf-conversion-toggle, .wf-conversion-chip, .wf-conversion-control")).toBeNull();
+    // A secret picker that asks to expand does not open the expanded editor, which carries its own conversion control.
+    flushSync(() => row.querySelector<HTMLButtonElement>("button[aria-label='Expand secret']")!.click());
+    expect(row.querySelector("[role='dialog']")).toBeNull();
+
+    // Exercise every other control the row offers, including whatever those controls reveal.
+    const picking = new Set(["Pick secret", "Clear secret"]);
+    const clicked = new Set<Element>();
+    for (let pass = 0; pass < 3; pass++) {
+      const controls = [...row.querySelectorAll("button"), ...document.querySelectorAll("[role='option']")]
+        .filter(control => !clicked.has(control) && !picking.has(control.getAttribute("aria-label") ?? ""));
+      for (const control of controls) {
+        clicked.add(control);
+        flushSync(() => (control as HTMLElement).click());
+      }
+    }
+
+    expect(clicked.size).toBeGreaterThan(0);
+    expect(changes).toEqual([]);
+    expect(document.querySelector(".wf-conversion-control, textarea")).toBeNull();
+    expect(document.body.innerHTML).not.toContain(legacyLiteral);
+  });
 });
 
-function SecretPickerStub({ value, onChange }: React.ComponentProps<NonNullable<StudioExpressionEditorContribution["surfaces"]["inline"]>>) {
+describe("property editor context", () => {
+  it("gives a property editor the node id of the activity being edited", () => {
+    const identityEditor: StudioActivityPropertyEditorContribution = {
+      id: "test.identity",
+      supports: () => true,
+      component: ({ context }) => <span data-activity-id={context.activityId ?? ""} />
+    };
+
+    const container = renderPanel([input("Message")], { editors: [identityEditor] });
+
+    expect(container.querySelector("[data-activity-id]")?.getAttribute("data-activity-id")).toBe("node-1");
+  });
+});
+
+describe("masked inputs", () => {
+  const storedValue = "stored-value-words";
+  const maskedEditor: StudioActivityPropertyEditorContribution = {
+    id: "studio.property.password",
+    supports: descriptor => descriptor.isSensitive === true,
+    component: () => <span>Value set</span>
+  };
+
+  it("never offers to expand a sensitive multiline input into a clear-text editor", () => {
+    const container = renderPanel([input("ApiToken", { isWrapped: true, isSensitive: true, uiHint: "multiline" })], {
+      editors: [maskedEditor],
+      activity: activity({ apiToken: { typeName: "System.String", expression: { type: "Literal", value: storedValue } } })
+    });
+    const expand = container.querySelector<HTMLButtonElement>("button[aria-label='Open expanded ApiToken editor']");
+
+    expect(container.textContent).toContain("Value set");
+    expect(expand).toBeNull();
+    flushSync(() => expand?.click());
+    expect(document.body.innerHTML).not.toContain(storedValue);
+  });
+});
+
+function SecretPickerStub({ value, onChange, onExpand }: React.ComponentProps<NonNullable<StudioExpressionEditorContribution["surfaces"]["inline"]>>) {
   return (
     <div aria-label="Secret picker" data-value={JSON.stringify(value)}>
       <button type="button" aria-label="Pick secret" onClick={() => onChange({ name: "tokens" })} />
       <button type="button" aria-label="Clear secret" onClick={() => onChange(null)} />
+      <button type="button" aria-label="Expand secret" onClick={() => onExpand?.()} />
     </div>
   );
 }

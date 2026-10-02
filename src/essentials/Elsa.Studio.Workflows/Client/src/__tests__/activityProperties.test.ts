@@ -22,6 +22,7 @@ import {
   withSyntax
 } from "../activityProperties";
 import { canonicalizeStateForWire, expandStateFromWire } from "../activityInputWire";
+import { clearSecretOnlyInput } from "../secretOnlyInput";
 import { updateActivity } from "../workflowAdapter";
 import type { ActivityNode } from "../workflowTypes";
 
@@ -482,8 +483,8 @@ describe("Object-to-Literal demotion on read", () => {
   });
 });
 
-describe("secret-only (credential) input values", () => {
-  const credential: StudioActivityInputDescriptor = {
+describe("secret-only input values", () => {
+  const secretOnly: StudioActivityInputDescriptor = {
     name: "Authorization",
     referenceKey: "authorization",
     typeName: "System.String",
@@ -495,19 +496,19 @@ describe("secret-only (credential) input values", () => {
   const nodeWith = (value: unknown): ActivityNode => ({ ...activity("http"), ...(value === undefined ? {} : { authorization: value }) });
   const wire = (node: ActivityNode) => canonicalizeStateForWire({ rootActivity: node } as never).rootActivity!;
 
-  it("recognizes only an explicit credential declaration", () => {
-    expect(acceptsOnlySecretReference(credential)).toBe(true);
-    expect(acceptsOnlySecretReference({ ...credential, isCredential: false })).toBe(false);
-    expect(acceptsOnlySecretReference({ ...credential, isCredential: null })).toBe(false);
-    expect(acceptsOnlySecretReference({ ...credential, isCredential: undefined, isSensitive: true })).toBe(false);
+  it("recognizes only an explicit secret-only declaration", () => {
+    expect(acceptsOnlySecretReference(secretOnly)).toBe(true);
+    expect(acceptsOnlySecretReference({ ...secretOnly, isCredential: false })).toBe(false);
+    expect(acceptsOnlySecretReference({ ...secretOnly, isCredential: null })).toBe(false);
+    expect(acceptsOnlySecretReference({ ...secretOnly, isCredential: undefined, isSensitive: true })).toBe(false);
   });
 
   it("defaults an unauthored input to the Secret syntax ahead of the descriptor's default syntax", () => {
-    expect(readWrappedInput(nodeWith(undefined), credential)).toEqual({
+    expect(readWrappedInput(nodeWith(undefined), secretOnly)).toEqual({
       typeName: "System.String",
       expression: { type: "Secret", value: null }
     });
-    expect(readWrappedInput(nodeWith(undefined), { ...credential, isCredential: false }).expression.type).toBe("Literal");
+    expect(readWrappedInput(nodeWith(undefined), { ...secretOnly, isCredential: false }).expression.type).toBe("Literal");
   });
 
   it("reads a value authored under another syntax as an empty Secret without exposing it, keeping the binding's extras", () => {
@@ -517,7 +518,7 @@ describe("secret-only (credential) input values", () => {
       argumentExtras: { isSensitive: true }
     };
 
-    const read = readWrappedInput(nodeWith(stored), credential);
+    const read = readWrappedInput(nodeWith(stored), secretOnly);
 
     expect(read.expression).toEqual({ type: "Secret", value: null });
     expect(read.argumentExtras).toEqual({ isSensitive: true });
@@ -527,12 +528,12 @@ describe("secret-only (credential) input values", () => {
   it("keeps an authored Secret Reference", () => {
     const reference = { name: "tokens", typeName: "text" };
 
-    expect(readWrappedInput(nodeWith({ typeName: "System.String", expression: { type: "Secret", value: reference } }), credential).expression)
+    expect(readWrappedInput(nodeWith({ typeName: "System.String", expression: { type: "Secret", value: reference } }), secretOnly).expression)
       .toEqual({ type: "Secret", value: reference });
   });
 
-  it("leaves reading a non-credential input unchanged", () => {
-    const plain = { ...credential, isCredential: false, isSensitive: true };
+  it("leaves reading an input that is not secret-only unchanged", () => {
+    const plain = { ...secretOnly, isCredential: false, isSensitive: true };
 
     expect(readWrappedInput(nodeWith({ typeName: "System.String", expression: { type: "Literal", value: "hello" } }), plain).expression)
       .toEqual({ type: "Literal", value: "hello" });
@@ -544,15 +545,24 @@ describe("secret-only (credential) input values", () => {
       expression: { type: "Literal", value: "plain-old-words" },
       argumentExtras: { isSensitive: true }
     });
-    const picked = writeInputValue(stored, credential, withLiteralValue(readWrappedInput(stored, credential), { name: "tokens" }));
+    const picked = writeInputValue(stored, secretOnly, withLiteralValue(readWrappedInput(stored, secretOnly), { name: "tokens" }));
 
     expect(wire(picked).inputs).toEqual([
       { isSensitive: true, referenceKey: "authorization", value: { value: '{"name":"tokens"}', expressionType: "Secret" } }
     ]);
 
-    const { authorization: _unbound, ...unbound } = picked;
-    void _unbound;
-    expect(wire(unbound as ActivityNode).inputs).toEqual([]);
+    const unbound = clearSecretOnlyInput(picked, secretOnly, null)!;
+    expect(unbound).not.toHaveProperty("authorization");
+    expect(wire(unbound).inputs).toEqual([]);
+  });
+
+  it("unbinds a secret-only input only when it is cleared", () => {
+    const bound = nodeWith({ typeName: "System.String", expression: { type: "Secret", value: { name: "tokens" } } });
+
+    expect(clearSecretOnlyInput(bound, secretOnly, null)).toEqual(activity("http"));
+    expect(clearSecretOnlyInput(bound, secretOnly, "")).toEqual(activity("http"));
+    expect(clearSecretOnlyInput(bound, secretOnly, { name: "tokens" })).toBeNull();
+    expect(clearSecretOnlyInput(bound, { ...secretOnly, isCredential: false }, null)).toBeNull();
   });
 
   it("round-trips a Secret binding through the wire", () => {
@@ -560,7 +570,7 @@ describe("secret-only (credential) input values", () => {
 
     const expanded = expandStateFromWire(state as never).rootActivity!;
 
-    expect(readWrappedInput(expanded, credential).expression).toEqual({ type: "Secret", value: { name: "tokens" } });
+    expect(readWrappedInput(expanded, secretOnly).expression).toEqual({ type: "Secret", value: { name: "tokens" } });
   });
 });
 

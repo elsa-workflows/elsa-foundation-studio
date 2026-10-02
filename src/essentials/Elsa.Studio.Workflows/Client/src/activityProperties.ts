@@ -23,9 +23,9 @@ export interface WrappedActivityInputValue {
 export const secretSyntax = "Secret";
 
 /**
- * Whether the activity declares the input as accepting only a Secret Reference (the backend's
- * `isCredential`). Such an input is authored with the secret picker alone: it has no literal entry, and
- * emptying it unbinds it rather than leaving an empty value behind.
+ * Whether the input is secret-only: the activity declares that it accepts only a Secret Reference (the
+ * backend's `isCredential`). Such an input is authored with the secret picker alone: it has no literal
+ * entry, and emptying it unbinds it (`clearSecretOnlyInput`) rather than leaving an empty value behind.
  */
 export function acceptsOnlySecretReference(descriptor: StudioActivityInputDescriptor) {
   return descriptor.isCredential === true;
@@ -247,7 +247,7 @@ function asStructuredValue(value: unknown): unknown {
   }
 }
 
-// A credential input shows only the secret picker. Anything authored under another syntax (possible only
+// A secret-only input shows only the secret picker. Anything authored under another syntax (possible only
 // from before the rule) is not read as text: the picker starts empty and the stored value stays untouched
 // on the node until the author picks a Secret.
 function secretOnlyExpression(expression: ActivityExpression): ActivityExpression {

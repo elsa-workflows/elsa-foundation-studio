@@ -184,25 +184,6 @@ button {
   font-size: var(--studio-label-size);
 }
 
-.studio-property-secret-value button {
-  border: 1px solid var(--studio-border);
-  border-radius: var(--studio-radius);
-  background: var(--studio-surface-muted);
-  color: var(--studio-text);
-  font-size: var(--studio-label-size);
-  padding: 4px 10px;
-}
-
-.studio-property-secret-value button:focus-visible {
-  outline: 3px solid var(--studio-focus);
-  outline-offset: 2px;
-}
-
-.studio-property-secret-value button:disabled {
-  cursor: not-allowed;
-  opacity: .55;
-}
-
 .studio-property-error {
   margin: var(--spacing-xs) 0 0;
   color: var(--studio-danger-fg);

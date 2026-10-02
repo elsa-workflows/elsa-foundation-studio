@@ -744,6 +744,38 @@ describe("WorkflowActivityExecutionDetails", () => {
     expect(container.textContent).toContain("Authored source is hidden by source permissions.");
   });
 
+  it.each([
+    ["sensitive", { isSensitive: true }],
+    ["secret-only", { isCredential: true }]
+  ])("keeps the authored source of a declared %s input hidden when the backend did not flag the record", async (_label, declared) => {
+    vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([]));
+    const authoredSource = "variables.storedWords";
+
+    const container = render(
+      <WorkflowActivityExecutionDetails
+        context={context}
+        activity={activity}
+        activityCatalog={[{ ...catalog[0]!, inputs: [{ referenceKey: "token-key", name: "Token", typeName: "System.String", ...declared }] }]}
+        executableNodeFacts={{
+          executableNodeId: "node-1",
+          authoredActivityId: "write-line",
+          activityType: activity.activityType,
+          activityTypeVersion: activity.activityTypeVersion,
+          structureKind: null,
+          available: true,
+          outputCaptures: [],
+          authoredInputsAccess: "visible",
+          authoredInputs: [{ executableNodeId: "node-1", inputKey: "token-key", expressionType: "JavaScript", value: authoredSource }],
+          inputBindings: [{ inputKey: "token-key", inputName: "Token", source: "Expression", expression: { language: "JavaScript", expression: authoredSource } }]
+        }}
+      />
+    );
+
+    await waitFor(() => expect(container.textContent).toContain("Protected source"));
+    expect(container.textContent).toContain("Authored source is protected because this input is sensitive.");
+    expect(container.innerHTML).not.toContain(authoredSource);
+  });
+
   it("shows an empty state when no input snapshots exist", async () => {
     vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([]));
 

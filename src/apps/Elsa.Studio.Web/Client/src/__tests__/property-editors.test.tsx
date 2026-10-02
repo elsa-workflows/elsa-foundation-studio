@@ -275,17 +275,19 @@ describe("masked password activity property editor", () => {
   const descriptor: StudioActivityInputDescriptor = { name: "ApiToken", displayName: "API token", typeName: "System.String", uiHint: "password" };
   const storedValue = "stored-value-words";
 
-  // Mirrors the panel: the parent feeds each emitted value back in as the new `value`.
-  function Host({ initial, onChange, disabled }: { initial?: unknown; onChange(value: unknown): void; disabled?: boolean }) {
-    const [value, setValue] = React.useState(initial);
+  // Mirrors the panel: the parent feeds each emitted value back in as the new `value`, and selecting another
+  // activity (or a stored value changing from outside) replaces whatever was emitted.
+  function Host({ initial, activityId, onChange, disabled }: { initial?: unknown; activityId?: string; onChange(value: unknown): void; disabled?: boolean }) {
+    const [edit, setEdit] = React.useState<{ activityId?: string; initial?: unknown; value: unknown } | null>(null);
+    const value = edit && edit.activityId === activityId && edit.initial === initial ? edit.value : initial;
     const Editor = builtInPropertyEditors.find(editor => editor.id === "studio.property.password")!.component;
     return (
       <Editor
         descriptor={descriptor}
         value={value}
         disabled={disabled}
-        context={{ activity: {}, expressionDescriptors: [] }}
-        onChange={next => { setValue(next); onChange(next); }}
+        context={{ activity: {}, activityId, expressionDescriptors: [] }}
+        onChange={next => { setEdit({ activityId, initial, value: next }); onChange(next); }}
       />
     );
   }
@@ -293,8 +295,13 @@ describe("masked password activity property editor", () => {
   const renderHost = (props: Parameters<typeof Host>[0]) => flushSync(() => root.render(<Host {...props} />));
   const field = () => container.querySelector<HTMLInputElement>("input");
   const replaceButton = () => container.querySelector<HTMLButtonElement>("button")!;
+  const showsValueSet = () => field() === null && container.textContent?.includes("Value set");
+  const startReplacing = (props: Parameters<typeof Host>[0]) => {
+    renderHost(props);
+    flushSync(() => replaceButton().click());
+  };
 
-  it("claims a password hint or a sensitive non-credential text input in element scope", () => {
+  it("claims a password hint or a sensitive text input that is not secret-only in element scope", () => {
     expect(resolves("studio.property.password", descriptor)).toBe(true);
     expect(resolves("studio.property.password", { name: "x", typeName: "System.String", isSensitive: true })).toBe(true);
     expect(resolves("studio.property.password", { name: "x", typeName: "System.String", isSensitive: true, isCredential: true })).toBe(false);
@@ -357,6 +364,65 @@ describe("masked password activity property editor", () => {
 
     expect(onChange).toHaveBeenLastCalledWith("");
     expect(field()).not.toBeNull();
+  });
+
+  it("returns to the stored value when the replacement field loses focus with nothing typed", () => {
+    const onChange = vi.fn();
+    startReplacing({ initial: storedValue, onChange });
+    expect(document.activeElement).toBe(field());
+
+    flushSync(() => field()!.blur());
+
+    expect(showsValueSet()).toBe(true);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("returns to the stored value on Escape with nothing typed and puts focus back on Replace", () => {
+    const onChange = vi.fn();
+    startReplacing({ initial: storedValue, onChange });
+
+    flushSync(() => field()!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+
+    expect(showsValueSet()).toBe(true);
+    expect(document.activeElement).toBe(replaceButton());
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("keeps a typed replacement when the field loses focus", () => {
+    const onChange = vi.fn();
+    startReplacing({ initial: storedValue, onChange });
+    typeInto(field()!, "new-words");
+
+    flushSync(() => field()!.blur());
+
+    expect(field()!.value).toBe("new-words");
+    expect(onChange).toHaveBeenLastCalledWith("new-words");
+  });
+
+  it("discards a half-typed replacement when another activity is selected", () => {
+    startReplacing({ initial: storedValue, activityId: "first", onChange: vi.fn() });
+    typeInto(field()!, "half-typed");
+
+    renderHost({ initial: storedValue, activityId: "second", onChange: vi.fn() });
+
+    expect(showsValueSet()).toBe(true);
+  });
+
+  it("starts the next activity at its stored value even when both store the same value", () => {
+    startReplacing({ initial: storedValue, activityId: "first", onChange: vi.fn() });
+
+    renderHost({ initial: storedValue, activityId: "second", onChange: vi.fn() });
+
+    expect(showsValueSet()).toBe(true);
+  });
+
+  it("discards a half-typed replacement when the stored value changes from outside, even without an activity id", () => {
+    startReplacing({ initial: storedValue, onChange: vi.fn() });
+    typeInto(field()!, "half-typed");
+
+    renderHost({ initial: "other-stored-words", onChange: vi.fn() });
+
+    expect(showsValueSet()).toBe(true);
   });
 
   it("disables Replace when the input is read-only", () => {

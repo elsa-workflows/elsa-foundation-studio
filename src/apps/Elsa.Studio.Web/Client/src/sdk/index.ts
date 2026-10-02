@@ -569,6 +569,8 @@ export type StudioActivityPropertyEditorScope = "element" | "collection";
 
 export interface StudioActivityPropertyEditorContext {
   activity: unknown;
+  /** The node id of the activity being edited, so an editor can tell one activity from the next. Absent on older hosts. */
+  activityId?: string | null;
   expressionDescriptors: StudioExpressionDescriptor[];
   readOnly?: boolean;
   scope?: StudioActivityPropertyEditorScope;

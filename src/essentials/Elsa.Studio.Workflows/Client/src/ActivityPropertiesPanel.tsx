@@ -38,7 +38,6 @@ import {
   describeCollectionForInput,
   describeDictionaryForInput,
   getLiteralDefaultValue,
-  isEmptyExpressionValue,
   isRepeaterOptOut,
   planExpressionModeTransition,
   readWrappedInput,
@@ -49,6 +48,7 @@ import {
   writeInputValue,
   type WrappedActivityInputValue
 } from "./activityProperties";
+import { clearSecretOnlyInput } from "./secretOnlyInput";
 import {
   builtInConversionProfiles,
   conversionModeDescriptors,
@@ -399,7 +399,9 @@ function PropertyRow({
   onChange
 }: PropertyRowProps) {
   const readOnly = input.isReadOnly === true;
-  // An input that takes only a Secret Reference offers the secret picker and nothing else (FR-016).
+  // A secret-only input offers the secret picker and nothing else: no other syntax, no literal or expanded
+  // editor and no conversion control, so no control on the row can write anything but a Secret Reference
+  // or a clear (elsa-foundation spec 188, workflow secret safety).
   const secretOnly = acceptsOnlySecretReference(input);
   const syntaxDescriptors = secretOnly
     ? expressionDescriptors.filter(descriptor => descriptor.type === secretSyntax)
@@ -411,7 +413,7 @@ function PropertyRow({
     uiSpecifications: { ...input.uiSpecifications, options: dynamicOptions.options }
   } : input;
   const editorDisabled = readOnly || (!!provider && dynamicOptions.status !== "ready");
-  const context: StudioActivityPropertyEditorContext = { activity, expressionDescriptors, readOnly: editorDisabled };
+  const context: StudioActivityPropertyEditorContext = { activity, activityId: activity.nodeId, expressionDescriptors, readOnly: editorDisabled };
   const editor = resolveEditor(editors, effectiveInput, context);
   const EditorComponent = editor?.component;
   const wrapped = input.isWrapped !== false ? readWrappedInput(activity, input) : null;
@@ -578,11 +580,9 @@ function PropertyRow({
     const currentWrapped = current.input.isWrapped !== false
       ? readWrappedInput(current.activity, current.input)
       : null;
-    // Emptying a secret-only input unbinds it: no entry is written, so nothing pretends to be a value.
-    if (acceptsOnlySecretReference(current.input) && isEmptyExpressionValue(nextValue)) {
-      const { [getInputPropertyName(current.input)]: _unbound, ...rest } = current.activity;
-      void _unbound;
-      current.onChange(rest as ActivityNode);
+    const cleared = clearSecretOnlyInput(current.activity, current.input, nextValue);
+    if (cleared) {
+      current.onChange(cleared);
       return;
     }
     const next = currentWrapped ? withLiteralValue(currentWrapped, nextValue) : nextValue;
@@ -687,7 +687,7 @@ function PropertyRow({
       disabled={editingMode === "structured" ? editorDisabled : readOnly}
       initialFocus={focusRequested && !expanded}
       context={inlineExpressionContext}
-      onExpand={() => {
+      onExpand={secretOnly ? undefined : () => {
         activateTooling();
         setExpanded(true);
       }}
@@ -723,7 +723,7 @@ function PropertyRow({
         <label>{input.displayName || input.name}</label>
         <div className="wf-property-row-header-meta">
           <span>{formatTypeName(input.typeName)}</span>
-          {wrapped ? (
+          {wrapped && !secretOnly ? (
             <button
               ref={conversionToggleRef}
               type="button"
@@ -799,7 +799,7 @@ function PropertyRow({
           {renderExpressionDiagnostics(inlineDiagnostics)}
         </>
       )}
-      {wrapped && (conversionOpen || conversionAuthored) ? (
+      {wrapped && !secretOnly && (conversionOpen || conversionAuthored) ? (
         <div id={conversionRegionId} className="wf-conversion-region">
           {conversionOpen ? (
             <div
@@ -1655,6 +1655,8 @@ function isSingleLineTextInput(input: StudioActivityInputDescriptor, editorId: s
 function isExpandableTextInput(input: StudioActivityInputDescriptor, editorId: string | undefined) {
   const uiHint = input.uiHint?.toLowerCase();
   if (uiHint === "checkbox" || uiHint === "dropdown") return false;
+  // A masked input never opens into a clear-text editor, whatever its hint.
+  if (uiHint === "password" || input.isSensitive === true) return false;
   if (editorId && !inlineSyntaxEditorIds.has(editorId) && uiHint !== "multiline") return false;
 
   const normalizedType = input.typeName.split(",", 1)[0]?.trim().toLowerCase();

@@ -7,6 +7,7 @@ import {
   type StudioActivityPropertyEditorContribution,
   type StudioActivityPropertyEditorProps
 } from "../sdk";
+import { StudioButton } from "./ui/forms/Button";
 
 const textLikeTypes = new Set(["string", "system.string", "text"]);
 
@@ -184,10 +185,10 @@ function SinglelineEditor({ descriptor, value, disabled, onChange }: StudioActiv
   );
 }
 
-// Local replace/draft state belongs to one activity: the properties panel reuses a row when another
-// activity of the same type is selected, so a half-typed value must not follow the selection.
+// Local replace/draft state belongs to one input of one activity: the properties panel reuses a row when
+// another activity of the same type is selected, so a half-typed value must not follow the selection.
 function PasswordEditor(props: StudioActivityPropertyEditorProps) {
-  return <PasswordField key={(props.context.activity as { nodeId?: string } | null)?.nodeId} {...props} />;
+  return <PasswordField key={`${props.context.activityId ?? ""}\u001f${props.descriptor.name}`} {...props} />;
 }
 
 // Masks while typing and never renders a stored value. The field only ever shows what was typed in this
@@ -196,31 +197,52 @@ function PasswordEditor(props: StudioActivityPropertyEditorProps) {
 function PasswordField({ descriptor, value, disabled, onChange }: StudioActivityPropertyEditorProps) {
   const [replacing, setReplacing] = useState(false);
   const [draft, setDraft] = useState("");
+  const [storedValue, setStoredValue] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
-  const focusRequested = useRef(false);
+  const valueSetRef = useRef<HTMLDivElement>(null);
+  const focusTarget = useRef<"field" | "replace" | null>(null);
   const name = accessibleName(descriptor);
+  const hasStoredValue = value != null && String(value) !== "";
+
+  // A stored value that changes from outside (another activity without an id, an undo) discards the draft;
+  // the parent feeding back what was just typed does not.
+  if (value !== storedValue) {
+    setStoredValue(value);
+    if (value !== draft) {
+      setReplacing(false);
+      setDraft("");
+    }
+  }
 
   useEffect(() => {
-    if (!replacing || !focusRequested.current) return;
-    focusRequested.current = false;
-    inputRef.current?.focus();
+    const target = focusTarget.current;
+    focusTarget.current = null;
+    if (target === "field") inputRef.current?.focus();
+    if (target === "replace") valueSetRef.current?.querySelector("button")?.focus();
   }, [replacing]);
 
-  if (!replacing && value != null && String(value) !== "") {
+  // Leaving a replacement before typing anything goes back to "Value set": the stored value is untouched.
+  const restoreValueSet = (refocusReplace: boolean) => {
+    if (refocusReplace) focusTarget.current = "replace";
+    setReplacing(false);
+  };
+  const canRestore = replacing && hasStoredValue && draft === "";
+
+  if (!replacing && hasStoredValue) {
     return (
-      <div className="studio-property-secret-value">
+      <div ref={valueSetRef} className="studio-property-secret-value">
         <span>Value set</span>
-        <button
-          type="button"
+        <StudioButton
+          size="sm"
           aria-label={`Replace ${name}`}
           disabled={disabled}
           onClick={() => {
-            focusRequested.current = true;
+            focusTarget.current = "field";
             setReplacing(true);
           }}
         >
           Replace
-        </button>
+        </StudioButton>
       </div>
     );
   }
@@ -234,6 +256,15 @@ function PasswordField({ descriptor, value, disabled, onChange }: StudioActivity
       disabled={disabled}
       spellCheck={false}
       autoComplete="new-password"
+      onBlur={() => {
+        if (canRestore) restoreValueSet(false);
+      }}
+      onKeyDown={event => {
+        if (event.key !== "Escape" || !canRestore) return;
+        event.preventDefault();
+        event.stopPropagation();
+        restoreValueSet(true);
+      }}
       onChange={event => {
         // Keep the field mounted once typing starts, even though the typed value now counts as stored.
         setReplacing(true);
