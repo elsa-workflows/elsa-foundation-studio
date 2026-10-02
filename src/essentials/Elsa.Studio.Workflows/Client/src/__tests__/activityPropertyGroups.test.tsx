@@ -861,7 +861,7 @@ describe("property editor context", () => {
 
 describe("masked inputs", () => {
   const storedValue = "stored-value-words";
-  const hiddenNotice = "This value is masked. It is preserved and read-only here.";
+  const maskedNotice = "This value is masked. It is preserved and read-only here.";
   // The panel asks nothing of the masked editor but its id; this one renders nothing of the value.
   const maskedEditor: StudioActivityPropertyEditorContribution = {
     id: "studio.property.password",
@@ -1115,7 +1115,7 @@ describe("masked inputs", () => {
       const { container, changes } = renderToken(stored, declared, { editors });
 
       expectNowhere(shown);
-      expect(container.textContent).toContain(hiddenNotice);
+      expect(container.textContent).toContain(maskedNotice);
       expect(container.textContent).not.toContain("Value set");
       expect(expandAffordance(container)).toBeNull();
       expect(changes).toEqual([]);

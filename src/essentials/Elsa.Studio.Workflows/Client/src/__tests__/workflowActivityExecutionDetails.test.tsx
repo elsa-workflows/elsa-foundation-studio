@@ -804,6 +804,22 @@ describe("WorkflowActivityExecutionDetails", () => {
       expect(container.textContent).not.toContain("Protected source");
     });
 
+    const extraField = "extra-field-words";
+    const carrying = { name: "api-tokens", rawValue: extraField };
+    const compiledCarrying = { inputKey: "token-key", inputName: "Token", source: "SecretRead", reference: carrying };
+
+    it.each([
+      ["sensitive", "an object", { isSensitive: true }, carrying],
+      ["sensitive", "JSON text", { isSensitive: true }, JSON.stringify(carrying)],
+      ["secret-only", "an object", { isCredential: true }, carrying],
+      ["secret-only", "JSON text", { isCredential: true }, JSON.stringify(carrying)]
+    ])("shows only the name of a Secret Reference that carries another field, on a %s input held as %s", async (_kind, _shape, declared, value) => {
+      const container = renderDeclaredInput(declared, { expressionType: "Secret", value }, [compiledCarrying]);
+
+      await waitFor(() => expect(container.textContent).toContain("api-tokens"));
+      expect(container.innerHTML).not.toContain(extraField);
+    });
+
     it("keeps a Secret Reference hidden when the backend flagged the record", async () => {
       const container = renderDeclaredInput({ isCredential: true }, { expressionType: "Secret", value: { name: "api-tokens" }, isSensitive: true });
 

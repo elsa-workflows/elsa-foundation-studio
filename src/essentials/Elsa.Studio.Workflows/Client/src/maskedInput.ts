@@ -19,18 +19,31 @@ export function isMaskedInput(descriptor: StudioActivityInputDescriptor) {
   return descriptor.uiHint?.toLowerCase() === "password" || descriptor.isSensitive === true || acceptsOnlySecretReference(descriptor);
 }
 
+/** A Secret Reference as the secret picker normalizes it: a name, and its type and scope when they are text. */
+export interface SecretReferenceView {
+  name: string;
+  typeName: string | null;
+  scope: string | null;
+}
+
 /**
- * Whether an authored expression is a Secret Reference: the exact Secret syntax holding an object with a non-empty
- * name, as the secret picker writes it, or that object as JSON text on a wire-shaped node. The name check matches
- * the secret picker's own reader (`toReference` in the Secrets extension, which this module cannot import across
- * the type-only SDK boundary). Anything else under the Secret syntax, such as a plain string the backend accepts at
- * save and refuses only at publish, names no secret and stays masked.
+ * Reads the Secret Reference an authored expression holds: the exact Secret syntax holding an object with a
+ * non-empty name, as the secret picker writes it, or that object as JSON text on a wire-shaped node. The result is
+ * normalized as the secret picker's own reader normalizes it (`toReference` in the Secrets extension, held to the
+ * same cases by a shared test table), so any other field is dropped. Anything else under the Secret syntax, such as
+ * a plain string the backend accepts at save and refuses only at publish, names no secret: `null`.
  */
-export function isSecretReference(expressionType: string | null | undefined, value: unknown) {
-  if (expressionType !== secretSyntax) return false;
-  const reference = typeof value === "string" ? parseJson(value) : value;
-  return typeof reference === "object" && reference !== null
-    && typeof (reference as { name?: unknown }).name === "string" && (reference as { name: string }).name.trim() !== "";
+export function readSecretReference(expressionType: string | null | undefined, value: unknown): SecretReferenceView | null {
+  if (expressionType !== secretSyntax) return null;
+  const candidate = typeof value === "string" ? parseJson(value) : value;
+  if (!candidate || typeof candidate !== "object") return null;
+  const { name, typeName, scope } = candidate as Record<string, unknown>;
+  if (typeof name !== "string" || !name.trim()) return null;
+  return {
+    name,
+    typeName: typeof typeName === "string" ? typeName : null,
+    scope: typeof scope === "string" ? scope : null
+  };
 }
 
 function parseJson(text: string): unknown {

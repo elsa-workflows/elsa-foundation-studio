@@ -7,7 +7,7 @@ import { listActivities } from "../api/activityDesign";
 import { getActivityExecutionInspection, getExecutable, getExecutableInputSources, getWorkflowInstance, listWorkflowInstances, type WorkflowInstanceListPage } from "../api/runtime";
 import type { ActivityCatalogItem, ActivityExecutionInspection, ActivityExecutionInspectionValueSnapshot, ActivityExecutionStateSummary, ActivityNode, IncidentStateSummary, WorkflowDefinitionVersionDetails, WorkflowExecutableDetails, WorkflowInstanceDetails, WorkflowInstanceSummary } from "../workflowTypes";
 import { formatActivitySummary } from "../activitySummary";
-import { isMaskedInput, isSecretReference } from "../maskedInput";
+import { isMaskedInput, readSecretReference } from "../maskedInput";
 import { resolveActivityLabel } from "../activityPresentation";
 import {
   applyRuntimeOverlays,
@@ -1293,11 +1293,14 @@ function InputInspectionRowCard({
   const latest = row.latestEvaluation;
   const sourceKind = row.authoredSource?.expressionType || row.compiledBinding?.source || "No source";
   // The input's declaration counts as much as the per-record flags: a masked input (a password hint, or declared
-  // sensitive or secret-only) keeps its authored source hidden even when the backend did not flag the record,
-  // unless that source is a Secret Reference, which names a secret without holding its value. A record the
-  // backend flagged stays hidden.
+  // sensitive or secret-only) shows nothing of its authored source but the name of a Secret Reference it is bound
+  // to, even when the backend did not flag the record. Any other source stays hidden, and so does a masked input's
+  // compiled binding, whose fields Studio cannot vet. A record the backend flagged stays hidden.
+  const masked = !!row.declaration && isMaskedInput(row.declaration);
+  const secretReference = masked ? readSecretReference(row.authoredSource?.expressionType, row.authoredSource?.value) : null;
+  const shownSource = secretReference && row.authoredSource ? { ...row.authoredSource, value: secretReference.name } : row.authoredSource;
   const sourceProtected = isProtectedSourceAccess(sourceAccess) || isProtectedSourceAccess(row.authoredSource?.accessState ?? row.authoredSource?.access) || !!row.authoredSource?.isSensitive || !!row.compiledBinding?.isSensitive || !!latest?.isSensitive
-    || (!!row.declaration && isMaskedInput(row.declaration) && !isSecretReference(row.authoredSource?.expressionType, row.authoredSource?.value));
+    || (masked && !secretReference);
   const regionId = useId();
 
   return (
@@ -1315,7 +1318,7 @@ function InputInspectionRowCard({
             </span>
             <span className="wf-input-inspection-preview">
               <small>{sourceKind}</small>
-              <code>{sourcePreview(row, sourceProtected, sourceAccess)}</code>
+              <code>{sourcePreview(row, shownSource, sourceProtected, sourceAccess)}</code>
             </span>
           </span>
         </summary>
@@ -1332,6 +1335,8 @@ function InputInspectionRowCard({
             <h5>Authored source</h5>
             <AuthoredInputSource
               row={row}
+              source={shownSource}
+              compiledBindingShown={!masked}
               sourceAccess={sourceAccess}
               protectedSource={sourceProtected}
               expressionEditors={expressionEditors}
@@ -1363,11 +1368,15 @@ function InputEvaluationHistory({ evaluations }: { evaluations: ActivityExecutio
 
 function AuthoredInputSource({
   row,
+  source,
+  compiledBindingShown,
   sourceAccess,
   protectedSource,
   expressionEditors
 }: {
   row: InputInspectionRow;
+  source: InputInspectionRow["authoredSource"];
+  compiledBindingShown: boolean;
   sourceAccess?: string | null;
   protectedSource: boolean;
   expressionEditors: StudioExpressionEditorContribution[];
@@ -1376,7 +1385,6 @@ function AuthoredInputSource({
     return <p>{isProtectedSourceAccess(sourceAccess) ? "Authored source is hidden by source permissions." : "Authored source is protected because this input is sensitive."}</p>;
   }
 
-  const source = row.authoredSource;
   const expressionType = source?.expressionType || "Unknown";
   const fallback = source ? <GenericExpressionSource expressionType={expressionType} value={source.value} expanded /> : null;
   const renderer = source ? resolveExpressionSourceRenderer(expressionEditors, row, expressionType) : undefined;
@@ -1396,7 +1404,9 @@ function AuthoredInputSource({
           <Renderer context={rendererContext} />
         </ExpressionSourceRendererBoundary>
       ) : fallback ?? <p>No authored source is available for this pinned Source Reference.</p>}
-      {row.compiledBinding ? (
+      {!compiledBindingShown ? (
+        <p className="wf-instance-note">The compiled binding of a masked input is not shown.</p>
+      ) : row.compiledBinding ? (
         <details>
           <summary>Compiled binding ({row.compiledBinding.source || "Unknown"})</summary>
           <GenericExpressionSource expressionType={row.compiledBinding.source || "Unknown"} value={compiledBindingDetails(row.compiledBinding)} expanded />
@@ -1480,10 +1490,10 @@ function runtimeEvidencePreview(snapshot: ActivityExecutionInspectionValueSnapsh
   return snapshot.captureReason || formatCaptureMode(snapshot.captureState ?? snapshot.state ?? snapshot.captureMode);
 }
 
-function sourcePreview(row: InputInspectionRow, protectedSource: boolean, sourceAccess?: string | null) {
+function sourcePreview(row: InputInspectionRow, source: InputInspectionRow["authoredSource"], protectedSource: boolean, sourceAccess?: string | null) {
   if (protectedSource) return isProtectedSourceAccess(sourceAccess) ? "Source hidden" : "Protected source";
-  if (!row.authoredSource) return row.compiledBinding ? "Compiled source only" : "Source unavailable";
-  return previewSnapshotPayload(formatSnapshotPayload(row.authoredSource.value));
+  if (!source) return row.compiledBinding ? "Compiled source only" : "Source unavailable";
+  return previewSnapshotPayload(formatSnapshotPayload(source.value));
 }
 
 function isProtectedSourceAccess(access: string | null | undefined) {

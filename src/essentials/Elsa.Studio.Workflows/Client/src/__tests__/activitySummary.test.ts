@@ -107,6 +107,16 @@ describe("formatActivitySummary for masked and secret-only inputs", () => {
     expect(formatActivitySummary(node({ text: wrapped("Literal", "   ") }), catalog([sensitiveInput]))).toBeUndefined();
   });
 
+  it.each([
+    ["a sensitive", sensitiveInput],
+    ["a secret-only", secretOnlyInput]
+  ])("shows only the name of a Secret Reference that carries another field, on %s input", (_label, input) => {
+    const carrying = { name: "tokens", rawValue: "extra-field-words" };
+
+    expect(formatActivitySummary(wireNode("Secret", JSON.stringify(carrying)), catalog([input]))).toBe("tokens");
+    expect(formatActivitySummary(node({ text: wrapped("Secret", carrying) }), catalog([input]))).toBeUndefined();
+  });
+
   it("does not summarize a Secret Reference held as an object on the editor's node", () => {
     expect(formatActivitySummary(node({ text: wrapped("Secret", { name: "tokens" }) }), catalog([secretOnlyInput]))).toBeUndefined();
   });
