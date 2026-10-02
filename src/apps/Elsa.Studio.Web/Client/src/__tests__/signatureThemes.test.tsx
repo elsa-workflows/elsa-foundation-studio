@@ -1,7 +1,7 @@
 import React from "react";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   allThemeModes,
   builtInThemeDefinitions,
@@ -10,6 +10,7 @@ import {
   getThemeColorScheme,
   getThemeModeDefinition,
   resolveThemeMode,
+  type StudioThemeDefinition,
   type ThemeMode,
   type ThemeModeDefinition
 } from "../app/themes/presets";
@@ -25,7 +26,22 @@ import {
 import { ThemeProvider, useTheme } from "../app/components/ThemeProvider";
 import { ThemeSwitcher } from "../app/components/ThemeSwitcher";
 import { ShellFrame } from "../app/App";
-import { getStudioThemeLayout } from "../sdk";
+import { getStudioThemeLayout, type StudioEndpointContext } from "../sdk";
+
+/**
+ * A custom theme with only the two base modes and no typography, shape or layout. Every built-in
+ * defines all four modes, so this is the stand-in for a theme that lacks the optional ones.
+ */
+const twoModeTheme = (): StudioThemeDefinition => ({
+  ...withoutOptionalMode(withoutOptionalMode(createCustomThemeFrom(getTheme("meridian")!, "two-mode", "Two Mode"), "dim"), "high-contrast"),
+  typography: undefined,
+  shape: undefined,
+  layout: undefined,
+  enabled: true,
+  published: true
+});
+
+const darkOnlyTheme = (): StudioThemeDefinition => ({ ...twoModeTheme(), supportedModes: ["dark"] });
 
 /** WCAG 2 contrast ratio between two `oklch(L C H)` colours, via OKLab → linear sRGB. */
 function contrast(first: string, second: string) {
@@ -54,8 +70,8 @@ const signatureModes = foundationThemeIds.flatMap(id =>
   allThemeModes.map(mode => [id, mode, getThemeModeDefinition(getTheme(id)!, mode)!] as const));
 
 describe("signature themes", () => {
-  it("lead the built-in list with Meridian as the out-of-box default", () => {
-    expect(builtInThemeDefinitions.slice(0, foundationThemeIds.length).map(theme => theme.id)).toEqual([...foundationThemeIds]);
+  it("are the built-in list, with Meridian as the out-of-box default", () => {
+    expect(builtInThemeDefinitions.map(theme => theme.id)).toEqual([...foundationThemeIds]);
     expect(foundationThemeIds[0]).toBe("meridian");
     expect(normalizeThemeStore().defaultThemeId).toBe("meridian");
   });
@@ -92,9 +108,8 @@ describe("signature themes", () => {
     }
   });
 
-  it("gives each signature theme its layout, and every other built-in the classic one", () => {
+  it("gives each signature theme its layout", () => {
     expect(foundationThemeIds.map(id => getTheme(id)!.layout)).toEqual(["classic", "floating", "workbench", "editorial", "classic", "classic", "classic"]);
-    expect(builtInThemeDefinitions.slice(foundationThemeIds.length).every(theme => theme.layout === undefined)).toBe(true);
   });
 
   it.each(foundationThemeIds)("%s high contrast is black-grounded with a bright accent", id => {
@@ -112,18 +127,19 @@ describe("theme modes", () => {
     expect(allThemeModes.map(getThemeColorScheme)).toEqual(["light", "dark", "dark", "dark"]);
   });
 
-  it("offers only light and dark for themes that define no optional modes", () => {
-    expect(getSupportedThemeModes(getTheme("stone")!)).toEqual(["light", "dark"]);
+  it("offers only the modes a theme defines, narrowed by its supported modes", () => {
+    expect(getSupportedThemeModes(twoModeTheme())).toEqual(["light", "dark"]);
+    expect(getSupportedThemeModes(darkOnlyTheme())).toEqual(["dark"]);
   });
 
-  it.each<[string, ThemeMode, ThemeMode]>([
-    ["stone", "dim", "dark"],
-    ["stone", "high-contrast", "dark"],
-    ["brass-instrument", "high-contrast", "dark"],
-    ["brass-instrument", "light", "dark"],
-    ["meridian", "high-contrast", "high-contrast"]
-  ])("resolves %s with a %s preference to %s, staying in the same scheme when it can", (id, preferred, expected) => {
-    expect(resolveThemeMode(getTheme(id)!, preferred)).toBe(expected);
+  it.each<[string, ThemeMode, ThemeMode, StudioThemeDefinition]>([
+    ["a light/dark theme", "dim", "dark", twoModeTheme()],
+    ["a light/dark theme", "high-contrast", "dark", twoModeTheme()],
+    ["a dark-only theme", "high-contrast", "dark", darkOnlyTheme()],
+    ["a dark-only theme", "light", "dark", darkOnlyTheme()],
+    ["Meridian", "high-contrast", "high-contrast", getTheme("meridian")!]
+  ])("resolves %s with a %s preference to %s, staying in the same scheme when it can", (_label, preferred, expected, theme) => {
+    expect(resolveThemeMode(theme, preferred)).toBe(expected);
   });
 
   it("carries optional modes, typography and shape into a custom duplicate", () => {
@@ -137,7 +153,7 @@ describe("theme modes", () => {
 });
 
 describe("Theme Builder edits", () => {
-  const custom = () => createCustomThemeFrom(getTheme("stone")!, "stone-custom", "Stone Custom");
+  const custom = twoModeTheme;
 
   it("adds an optional mode seeded from the dark palette and offers it", () => {
     const theme = withOptionalMode(custom(), "high-contrast");
@@ -201,6 +217,12 @@ describe("ThemeProvider and ThemeSwitcher", () => {
   let root: Root;
   let api: ReturnType<typeof useTheme> | undefined;
 
+  const contextServing = (getJson: () => Promise<unknown>) => ({ http: { getJson } }) as unknown as StudioEndpointContext;
+  const storeWithDefault = (defaultThemeId: string) =>
+    contextServing(async () => ({ themes: [twoModeTheme()], defaultThemeId, assets: [] }));
+  // The store adds the two-mode custom theme to the built-ins, so the provider can switch to it.
+  const storeContext = storeWithDefault("meridian");
+
   function Probe() {
     api = useTheme();
     return null;
@@ -217,9 +239,9 @@ describe("ThemeProvider and ThemeSwitcher", () => {
     }
   }
 
-  async function render() {
+  async function render(context = storeContext) {
     await act(() => root.render(
-      <ThemeProvider>
+      <ThemeProvider storeContext={context}>
         <Probe />
         <ThemeSwitcher />
         <ShellFrame navigation={[]} panels={[]} path="/" title="Dashboard" backendBaseUrl="https://backend.example/" onNavigate={() => {}}>
@@ -267,6 +289,43 @@ describe("ThemeProvider and ThemeSwitcher", () => {
     api = undefined;
   });
 
+  describe("restoring the stored theme", () => {
+    /** Renders against the store and waits until it has loaded and the theme has settled on <html> and in storage. */
+    async function expectSettledTheme(storedThemeId: string, expectedThemeId: string) {
+      localStorage.setItem("elsa-studio-theme", storedThemeId);
+      // The store default deliberately differs from the first built-in (Meridian), so a fallback proves which one won.
+      await render(storeWithDefault("atelier"));
+      await vi.waitFor(() => {
+        expect(api!.availableThemes.some(theme => theme.id === "two-mode")).toBe(true);
+        expect(document.documentElement.getAttribute("data-theme")).toBe(expectedThemeId);
+        expect(localStorage.getItem("elsa-studio-theme")).toBe(expectedThemeId);
+      });
+    }
+
+    it("restores a stored custom theme once the store loads", async () => {
+      await expectSettledTheme("two-mode", "two-mode");
+    });
+
+    it("restores a stored built-in theme", async () => {
+      await expectSettledTheme("drift", "drift");
+    });
+
+    it("falls back to the store default for a stored id the store no longer offers", async () => {
+      await expectSettledTheme("retired-theme", "atelier");
+    });
+
+    it("keeps the stored custom theme id when the store cannot be fetched", async () => {
+      localStorage.setItem("elsa-studio-theme", "two-mode");
+      const getJson = vi.fn(() => Promise.reject(new Error("offline")));
+      await render(contextServing(getJson));
+      await vi.waitFor(() => expect(getJson).toHaveBeenCalled());
+      await act(() => {});
+
+      expect(document.documentElement.getAttribute("data-theme")).toBe("meridian");
+      expect(localStorage.getItem("elsa-studio-theme")).toBe("two-mode");
+    });
+  });
+
   it("renders Meridian by default and applies its typography and shape", async () => {
     await render();
     const html = document.documentElement;
@@ -290,11 +349,11 @@ describe("ThemeProvider and ThemeSwitcher", () => {
   it("remembers the preferred mode across a theme that lacks it", async () => {
     await render();
     await act(() => api!.setMode("dim"));
-    await act(() => api!.setTheme("stone"));
+    await act(() => api!.setTheme("two-mode"));
 
     expect(api!.mode).toBe("dark");
     expect(api!.preferredMode).toBe("dim");
-    // Stone sets no typography, so Meridian's stack must not linger on <html>.
+    // The two-mode theme sets no typography, so Meridian's stack must not linger on <html>.
     expect(document.documentElement.style.getPropertyValue("--font-sans")).toBe("");
 
     await act(() => api!.setTheme("drift"));
@@ -318,7 +377,7 @@ describe("ThemeProvider and ThemeSwitcher", () => {
 
   it("disables the modes the current theme does not define", async () => {
     await render();
-    await act(() => api!.setTheme("stone"));
+    await act(() => api!.setTheme("two-mode"));
     await openThemeMenu();
     const [, , dim, highContrast] = modeItems();
 
@@ -387,7 +446,7 @@ describe("ThemeProvider and ThemeSwitcher", () => {
   it("offers no Dim option for a theme that only defines Light and Dark", async () => {
     await render();
     await act(() => api!.setMode("dim"));
-    await act(() => api!.setTheme("stone"));
+    await act(() => api!.setTheme("two-mode"));
 
     expect(quickLabels()).toEqual(["Light", "Dark"]);
     expect(quickOption("Dark").getAttribute("aria-checked")).toBe("true");
@@ -409,7 +468,7 @@ describe("ThemeProvider and ThemeSwitcher", () => {
     await act(() => api!.setTheme("atelier"));
     expect(document.documentElement.getAttribute("data-theme-layout")).toBe("editorial");
 
-    await act(() => api!.setTheme("stone"));
+    await act(() => api!.setTheme("two-mode"));
     expect(getStudioThemeLayout()).toBe("classic");
   });
 
@@ -431,7 +490,7 @@ describe("ThemeProvider and ThemeSwitcher", () => {
     expect(railCollapsed()).toBe(false);
   });
 
-  it.each(["meridian", "drift", "atelier", "stone"])("puts the navigation on top in %s when asked, leaving the theme's layout alone", async themeId => {
+  it.each(["meridian", "drift", "atelier", "two-mode"])("puts the navigation on top in %s when asked, leaving the theme's layout alone", async themeId => {
     await render();
     await act(() => api!.setTheme(themeId));
     const layout = getStudioThemeLayout();
