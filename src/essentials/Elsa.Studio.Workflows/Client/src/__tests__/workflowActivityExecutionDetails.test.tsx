@@ -9,8 +9,10 @@ import {
   WorkflowActivityExecutionDetails,
   WorkflowIncidentList,
   buildInstanceCanvas,
+  combineActivityExecutions,
   formatSnapshotPayload,
-  getIncidentStackTrace
+  getIncidentStackTrace,
+  loadActiveIncidentActivitySummaries
 } from "../workflow-editor/WorkflowInstances";
 import type { ScopeFrame } from "../workflowAdapter";
 import type {
@@ -950,7 +952,7 @@ describe("WorkflowIncidentList", () => {
     const stackTrace = "System.InvalidOperationException: No value\n   at Elsa.Tests.WriteLine.Execute()";
     const container = render(<WorkflowIncidentList incidents={[{ ...incident, metadata: { stackTrace } }]} />);
 
-    const details = container.querySelector("details");
+    const details = container.querySelector(".wf-incident-stacktrace");
     expect(details).not.toBeNull();
     expect(details?.textContent).toContain("System.InvalidOperationException: No value");
     expect(details?.querySelector("pre")?.textContent).toBe(stackTrace);
@@ -959,7 +961,8 @@ describe("WorkflowIncidentList", () => {
   it("does not render a stack trace disclosure when none is available", () => {
     const container = render(<WorkflowIncidentList incidents={[incident]} />);
 
-    expect(container.querySelector("details")).toBeNull();
+    expect(container.querySelector(".wf-incident-stacktrace")).toBeNull();
+    expect(container.querySelector(".wf-incident-technical-details")).not.toBeNull();
     expect(container.textContent).toContain("Input failed to evaluate.");
   });
 });
@@ -1055,6 +1058,46 @@ describe("buildInstanceCanvas", () => {
     const overlaid = descended.nodes.find(node => node.id === "wl-1")!;
     expect(overlaid.data.runtime?.status).toBe("Completed");
     expect(descended.nodes.find(node => node.id === "wl-2")!.data.runtime).toBeUndefined();
+  });
+
+  it("maps an exact activity inspection beyond the summary page onto its authored graph node", async () => {
+    const targetIncident = {
+      ...incident,
+      activityExecutionId: "older-execution",
+      executableNodeId: "compiled-wl-1"
+    };
+    const details: WorkflowInstanceDetails = {
+      ...instanceDetails([]),
+      instance: { workflowExecutionId: "wf-1" } as WorkflowInstanceDetails["instance"],
+      activityNextContinuationToken: "next-activity-page",
+      incidents: [targetIncident]
+    };
+    const exactInspection = {
+      ...inspection([]),
+      activityExecutionId: "older-execution",
+      workflowExecutionId: "wf-1",
+      executableNodeId: "compiled-wl-1",
+      authoredActivityId: "wl-1",
+      incidents: [{ ...incident, incidentId: targetIncident.incidentId }]
+    };
+    const loaded = await loadActiveIncidentActivitySummaries(details, async () => exactInspection);
+    const frames = enterForEachBody()!;
+    const descended = buildInstanceCanvas(
+      definitionVersion,
+      instanceCatalog,
+      details,
+      null,
+      frames,
+      () => {},
+      undefined,
+      combineActivityExecutions(details.activities, loaded.activities)
+    );
+
+    expect(loaded.incomplete).toBe(false);
+    expect(descended.nodes.find(node => node.id === "wl-1")?.data.runtime).toMatchObject({
+      primaryIncidentId: targetIncident.incidentId,
+      hasBlockingIncident: true
+    });
   });
 
   it("renders a projected Flowchart connection as a focusable, named run-canvas edge", () => {

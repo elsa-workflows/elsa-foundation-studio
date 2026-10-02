@@ -33,6 +33,7 @@ describe("workflow run history", () => {
     expect(input(container, "Workflow run definition").value).toBe("definition-1");
     expect(input(container, "Workflow run artifact").value).toBe("artifact-1");
     expect(container.textContent).toContain("Showing 1 of 42 matching runs");
+    expect(container.textContent).toContain("Current health unavailable");
     expect(getJson).toHaveBeenCalledWith(
       "/runtime/workflows/instances/page?definitionId=definition-1&artifactId=artifact-1&take=10");
 
@@ -88,6 +89,48 @@ describe("workflow run history", () => {
       throw new Error("Runtime unavailable");
     }), vi.fn());
     await waitFor(() => expect(errorContainer.querySelector("[role='alert']")?.textContent).toContain("Runtime unavailable"));
+  });
+
+  it("uses the advertised health filter and distinguishes current health from historical incident totals", async () => {
+    window.history.replaceState({}, "", "/workflows/instances?incidentHealth=blocking");
+    const getJson = vi.fn(async (url: string) => {
+      if (url === "/capabilities") return healthCapabilities;
+      return page("blocking-run", {
+        items: [{
+          ...page("blocking-run").items[0],
+          incidentCount: 4,
+          activeIncidentCount: 2,
+          blockingIncidentCount: 1
+        }]
+      });
+    });
+    const navigate = vi.fn();
+    const container = render(context(getJson), navigate);
+
+    await waitFor(() => expect(container.textContent).toContain("blocking-run"));
+    expect(container.textContent).toContain("Needs intervention");
+    expect(container.textContent).toContain("4 incidents");
+    expect(getJson.mock.calls.map(([url]) => url)).toContain("/runtime/workflows/instances/health?incidentHealth=blocking&take=25");
+
+    select(container.querySelector<HTMLSelectElement>("select[aria-label='Workflow run incident health']")!, "active");
+    click(buttonByText(container, "Apply filters"));
+    await waitFor(() => expect(navigate).toHaveBeenLastCalledWith(expect.stringContaining("incidentHealth=active")));
+    await waitFor(() => expect(getJson.mock.calls.map(([url]) => url)).toContain("/runtime/workflows/instances/health?incidentHealth=active&take=25"));
+  });
+
+  it("reports unsupported health filtering without querying an older server or claiming zero matches", async () => {
+    window.history.replaceState({}, "", "/workflows/instances?incidentHealth=active");
+    const getJson = vi.fn(async (url: string) => {
+      if (url === "/capabilities") return capabilities;
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    const container = render(context(getJson), vi.fn());
+
+    await waitFor(() => expect(container.textContent).toContain("Current incident health filtering is not available on this server"));
+    expect(container.textContent).not.toContain("No workflow runs match these filters");
+    expect(container.querySelector<HTMLSelectElement>("select[aria-label='Workflow run incident health']")?.disabled).toBe(true);
+    expect(getJson).toHaveBeenCalledTimes(1);
+    expect(getJson).toHaveBeenCalledWith("/capabilities");
   });
 });
 
@@ -152,6 +195,18 @@ const capabilities = {
     links: [
       { rel: "workflow-instances", href: "runtime/workflows/instances" },
       { rel: "workflow-instances-page", href: "runtime/workflows/instances/page" }
+    ]
+  }]
+};
+
+const healthCapabilities = {
+  capabilities: [{
+    id: "elsa.api.runtime",
+    contractVersion: "1",
+    links: [
+      { rel: "workflow-instances", href: "runtime/workflows/instances" },
+      { rel: "workflow-instances-page", href: "runtime/workflows/instances/page" },
+      { rel: "workflow-instances-health-filter", href: "runtime/workflows/instances/health" }
     ]
   }]
 };

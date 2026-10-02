@@ -156,6 +156,11 @@ export function useRunDetailLayout({ selectedActivityId }: { selectedActivityId?
     setInspectorCollapsed(current => !current);
   }, []);
 
+  const openInspector = useCallback(() => {
+    setInspectorCollapsed(false);
+    showInspectorForSelection();
+  }, [showInspectorForSelection]);
+
   const toggleInspectorMaximized = useCallback(() => {
     if (mode !== "desktop") return;
     setInspectorCollapsed(false);
@@ -249,6 +254,7 @@ export function useRunDetailLayout({ selectedActivityId }: { selectedActivityId?
     showInspectorForSelection,
     closeInspector,
     toggleInspectorCollapsed,
+    openInspector,
     toggleInspectorMaximized,
     startInspectorResize,
     handleInspectorResizeKeyDown

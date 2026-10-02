@@ -9,6 +9,7 @@ import {
   getActivityDesignerSupport,
   getActivityDisplay,
   getChildSlots,
+  isActiveIncident,
   normalizeActivityStructures,
   readStructureDesignFacet,
   replaceSlotActivities,
@@ -570,6 +571,127 @@ describe("workflow adapter", () => {
         }
       }
     });
+  });
+
+  it("excludes resolved and suppressed incidents from current node health while retaining history", () => {
+    const canvas = buildCanvas(firstScope(sequenceRoot([node("write-line-1")])), [writeLine], []);
+    const nonBlocking = { ...incident(), incidentId: "incident-nonblocking", isBlocking: false, status: "Open" };
+    const resolved = { ...incident(), incidentId: "incident-resolved", status: "Resolved" };
+    const suppressed = { ...incident(), incidentId: "incident-suppressed", status: "Suppressed" };
+    const nodes = applyRuntimeOverlays(canvas.nodes, [activityExecution()], [nonBlocking, resolved, suppressed]);
+
+    expect(nodes[0]?.data.runtime).toMatchObject({
+      incidentCount: 1,
+      historicalIncidentCount: 2,
+      hasBlockingIncident: false,
+      primaryIncidentId: "incident-nonblocking"
+    });
+    expect(isActiveIncident(resolved)).toBe(false);
+    expect(isActiveIncident(suppressed)).toBe(false);
+  });
+
+  it("marks a parent container with a contained issue while preserving its own lifecycle", () => {
+    const nestedSequence = sequenceNode("sequence-child", [node("write-line-child")]);
+    const catalog = [flowchartActivity, sequenceActivity, writeLine];
+    const outerCanvas = buildCanvas(firstScope(flowchartRoot([nestedSequence])), catalog, []);
+    const parentExecution = {
+      ...activityExecution(),
+      activityExecutionId: "sequence-execution",
+      executableNodeId: "sequence-child",
+      authoredActivityId: "sequence-child",
+      status: "Running",
+      incidentIds: [],
+      faultCount: 1
+    };
+    const childExecution = {
+      ...activityExecution(),
+      activityExecutionId: "write-line-execution",
+      executableNodeId: "compiled-write-line",
+      authoredActivityId: "write-line-child",
+      status: "Faulted",
+      incidentIds: ["child-incident"]
+    };
+    const childIncident = {
+      ...incident(),
+      incidentId: "child-incident",
+      activityExecutionId: "write-line-execution",
+      executableNodeId: "compiled-write-line"
+    };
+    const parent = applyRuntimeOverlays(outerCanvas.nodes, [parentExecution, childExecution], [childIncident], null, catalog)[0]!;
+
+    expect(parent.data.runtime).toMatchObject({
+      status: "Running",
+      faultCount: 1,
+      incidentCount: 0,
+      hasBlockingIncident: false,
+      containedIncidentCount: 1,
+      containedAffectedActivityCount: 1,
+      containedPrimaryIncidentId: "child-incident",
+      containsBlockingIncident: true
+    });
+
+    const legacyIncident = { ...childIncident, incidentId: "legacy-child-incident", activityExecutionId: null, executableNodeId: null };
+    const legacyChildExecution = { ...childExecution, incidentIds: ["legacy-child-incident"] };
+    const legacyParent = applyRuntimeOverlays(outerCanvas.nodes, [parentExecution, legacyChildExecution], [legacyIncident], null, catalog)[0]!;
+    expect(legacyParent.data.runtime).toMatchObject({
+      incidentCount: 0,
+      containedIncidentCount: 1,
+      containedAffectedActivityCount: 1,
+      containedPrimaryIncidentId: "legacy-child-incident"
+    });
+
+    const childScope = { owner: nestedSequence, slot: getChildSlots(nestedSequence, sequenceActivity)[0]! };
+    const childCanvas = buildCanvas(childScope, catalog, []);
+    const child = applyRuntimeOverlays(childCanvas.nodes, [parentExecution, childExecution], [childIncident], null, catalog)[0]!;
+    expect(child.data.runtime).toMatchObject({ incidentCount: 1, hasBlockingIncident: true, primaryIncidentId: "child-incident" });
+
+    const observedFaultedParent = applyRuntimeOverlays(
+      outerCanvas.nodes,
+      [{ ...parentExecution, status: "Faulted" }, childExecution],
+      [childIncident],
+      null,
+      catalog)[0]!;
+    expect(observedFaultedParent.data.runtime).toMatchObject({
+      status: "Faulted",
+      incidentCount: 0,
+      hasBlockingIncident: false,
+      containedPrimaryIncidentId: "child-incident"
+    });
+
+    const bpmnContainer = {
+      ...outerCanvas.nodes[0]!,
+      id: "bpmn-sequence-element",
+      data: { ...outerCanvas.nodes[0]!.data, runtimeNodeId: "sequence-child" }
+    };
+    const bpmnParent = applyRuntimeOverlays([bpmnContainer], [parentExecution, childExecution], [childIncident], null, catalog)[0]!;
+    expect(bpmnParent).toMatchObject({
+      id: "bpmn-sequence-element",
+      data: { runtime: { status: "Running", incidentCount: 0, containedIncidentCount: 1, containedPrimaryIncidentId: "child-incident" } }
+    });
+  });
+
+  it("translates BPMN element identity to its bound runtime activity identity", () => {
+    const canvas = buildCanvas(firstScope(sequenceRoot([node("write-line-1")])), [writeLine], []);
+    const bpmnNode = {
+      ...canvas.nodes[0]!,
+      id: "bpmn-task-element",
+      data: { ...canvas.nodes[0]!.data, runtimeNodeId: "write-line-1" }
+    };
+    const nodes = applyRuntimeOverlays([bpmnNode], [activityExecution()], [incident()], "incident-1");
+
+    expect(nodes[0]).toMatchObject({
+      id: "bpmn-task-element",
+      selected: true,
+      data: { runtimeNodeId: "write-line-1", runtime: { incidentCount: 1, primaryIncidentId: "incident-1" } }
+    });
+  });
+
+  it("does not attach a run-level incident to a graph node without structured association", () => {
+    const canvas = buildCanvas(firstScope(sequenceRoot([node("write-line-1")])), [writeLine], []);
+    const runLevelIncident = { ...incident(), activityExecutionId: null, executableNodeId: null, metadata: {} };
+    const nodes = applyRuntimeOverlays(canvas.nodes, [], [runLevelIncident]);
+
+    expect(nodes[0]?.data.runtime).toBeUndefined();
   });
 });
 

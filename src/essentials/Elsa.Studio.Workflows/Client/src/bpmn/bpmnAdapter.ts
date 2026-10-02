@@ -1,10 +1,10 @@
 import type { Edge, Node, XYPosition } from "@xyflow/react";
 import type { ActivityCatalogItem, ActivityNode, DesignMetadataRecord } from "../workflowTypes";
+import type { WorkflowRuntimeNodeOverlay } from "../workflowAdapter";
 import { collectActivityNodeIds, getActivityDisplay, getChildSlots, readStructureDesignFacet, resolveActivityIcon, type ActivityCatalogLookup, type CanvasScope, type ChildSlot, type WorkflowNodeIcon } from "../workflowAdapter";
 import {
   bpmnElementTypes,
   bpmnStructureKind,
-  isActivityBearingElementType,
   type BpmnElement,
   type BpmnSequenceFlow,
   type BpmnShapeDescriptor
@@ -27,6 +27,10 @@ export interface BpmnNodeData extends Record<string, unknown> {
   // (empty for events, gateways, unbound tasks, and tasks bound to a leaf). Slot entry addresses
   // `boundActivity.nodeId`, never the element id — see NodeSlotBadges.
   childSlots: ChildSlot[];
+  runtimeNodeId?: string;
+  runtime?: WorkflowRuntimeNodeOverlay;
+  onEnterSlot?(slot: ChildSlot): void;
+  onIncidentClick?(incidentId: string, targetNodeId?: string | null): void;
 }
 
 export interface BpmnCanvas {
@@ -104,6 +108,7 @@ function createBpmnNode(
       element,
       label: element.name?.trim() || boundActivity?.label || "",
       boundActivity,
+      runtimeNodeId: boundActivity?.nodeId ?? element.elementId,
       childSlots: boundActivityNode ? getChildSlots(boundActivityNode, catalogByVersion) : []
     }
   };

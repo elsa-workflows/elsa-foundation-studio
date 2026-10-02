@@ -1,9 +1,27 @@
-import { describe, expect, it } from "vitest";
+import React from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { flushSync } from "react-dom";
+import { createRoot, type Root } from "react-dom/client";
 import {
+  getIncidentRootCause,
+  combineActivityExecutions,
+  loadExactIncidentActivitySummary,
+  loadActiveIncidentActivitySummaries,
   projectPinnedExecutable,
-  resolveInitialActivityEvidenceId
+  resolveIncidentActivityAssociation,
+  resolveInitialActivityEvidenceId,
+  WorkflowIncidentList
 } from "../workflow-editor/WorkflowInstances";
-import type { WorkflowExecutableDetails, WorkflowInstanceDetails } from "../workflowTypes";
+import type { ActivityCatalogItem, ActivityExecutionStateSummary, IncidentStateSummary, WorkflowExecutableDetails, WorkflowInstanceDetails } from "../workflowTypes";
+
+let mounted: { root: Root; container: HTMLDivElement } | null = null;
+
+afterEach(() => {
+  if (!mounted) return;
+  flushSync(() => mounted!.root.unmount());
+  mounted.container.remove();
+  mounted = null;
+});
 
 describe("Runtime-pinned workflow instance rendering", () => {
   it("projects the executable pinned by artifactId without a Design version", () => {
@@ -80,4 +98,304 @@ describe("Runtime-pinned workflow instance rendering", () => {
     expect(resolveInitialActivityEvidenceId(activities, null))
       .toBeNull();
   });
+
+  it("uses an incident execution ID for exact occurrence and leaves node-only repeats unguessed", () => {
+    const first = activityExecution({ activityExecutionId: "repeat-1" });
+    const second = activityExecution({ activityExecutionId: "repeat-2" });
+    const direct = incident({ activityExecutionId: "repeat-2", executableNodeId: "exec-node" });
+    const nodeOnly = incident({ activityExecutionId: null, executableNodeId: "exec-node" });
+
+    expect(resolveIncidentActivityAssociation(direct, [first, second])).toEqual({
+      nodeId: "authored-node",
+      activityExecution: second
+    });
+    expect(resolveIncidentActivityAssociation(nodeOnly, [first, second])).toEqual({
+      nodeId: "authored-node",
+      activityExecution: null
+    });
+  });
+
+  it("loads an active exact execution beyond the summary page for occurrence and input navigation", async () => {
+    const first = activityExecution({ activityExecutionId: "repeat-1" });
+    const second = activityExecution({ activityExecutionId: "repeat-2" });
+    const targetIncident = incident({
+      activityExecutionId: "repeat-3",
+      executableNodeId: "compiled-node",
+      metadata: { "runtime.inputKey": "greeting" }
+    });
+    const details = {
+      instance: { workflowExecutionId: "workflow-execution-1" } as WorkflowInstanceDetails["instance"],
+      activities: [first, second],
+      activityNextContinuationToken: "next-activity-page",
+      incidents: [targetIncident]
+    } satisfies WorkflowInstanceDetails;
+    const fetchInspection = vi.fn(async (activityExecutionId: string) => ({
+      activityExecutionId,
+      workflowExecutionId: "workflow-execution-1",
+      executableNodeId: "compiled-node",
+      authoredActivityId: "authored-node",
+      activityType: "Example.Activity",
+      activityTypeVersion: "1.0.0",
+      status: "Faulted",
+      scheduledAt: "2026-10-01T12:00:00Z",
+      bookmarks: [],
+      incidents: [{
+        incidentId: "incident-1",
+        severity: "Error",
+        status: "Open",
+        resolutionAction: "None",
+        failureType: "ActivityInputFailed",
+        message: "Wrapper failure",
+        createdAt: "2026-10-01T12:00:00Z",
+        isBlocking: true,
+        metadata: {}
+      }],
+      metadata: {}
+    }));
+
+    const loaded = await loadActiveIncidentActivitySummaries(details, fetchInspection);
+    const associationActivities = combineActivityExecutions(details.activities, loaded.activities);
+    const association = resolveIncidentActivityAssociation(targetIncident, associationActivities);
+    expect(fetchInspection).toHaveBeenCalledTimes(1);
+    expect(fetchInspection).toHaveBeenCalledWith("repeat-3");
+    expect(loaded.incomplete).toBe(false);
+    expect(association).toMatchObject({ nodeId: "authored-node", activityExecution: { activityExecutionId: "repeat-3" } });
+
+    const onViewInput = vi.fn();
+    renderIncidentList([targetIncident], associationActivities, vi.fn(), onViewInput);
+    click(buttonByText(mounted!.container, "View input evidence"));
+    expect(onViewInput).toHaveBeenCalledWith(targetIncident);
+  });
+
+  it("leaves failed and wrong-identity exact activity evidence pending", async () => {
+    const details: WorkflowInstanceDetails = {
+      instance: { workflowExecutionId: "workflow-execution-1" } as WorkflowInstanceDetails["instance"],
+      activities: [],
+      incidents: [
+        incident({ incidentId: "wrong-id", activityExecutionId: "requested-wrong" }),
+        incident({ incidentId: "failed", activityExecutionId: "requested-failed" })
+      ]
+    };
+    const fetchInspection = vi.fn(async (activityExecutionId: string) => {
+      if (activityExecutionId === "requested-failed") throw new Error("Runtime unavailable");
+      return {
+        activityExecutionId: "different-execution",
+        workflowExecutionId: "workflow-execution-1",
+        executableNodeId: "compiled-node",
+        authoredActivityId: "authored-node",
+        activityType: "Example.Activity",
+        activityTypeVersion: "1.0.0",
+        status: "Faulted",
+        scheduledAt: "2026-10-01T12:00:00Z",
+        bookmarks: [],
+        incidents: [],
+        metadata: {}
+      };
+    });
+
+    const result = await loadActiveIncidentActivitySummaries(details, fetchInspection);
+
+    expect(result.activities).toEqual([]);
+    expect(result.incomplete).toBe(true);
+    expect(result.pendingActivityExecutionIds).toEqual(["requested-wrong", "requested-failed"]);
+  });
+
+  it("exposes another bounded association batch for active incidents beyond the first fifty", async () => {
+    const incidents = Array.from({ length: 51 }, (_, index) => incident({
+      incidentId: `incident-${index + 1}`,
+      activityExecutionId: `execution-${index + 1}`
+    }));
+    const details: WorkflowInstanceDetails = {
+      instance: { workflowExecutionId: "workflow-execution-1" } as WorkflowInstanceDetails["instance"],
+      activities: [],
+      incidents
+    };
+    const fetchInspection = vi.fn(async (activityExecutionId: string) => ({
+      activityExecutionId,
+      workflowExecutionId: "workflow-execution-1",
+      executableNodeId: `compiled-${activityExecutionId}`,
+      authoredActivityId: `authored-${activityExecutionId}`,
+      activityType: "Example.Activity",
+      activityTypeVersion: "1.0.0",
+      status: "Faulted",
+      scheduledAt: "2026-10-01T12:00:00Z",
+      bookmarks: [],
+      incidents: [],
+      metadata: {}
+    }));
+
+    const firstBatch = await loadActiveIncidentActivitySummaries(details, fetchInspection);
+    expect(firstBatch.activities).toHaveLength(50);
+    expect(firstBatch.pendingActivityExecutionIds).toEqual(["execution-51"]);
+    expect(firstBatch.incomplete).toBe(true);
+
+    const nextBatch = await loadActiveIncidentActivitySummaries(
+      { ...details, activities: combineActivityExecutions(details.activities, firstBatch.activities) },
+      fetchInspection,
+      firstBatch.pendingActivityExecutionIds);
+    expect(nextBatch.activities).toHaveLength(1);
+    expect(nextBatch.activities[0]?.activityExecutionId).toBe("execution-51");
+    expect(nextBatch.pendingActivityExecutionIds).toEqual([]);
+    expect(nextBatch.incomplete).toBe(false);
+  });
+
+  it("loads selected execution 51 on demand for exact input navigation", async () => {
+    const targetIncident = incident({
+      incidentId: "incident-51",
+      activityExecutionId: "execution-51",
+      executableNodeId: "compiled-51",
+      metadata: { "runtime.inputKey": "payload" }
+    });
+    const fetchInspection = vi.fn(async (activityExecutionId: string) => ({
+      activityExecutionId,
+      workflowExecutionId: "workflow-execution-1",
+      executableNodeId: "compiled-51",
+      authoredActivityId: "authored-51",
+      activityType: "Example.Activity",
+      activityTypeVersion: "1.0.0",
+      status: "Faulted",
+      scheduledAt: "2026-10-01T12:00:00Z",
+      bookmarks: [],
+      incidents: [],
+      metadata: {}
+    }));
+
+    const exact = await loadExactIncidentActivitySummary("workflow-execution-1", "execution-51", fetchInspection);
+    expect(fetchInspection).toHaveBeenCalledTimes(1);
+    expect(fetchInspection).toHaveBeenCalledWith("execution-51");
+    expect(exact).toMatchObject({ activityExecutionId: "execution-51", authoredActivityId: "authored-51" });
+    const activities = combineActivityExecutions([], exact ? [exact] : []);
+    expect(resolveIncidentActivityAssociation(targetIncident, activities)?.activityExecution?.activityExecutionId).toBe("execution-51");
+
+    const onViewInput = vi.fn();
+    renderIncidentList([targetIncident], activities, vi.fn(), onViewInput);
+    click(buttonByText(mounted!.container, "View input evidence"));
+    expect(onViewInput).toHaveBeenCalledWith(targetIncident);
+  });
+
+  it("keeps an unattributed incident run-level and prefers structured root-cause metadata", () => {
+    const runLevel = incident({
+      activityExecutionId: null,
+      executableNodeId: null,
+      metadata: { "runtime.faultInnerMessage": "The input expression referenced a missing variable." }
+    });
+
+    expect(resolveIncidentActivityAssociation(runLevel, [])).toBeNull();
+    expect(getIncidentRootCause(runLevel)).toBe("The input expression referenced a missing variable.");
+    expect(getIncidentRootCause(incident({ metadata: {} }))).toBe("Wrapper failure");
+  });
+
+  it("offers input navigation from structured incident metadata and labels run-level evidence honestly", () => {
+    const activity = activityExecution();
+    const affectedIncident = incident({
+      metadata: {
+        "runtime.inputKey": "greeting",
+        "runtime.inputFailureCode": "ExpressionEvaluationFailed",
+        "runtime.expressionLanguage": "JavaScript",
+        "runtime.inputEvaluationPhase": "Start",
+        "runtime.faultInnerMessage": "The variable was not found."
+      }
+    });
+    const onViewInput = vi.fn();
+    const onShowAffectedActivity = vi.fn();
+    const catalogItem = {
+      activityVersionId: "example-activity@1",
+      activityTypeKey: activity.activityType,
+      version: "1.0.0",
+      category: "Tests",
+      displayName: "Write Line",
+      executionType: "Activity",
+      inputs: [{ name: "greeting", typeName: "string", displayName: "Text" }],
+      outputs: []
+    } satisfies ActivityCatalogItem;
+    renderIncidentList([affectedIncident], [activity], onShowAffectedActivity, onViewInput, [catalogItem]);
+
+    const summary = mounted?.container.querySelector(".wf-instance-incident-summary");
+    expect(summary?.querySelector("strong")?.textContent).toBe("Write Line · Text input");
+    expect(summary?.textContent).toContain("The variable was not found.");
+    expect(summary?.textContent).toContain("Needs intervention · Open");
+    expect(summary?.textContent).toContain("Expression language · JavaScript");
+    expect(summary?.textContent).not.toContain("ExpressionEvaluationFailed");
+    expect(summary?.textContent).not.toContain("Start");
+    expect(mounted?.container.querySelector(".wf-incident-technical-details")?.textContent).toContain("ExpressionEvaluationFailed");
+    click(buttonByText(mounted!.container, "Show affected activity"));
+    click(buttonByText(mounted!.container, "View input evidence"));
+    expect(onShowAffectedActivity).toHaveBeenCalledWith(affectedIncident);
+    expect(onViewInput).toHaveBeenCalledWith(affectedIncident);
+
+    renderIncidentList([incident({ activityExecutionId: null, executableNodeId: null })], [], vi.fn(), vi.fn());
+    expect(mounted?.container.textContent).toContain("Run-level issue · no activity association was recorded.");
+    expect(buttonByText(mounted!.container, "Show affected activity")).toBeUndefined();
+  });
 });
+
+function renderIncidentList(
+  incidents: IncidentStateSummary[],
+  activities: ActivityExecutionStateSummary[],
+  onShowAffectedActivity: (incident: IncidentStateSummary) => void,
+  onViewInput: (incident: IncidentStateSummary) => void,
+  activityCatalog: ActivityCatalogItem[] = []
+) {
+  if (mounted) {
+    flushSync(() => mounted!.root.unmount());
+    mounted.container.remove();
+  }
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  mounted = { root, container };
+  flushSync(() => root.render(
+    <WorkflowIncidentList incidents={incidents} activities={activities} activityCatalog={activityCatalog} onShowAffectedActivity={onShowAffectedActivity} onViewInput={onViewInput} />
+  ));
+}
+
+function buttonByText(container: HTMLElement, text: string) {
+  return [...container.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === text);
+}
+
+function click(element: HTMLElement | undefined) {
+  flushSync(() => element?.click());
+}
+
+function activityExecution(overrides: Partial<ActivityExecutionStateSummary> = {}): ActivityExecutionStateSummary {
+  return {
+    activityExecutionId: "activity-execution-1",
+    workflowExecutionId: "workflow-execution-1",
+    executableNodeId: "exec-node",
+    authoredActivityId: "authored-node",
+    activityType: "Example.Activity",
+    activityTypeVersion: "1.0.0",
+    status: "Running",
+    scheduledAt: "2026-10-01T12:00:00Z",
+    startedAt: "2026-10-01T12:00:00Z",
+    completedAt: null,
+    parentActivityExecutionId: null,
+    branchId: null,
+    iterationId: null,
+    bookmarkIds: [],
+    incidentIds: ["incident-1"],
+    faultCount: 0,
+    aggregateFaultCount: 0,
+    metadata: {},
+    ...overrides
+  };
+}
+
+function incident(overrides: Partial<IncidentStateSummary> = {}): IncidentStateSummary {
+  return {
+    incidentId: "incident-1",
+    workflowExecutionId: "workflow-execution-1",
+    activityExecutionId: "activity-execution-1",
+    executableNodeId: "exec-node",
+    severity: "Error",
+    status: "Open",
+    resolutionAction: "None",
+    failureType: "ActivityInputFailed",
+    message: "Wrapper failure",
+    createdAt: "2026-10-01T12:00:00Z",
+    resolvedAt: null,
+    isBlocking: true,
+    metadata: {},
+    ...overrides
+  };
+}

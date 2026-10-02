@@ -771,12 +771,18 @@ export interface WorkflowInstanceSummary {
   sourceVersion?: string | null;
   activityCount: number;
   incidentCount: number;
+  /** Current unresolved incidents, excluding Resolved and Suppressed; absent on older Runtime hosts. */
+  activeIncidentCount?: number | null;
+  /** Current blocking incidents; absent on older Runtime hosts. */
+  blockingIncidentCount?: number | null;
 }
 
 export interface WorkflowInstanceDetails {
   instance: WorkflowInstanceSummary;
   activities: ActivityExecutionStateSummary[];
-  incidents: IncidentStateSummary[];
+  /** Present when Runtime bounded the activity summaries and another page is available. */
+  activityNextContinuationToken?: string | null;
+  incidents?: IncidentStateSummary[] | null;
 }
 
 export interface ActivityExecutionInspection {
@@ -1116,8 +1122,8 @@ export interface ActivityExecutionStateSummary {
   callStackDepth?: number | null;
   bookmarkIds: string[];
   incidentIds: string[];
-  faultCount: number;
-  aggregateFaultCount: number;
+  faultCount?: number;
+  aggregateFaultCount?: number;
   metadata: Record<string, string>;
 }
 
