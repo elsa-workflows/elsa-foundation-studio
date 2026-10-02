@@ -38,9 +38,9 @@ internal sealed class RecordingBackend : HttpMessageHandler
     /// transport failure.
     /// </summary>
     public static RecordingBackend For(HttpStatusCode? backendStatus) =>
-        backendStatus is null
-            ? Throwing(new HttpRequestException("connection refused"))
-            : RespondingWith(_ => new HttpResponseMessage(backendStatus.Value));
+        backendStatus is { } status
+            ? RespondingWith(_ => new HttpResponseMessage(status))
+            : Throwing(new HttpRequestException("connection refused"));
 
     public static HttpResponseMessage JsonOk(string json) => Json(HttpStatusCode.OK, json);
 

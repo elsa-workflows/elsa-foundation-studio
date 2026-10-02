@@ -173,7 +173,7 @@ public sealed class ExtensionBuilderOptionalityTests : IAsyncDisposable
     private static string[] ReadDefaultShellFeatures()
     {
         // Elsa.Studio.Web copies its shells.json to the output directory, so the test reads the shipped composition.
-        using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "shells.json")));
+        using var document = JsonDocument.Parse(File.ReadAllText(Path.Join(AppContext.BaseDirectory, "shells.json")));
         return document.RootElement
             .GetProperty("CShells").GetProperty("Shells").GetProperty("Default").GetProperty("Features")
             .EnumerateObject()
