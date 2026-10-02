@@ -251,6 +251,7 @@ textarea:focus {
   --auth-muted: oklch(0.5 0.025 255);
   --auth-track: oklch(0.3 0.03 250 / 0.1);
   --auth-mark-bg: oklch(0.97 0.012 245);
+  --auth-danger-text: oklch(0.5 0.2 27);
 
   position: relative;
   isolation: isolate;
@@ -277,6 +278,7 @@ textarea:focus {
     --auth-muted: oklch(0.72 0.02 245);
     --auth-track: oklch(0.95 0.02 240 / 0.12);
     --auth-mark-bg: oklch(0.27 0.025 255);
+    --auth-danger-text: oklch(0.78 0.15 27);
   }
 }
 
@@ -341,7 +343,7 @@ textarea:focus {
 }
 
 .studio-auth-card--error .studio-auth-title {
-  color: var(--studio-danger-fg, var(--studio-danger));
+  color: var(--auth-danger-text);
 }
 
 .studio-auth-copy {
@@ -385,8 +387,6 @@ textarea:focus {
 @media (prefers-reduced-motion: reduce) {
   .studio-auth-progress::after {
     transform: none;
-    width: 100%;
-    opacity: 0.55;
   }
 }
 
@@ -396,7 +396,7 @@ textarea:focus {
   padding: 0 var(--spacing-xl);
   border: 0;
   border-radius: 10px;
-  background: var(--primary);
+  background: color-mix(in oklch, var(--primary), black 30%);
   color: var(--primary-foreground);
   font: inherit;
   font-size: 14px;
@@ -414,7 +414,7 @@ textarea:focus {
 }
 
 .studio-auth-retry:focus-visible {
-  outline: 2px solid var(--studio-focus);
+  outline: 2px solid var(--ring);
   outline-offset: 3px;
 }
 
@@ -425,6 +425,7 @@ textarea:focus {
   }
 }
 
+/* The bar is 45% of the track wide: travelling from -100% of itself to the far edge is 100% / 45% + 100%. */
 @keyframes studio-auth-sweep {
   to {
     transform: translateX(322%);

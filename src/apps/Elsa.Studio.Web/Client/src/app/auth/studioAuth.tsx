@@ -92,13 +92,13 @@ export function createStudioEndpointContext(
 
 function StudioSignInStatus({ failed = false, onRetry }: { failed?: boolean; onRetry?: () => void }) {
   return (
-    <div
-      className="studio-shell studio-auth-signing-in"
-      role={failed ? "alert" : "status"}
-      aria-live={failed ? "assertive" : "polite"}
-      aria-busy={failed ? undefined : "true"}
-    >
-      <main className={`studio-auth-card${failed ? " studio-auth-card--error" : ""}`}>
+    <main className="studio-shell studio-auth-signing-in">
+      <div
+        className={`studio-auth-card${failed ? " studio-auth-card--error" : ""}`}
+        role={failed ? "alert" : "status"}
+        aria-live={failed ? "assertive" : "polite"}
+        aria-busy={failed ? undefined : "true"}
+      >
         <span className="studio-auth-brand-mark" aria-hidden="true">
           <img src={elsaLogo} alt="" />
         </span>
@@ -113,7 +113,7 @@ function StudioSignInStatus({ failed = false, onRetry }: { failed?: boolean; onR
         ) : (
           <span className="studio-auth-progress" aria-hidden="true" />
         )}
-      </main>
-    </div>
+      </div>
+    </main>
   );
 }
