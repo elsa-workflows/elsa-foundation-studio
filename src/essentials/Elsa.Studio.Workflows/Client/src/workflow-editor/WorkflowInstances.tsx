@@ -458,6 +458,7 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
   const [frames, setFrames] = useState<ScopeFrame[]>([]);
   const appliedInitialInspectorTab = useRef<InstanceInspectorTab | null>(null);
   const incidentNavigationRequest = useRef(0);
+  const loadGeneration = useRef(0);
   const associationActivities = combineActivityExecutions(data?.details.activities ?? [], data?.incidentActivityExecutions ?? []);
   const selectedActivity = findSelectedActivityExecution(associationActivities, selectedEvidenceId, data?.details.incidents ?? []);
   const {
@@ -490,6 +491,7 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
   const instanceAction = findAiAction(ai, "weaver.workflows.explain-instance");
 
   const load = useCallback(async () => {
+    const generation = ++loadGeneration.current;
     incidentNavigationRequest.current += 1;
     setIncidentAssociationMessage(null);
     setFocusedRuntimeNodeId(null);
@@ -524,6 +526,7 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
           }),
           async () => ({ supported: false, ...await loadActiveIncidentActivitySummaries(details, null) }))
       ]);
+      if (generation !== loadGeneration.current) return;
       const catalog = activityCatalog.activities;
       const executableGraph = executableResult.executable
         ? buildExecutableActivityGraph(
@@ -558,6 +561,7 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
         requestAnimationFrame(() => requestAnimationFrame(() => focusSelectedCanvasActivity(initialEvidence)));
       }
     } catch (e) {
+      if (generation !== loadGeneration.current) return;
       setData(null);
       setError(formatWorkflowRunLoadError(e, workflowExecutionId));
       setState("failed");
@@ -604,6 +608,7 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
   };
 
   const ensureIncidentActivityAssociation = useCallback(async (incident: IncidentStateSummary, isCurrent: () => boolean = () => true) => {
+    const generation = loadGeneration.current;
     const activities = combineActivityExecutions(data?.details.activities ?? [], data?.incidentActivityExecutions ?? []);
     const existing = resolveIncidentActivityAssociation(incident, activities, data?.executableGraph);
     if (existing?.activityExecution) {
@@ -634,7 +639,7 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
     }
     const exact = result.summary;
     if (isCurrent()) setIncidentAssociationMessage(null);
-    setData(current => current && current.details.instance.workflowExecutionId === workflowExecutionId
+    setData(current => current && generation === loadGeneration.current && current.details.instance.workflowExecutionId === workflowExecutionId
       ? { ...current, incidentActivityExecutions: combineActivityExecutions(current.incidentActivityExecutions, [exact]) }
       : current);
     return resolveIncidentActivityAssociation(incident, combineActivityExecutions(activities, [exact]), data?.executableGraph);
@@ -642,13 +647,14 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
 
   const loadMoreIncidentAssociations = async () => {
     if (!data?.incidentActivityLookupSupported || data.pendingIncidentActivityExecutionIds.length === 0) return;
+    const generation = loadGeneration.current;
     const workflowExecutionId = data.details.instance.workflowExecutionId;
     const pendingIds = data.pendingIncidentActivityExecutionIds;
     const result = await loadActiveIncidentActivitySummaries(
       { ...data.details, activities: associationActivities },
       activityExecutionId => getActivityExecutionInspection(context, workflowExecutionId, activityExecutionId),
       pendingIds);
-    setData(current => current && current.details.instance.workflowExecutionId === workflowExecutionId
+    setData(current => current && generation === loadGeneration.current && current.details.instance.workflowExecutionId === workflowExecutionId
       ? {
           ...current,
           incidentActivityExecutions: combineActivityExecutions(current.incidentActivityExecutions, result.activities),

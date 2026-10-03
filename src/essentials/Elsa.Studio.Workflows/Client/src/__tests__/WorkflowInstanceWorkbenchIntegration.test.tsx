@@ -313,6 +313,131 @@ describe("workflow run workbench incident navigation", () => {
     expect(container.textContent).not.toContain("You do not have permission to inspect this activity execution");
   });
 
+  it("does not cache an on-demand association after Refresh replaces the run snapshot", async () => {
+    const oldIncident = incident({ incidentId: "incident-old", failureType: "OldFailure" });
+    const refreshedIncident = incident({
+      incidentId: "incident-current",
+      failureType: "RefreshedFailure",
+      status: "Resolved",
+      isBlocking: false
+    });
+    const refreshedActivity = {
+      ...activityExecution(),
+      status: "Completed",
+      completedAt: "2026-10-01T12:01:00Z",
+      incidentCount: 0,
+      incidentIds: []
+    };
+    api.getWorkflowInstance
+      .mockResolvedValueOnce(workflowDetails({ activities: [], incidents: [oldIncident] }))
+      .mockResolvedValueOnce(workflowDetails({ activities: [refreshedActivity], incidents: [refreshedIncident] }));
+    api.supportsActivityExecutionInspection.mockReset()
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+    const lateLookup = deferred<ActivityExecutionInspection>();
+    api.getActivityExecutionInspection.mockReturnValue(lateLookup.promise);
+
+    renderWorkbench();
+    await vi.waitFor(() => expect(container.querySelector(".wf-instance-detail-workbench")).toBeTruthy());
+    click(buttonByText(container, "View input evidence"));
+    await vi.waitFor(() => expect(api.getActivityExecutionInspection).toHaveBeenCalledTimes(1));
+
+    click(buttonByText(container, "Refresh"));
+    await vi.waitFor(() => expect(api.getWorkflowInstance).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(container.textContent).toContain("RefreshedFailure"));
+    click(container.querySelector<HTMLButtonElement>("[data-tab-id='timeline']"));
+    click(container.querySelector<HTMLButtonElement>(".wf-timeline-entry"));
+    await vi.waitFor(() => expect(container.querySelector("[data-tab-id='activity']")?.getAttribute("aria-selected")).toBe("true"));
+    await vi.waitFor(() => expect(container.querySelector(".wf-activity-overview-status")?.textContent).toContain("Completed"));
+
+    lateLookup.resolve(activityInspection({
+      activityExecutionId: "execution-target",
+      status: "Faulted",
+      incidents: [oldIncident]
+    }));
+    await lateLookup.promise;
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(container.querySelector(".wf-activity-overview-status")?.textContent).toContain("Completed");
+    const incidentCount = [...container.querySelectorAll(".wf-activity-summary-grid dt")]
+      .find(label => label.textContent === "Incidents")?.nextElementSibling?.textContent;
+    expect(incidentCount).toBe("0");
+  });
+
+  it("does not cache a Load more response after Refresh replaces activity statuses", async () => {
+    const lastIndex = 50;
+    const executionId = (index: number) => `execution-${index}`;
+    const activityAt = (index: number, status: "Faulted" | "Completed") => ({
+      ...activityExecution(),
+      activityExecutionId: executionId(index),
+      executableNodeId: `compiled-${index}`,
+      authoredActivityId: `target-${index}`,
+      status,
+      scheduledAt: new Date(Date.UTC(2026, 9, 1, 12, 0, index)).toISOString(),
+      completedAt: status === "Completed" ? "2026-10-01T12:01:00Z" : null,
+      incidentCount: status === "Completed" ? 0 : 1,
+      incidentIds: status === "Completed" ? [] : [`incident-${index}`]
+    });
+    const incidentAt = (index: number, status: "Open" | "Resolved") => incident({
+      incidentId: `incident-${index}`,
+      activityExecutionId: executionId(index),
+      executableNodeId: `compiled-${index}`,
+      failureType: `${status}Failure-${index}`,
+      status,
+      isBlocking: status === "Open"
+    });
+    const initialIncidents = Array.from({ length: lastIndex + 1 }, (_, index) => incidentAt(index, "Open"));
+    const refreshedIncidents = Array.from({ length: lastIndex + 1 }, (_, index) => incidentAt(index, "Resolved"));
+    const refreshedActivities = Array.from({ length: lastIndex + 1 }, (_, index) => activityAt(index, "Completed"));
+    const lateLookup = deferred<ActivityExecutionInspection>();
+    api.getWorkflowInstance
+      .mockResolvedValueOnce(workflowDetails({ activities: [], incidents: initialIncidents }))
+      .mockResolvedValueOnce(workflowDetails({ activities: refreshedActivities, incidents: refreshedIncidents }));
+    api.supportsActivityExecutionInspection.mockResolvedValue(true);
+    api.getActivityExecutionInspection.mockImplementation((_context, workflowExecutionId: string, activityExecutionId: string) => {
+      const index = Number(activityExecutionId.replace("execution-", ""));
+      if (index === lastIndex) return lateLookup.promise;
+      return Promise.resolve(activityInspection({
+        activityExecutionId,
+        workflowExecutionId,
+        executableNodeId: `compiled-${index}`,
+        authoredActivityId: `target-${index}`,
+        incidents: [initialIncidents[index]!]
+      }));
+    });
+
+    renderWorkbench();
+    await vi.waitFor(() => expect(buttonByText(container, "Load more affected activities (1)")).toBeTruthy());
+    click(buttonByText(container, "Load more affected activities (1)"));
+    await vi.waitFor(() => expect(api.getActivityExecutionInspection).toHaveBeenCalledTimes(lastIndex + 1));
+
+    click(buttonByText(container, "Refresh"));
+    await vi.waitFor(() => expect(api.getWorkflowInstance).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(container.textContent).toContain("ResolvedFailure-50"));
+    click(container.querySelector<HTMLButtonElement>("[data-tab-id='timeline']"));
+    const timelineEntries = container.querySelectorAll<HTMLButtonElement>(".wf-timeline-entry");
+    expect(timelineEntries).toHaveLength(lastIndex + 1);
+    click(timelineEntries[lastIndex]);
+    await vi.waitFor(() => expect(container.querySelector("[data-tab-id='activity']")?.getAttribute("aria-selected")).toBe("true"));
+    await vi.waitFor(() => expect(container.textContent).toContain(executionId(lastIndex)));
+
+    lateLookup.resolve(activityInspection({
+      activityExecutionId: executionId(lastIndex),
+      executableNodeId: `compiled-${lastIndex}`,
+      authoredActivityId: `target-${lastIndex}`,
+      status: "Faulted",
+      incidents: [initialIncidents[lastIndex]!]
+    }));
+    await lateLookup.promise;
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(container.querySelector(".wf-activity-overview-status")?.textContent).toContain("Completed");
+    const incidentCount = [...container.querySelectorAll(".wf-activity-summary-grid dt")]
+      .find(label => label.textContent === "Incidents")?.nextElementSibling?.textContent;
+    expect(incidentCount).toBe("0");
+  });
+
   it("keeps the newest incident selected when exact activity lookups finish out of order", async () => {
     const firstIncident = incident({ incidentId: "incident-first", activityExecutionId: "execution-first", executableNodeId: "compiled-first", failureType: "FirstFailure", metadata: {} });
     const secondIncident = incident({ incidentId: "incident-second", activityExecutionId: "execution-second", executableNodeId: "compiled-second", failureType: "SecondFailure", metadata: {} });
