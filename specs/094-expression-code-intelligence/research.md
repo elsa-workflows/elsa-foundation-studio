@@ -196,3 +196,27 @@ for later M4 presentation without introducing an engine type into the public Stu
 
 These are implementation-candidate bounds. Final paired-host, review and acceptance evidence is
 recorded separately; this decision does not mark M3 complete or authorize delivery.
+
+## Decision 18: Liquid parser position gates rich, authorized help
+
+**Decision**: Studio Task#561 owns T033, based on reviewed Studio `8ab8fced` and Foundation
+`58238b86`. Keep the existing Liquid parser lazy and CodeEditor-owned. Expose only a small internal,
+engine-neutral cursor/range/snippet seam; no parser node type, dependency or field crosses the SDK
+or wire boundary. Use actual parser nodes and unfinished positions, bounded to 100,000 source
+characters with at most one source/tree cache per projection. Values, filters, tags and quiet
+regions have distinct help; string, raw and comment regions remain quiet.
+
+Liquid filter/tag metadata, docs and signatures come from the current policy-filtered rich catalog,
+not CodeMirror's built-in name lists or lossy direct completion/hover relations. Catalog failures,
+stale/canceled/auth/incompatible outcomes cannot resurrect cached authorized metadata. Preserve
+the general-purpose and JavaScript paths; generic local syntax editing remains available.
+
+Only a generic explicit interpolation snippet is permitted here. Signatures do not prove custom
+block grammar or paired closing tags, so those templates are not inferred. Unknown/dynamic or
+truncated shapes remain unknown; no guessed arity or closed-world diagnostic is added.
+
+**Consequences**: New Liquid projection/module tests and bounded shared parser/projection/range
+changes form one isolated worker slice. Root owns final integration and compact/expanded real-host
+proof, with controlled-removal or tests-first failures for adverse boundaries. M4 presentation and
+formatting remain separate. Final-head CI/review and manual acceptance are not inferred from the
+reviewed predecessor's local browser pass; all PRs stay draft and unmerged.
