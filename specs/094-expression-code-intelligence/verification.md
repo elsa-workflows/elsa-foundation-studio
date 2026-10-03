@@ -1,12 +1,26 @@
 # Expression Code Intelligence — Verification
 
-Last reconciled: 2026-10-02 for Program #2310 planning; current-head execution evidence pending
+Last reconciled: 2026-10-03 for Program #2310 partial implementation evidence; normal-host acceptance pending
 
 ## Program #2310 status
 
 The 2026-07-28 evidence below is retained as historical baseline evidence. It is not current-head normal-host proof. Studio PRs #546 and #545 now protect default-host feature discovery, but no persisted-workflow browser walkthrough has yet proved matching Studio/Foundation composition, actual location-scoped metadata, runtime-compatible JavaScript/Liquid help, the three themes, formatting, or the final accessibility/continuity matrix. T026-T038 remain open and all four program milestones remain incomplete.
 
 ## Passing evidence
+
+### Program #2310 implementation checkpoint, 2026-10-03
+
+On the uncommitted `claude/551-expression-normal-host` implementation over planning revision `24a937bf3f271a201fbbc18809a54dd9d15c4e51`:
+
+- `activityPropertyGroups.test.tsx`: 104 passing tests, including independent editor/provider readiness, authorization-session invalidation, stale-result rejection, and authored Liquid editing when its runtime descriptor is absent.
+- JavaScript and Liquid module tests: four passing tests each.
+- Workflows `typecheck`, scoped ESLint, and `git diff --check`: passed.
+- Normal-host lifecycle tests: five passed. Playwright collection: four real-host scenarios discovered, covering workflows, Activity Definitions, missing JavaScript editor, and missing Liquid provider.
+- The full serial client build (`pnpm -r --workspace-concurrency=1 build`) passed, including the Workflows production bundle check: entry 127.43 kB / 127.50 kB, Definitions total 375.87 kB / 384.50 kB, upgrades total 366.89 kB / 375.50 kB. The scoped Studio .NET build was still queued at this checkpoint.
+
+These are partial local checks, not T029 acceptance. No current-head normal-host browser case or current-head manual assistive-technology run has passed yet. The coordinated Foundation persisted-draft case timed out in Workbench readiness before its expression assertions under shared-machine load above 700; its negative missing-Liquid host case passed on the earlier compiled fixture. All milestone checkboxes remain open.
+
+### Historical baseline, 2026-07-28
 
 | Area | Evidence |
 |---|---|

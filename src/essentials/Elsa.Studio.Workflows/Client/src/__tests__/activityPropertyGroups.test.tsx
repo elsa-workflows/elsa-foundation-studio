@@ -2,12 +2,16 @@ import React from "react";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
+import { authSessionEndedEvent, authSessionStartedEvent } from "@elsa-workflows/studio-sdk";
 import type {
   StudioActivityDescriptor,
   StudioActivityInputDescriptor,
   StudioActivityPropertyEditorContribution,
   StudioExpressionDescriptor,
-  StudioExpressionEditorContribution
+  StudioExpressionEditorContribution,
+  StudioExpressionToolingClient,
+  StudioExpressionToolingDescriptor,
+  StudioExpressionToolingResult
 } from "@elsa-workflows/studio-sdk";
 import { ActivityPropertiesPanel } from "../ActivityPropertiesPanel";
 import { createObjectExpressionEditorContribution } from "../objectExpressionEditor";
@@ -45,6 +49,7 @@ function renderPanel(
     editors?: StudioActivityPropertyEditorContribution[];
     expressionEditors?: StudioExpressionEditorContribution[];
     expressionDescriptors?: StudioExpressionDescriptor[];
+    expressionTooling?: StudioExpressionToolingClient;
     expressionDescriptorStatus?: "loading" | "ready" | "failed";
     draftId?: string;
     onRetryDescriptors?(): void;
@@ -77,6 +82,7 @@ function renderPanel(
         descriptor={descriptor}
         editors={options.editors ?? []}
         expressionEditors={options.expressionEditors ?? []}
+        expressionTooling={options.expressionTooling}
         expressionDescriptors={options.expressionDescriptors ?? backendExpressionDescriptors}
         expressionDescriptorStatus={options.expressionDescriptorStatus ?? "ready"}
         onRetryDescriptors={options.onRetryDescriptors}
@@ -111,7 +117,145 @@ function propertyLabels(container: HTMLElement) {
   return [...container.querySelectorAll(".wf-property-row-header label")].map(label => label.textContent);
 }
 
+function readinessTooling(expressionTypes: string[] = [], state = "ready") {
+  return {
+    describe: vi.fn(async () => ({ state, contractVersion: 1, expressionType: "",
+      data: expressionTypes.map(expressionType => ({ expressionType })) }))
+  } as unknown as StudioExpressionToolingClient;
+}
+
 describe("activity property organization", () => {
+  it("keeps generic text editing available when an expression editor adapter is missing", async () => {
+    const changed = vi.fn();
+    const tooling = readinessTooling(["JavaScript"]);
+    const container = renderPanel([
+      input("Message", { isWrapped: true, defaultSyntax: "JavaScript" })
+    ], {
+      expressionTooling: tooling,
+      onChange: changed,
+      activity: activity({ message: { typeName: "System.String", expression: { type: "JavaScript", value: "return 42;" } } })
+    });
+
+    await vi.waitFor(() => expect(container.querySelector("[data-provider-readiness='ready']")).not.toBeNull());
+    const genericInput = container.querySelector<HTMLInputElement>("input[aria-label='Message expression']")!;
+    expect(genericInput.value).toBe("return 42;");
+    expect(container.querySelector("[data-editor-readiness='missing']")?.textContent).toContain("generic text editing remains available");
+    changeTextField(genericInput, "return 43;");
+    expect(changed.mock.calls.at(-1)?.[0].message.expression).toEqual({ type: "JavaScript", value: "return 43;" });
+    expect(tooling.describe).toHaveBeenCalledOnce();
+  });
+
+  it("reports editor and provider readiness independently for JavaScript and Liquid", async () => {
+    const tooling = readinessTooling(["Liquid"]);
+    const javascriptEditor: StudioExpressionEditorContribution = {
+      id: "test.javascript",
+      supports: context => context.syntax === "JavaScript",
+      surfaces: { inline: ({ value }) => <input aria-label="JavaScript rich editor" value={String(value ?? "")} readOnly /> }
+    };
+    const container = renderPanel([
+      input("JavaScriptMessage", { isWrapped: true, defaultSyntax: "JavaScript" }),
+      input("LiquidMessage", { isWrapped: true, defaultSyntax: "Liquid" })
+    ], {
+      expressionTooling: tooling,
+      expressionEditors: [javascriptEditor],
+      activity: activity({
+        javascriptMessage: { typeName: "System.String", expression: { type: "JavaScript", value: "return 42;" } },
+        liquidMessage: { typeName: "System.String", expression: { type: "Liquid", value: "{{ name }}" } }
+      })
+    });
+
+    await vi.waitFor(() => expect(container.querySelectorAll("[data-provider-readiness='ready']")).toHaveLength(1));
+    expect(container.querySelector("[data-property-name='JavaScriptMessage'] [data-editor-readiness='ready']")).not.toBeNull();
+    expect(container.querySelector("[data-property-name='JavaScriptMessage'] [data-provider-readiness='missing']")).not.toBeNull();
+    expect(container.querySelector("[data-property-name='LiquidMessage'] [data-editor-readiness='missing']")).not.toBeNull();
+    expect(container.querySelector("[data-property-name='LiquidMessage'] [data-provider-readiness='ready']")).not.toBeNull();
+  });
+
+  it("preserves rich inline and expanded text editing when its runtime descriptor is absent", async () => {
+    const changed = vi.fn();
+    const liquidEditor: StudioExpressionEditorContribution = {
+      id: "test.liquid",
+      supports: context => context.syntax === "Liquid",
+      metadata: { editingMode: "text" },
+      surfaces: {
+        inline: ({ value, onChange }) => <input aria-label="Liquid rich input" value={String(value ?? "")}
+          onChange={event => onChange(event.target.value)} />,
+        expanded: ({ value, onChange }) => <textarea aria-label="Liquid rich expanded" value={String(value ?? "")}
+          onChange={event => onChange(event.target.value)} />
+      }
+    };
+    const container = renderPanel([input("Template", { isWrapped: true })], {
+      expressionDescriptors: backendExpressionDescriptors.filter(descriptor => descriptor.type !== "Liquid"),
+      expressionEditors: [liquidEditor], expressionTooling: readinessTooling(["JavaScript"]), onChange: changed,
+      activity: activity({ template: { typeName: "System.String", expression: { type: "Liquid", value: "{{ customerName }}" } } })
+    });
+    await vi.waitFor(() => expect(container.querySelector("[data-provider-readiness='missing']")).not.toBeNull());
+    expect(container.querySelector("[data-editor-readiness='ready']")).not.toBeNull();
+    const compact = container.querySelector<HTMLInputElement>("input[aria-label='Liquid rich input']")!;
+    expect(compact.value).toBe("{{ customerName }}");
+    changeTextField(compact, "{{ customerName | upcase }}");
+    expect(changed.mock.calls.at(-1)?.[0].template.expression).toEqual({ type: "Liquid", value: "{{ customerName | upcase }}" });
+    clickButton(container, "Open expanded Template editor");
+    const expanded = container.querySelector<HTMLTextAreaElement>("textarea[aria-label='Liquid rich expanded']")!;
+    expect(expanded.value).toBe("{{ customerName | upcase }}");
+    expect(container.querySelector("[role='dialog'] [data-provider-readiness='missing']")).not.toBeNull();
+    expect(container.querySelector("[role='dialog'] [data-editor-readiness='ready']")).not.toBeNull();
+  });
+
+  it.each(["unavailable", "unauthorized"] as const)("keeps the text field editable when the runtime provider is %s", async state => {
+    const tooling = readinessTooling([], state);
+    const container = renderPanel([
+      input("Message", { isWrapped: true, defaultSyntax: "JavaScript" })
+    ], {
+      expressionTooling: tooling,
+      activity: activity({ message: { typeName: "System.String", expression: { type: "JavaScript", value: "return 42;" } } })
+    });
+
+    await vi.waitFor(() => expect(container.querySelector(`[data-provider-readiness='${state}']`)).not.toBeNull());
+    expect(container.querySelector<HTMLInputElement>("input[aria-label='Message expression']")?.value).toBe("return 42;");
+    expect(container.querySelector("[data-editor-readiness='missing']")).not.toBeNull();
+  });
+
+  it("ignores a stale describe result after replacing the host tooling client", async () => {
+    const pendingFirstResults: Array<(result: StudioExpressionToolingResult<StudioExpressionToolingDescriptor[]>) => void> = [];
+    const firstTooling = {
+      describe: vi.fn((_signal?: AbortSignal) => new Promise<StudioExpressionToolingResult<StudioExpressionToolingDescriptor[]>>(resolve => {
+        pendingFirstResults.push(resolve);
+      }))
+    } as unknown as StudioExpressionToolingClient;
+    const nextTooling = readinessTooling(["JavaScript"]);
+    const options = { expressionTooling: firstTooling };
+    const container = renderPanel([
+      input("Message", { isWrapped: true, defaultSyntax: "JavaScript" })
+    ], options);
+    await vi.waitFor(() => expect(firstTooling.describe).toHaveBeenCalledOnce());
+
+    options.expressionTooling = nextTooling;
+    replaceActivity(activity({ message: { typeName: "System.String", expression: { type: "JavaScript", value: "return 42;" } } }));
+    await vi.waitFor(() => expect(container.querySelector("[data-provider-readiness='ready']")).not.toBeNull());
+    pendingFirstResults[0]({ state: "unavailable", contractVersion: 1, expressionType: "" });
+    await Promise.resolve();
+
+    expect(container.querySelector("[data-provider-readiness='ready']")).not.toBeNull();
+    expect(container.querySelector("[data-provider-readiness='unavailable']")).toBeNull();
+  });
+
+  it("clears ready provider status when the authenticated session ends without disabling editing", async () => {
+    const tooling = readinessTooling(["JavaScript"]);
+    const container = renderPanel([input("Message", { isWrapped: true, defaultSyntax: "JavaScript" })], {
+      expressionTooling: tooling,
+      activity: activity({ message: { typeName: "System.String", expression: { type: "JavaScript", value: "return 42;" } } })
+    });
+    await vi.waitFor(() => expect(container.querySelector("[data-provider-readiness='ready']")).not.toBeNull());
+    onTestFinished(() => { window.dispatchEvent(new Event(authSessionStartedEvent)); });
+    flushSync(() => window.dispatchEvent(new Event(authSessionEndedEvent)));
+    expect(container.querySelector("[data-provider-readiness='ready']")).toBeNull();
+    expect(container.querySelector("[data-provider-readiness='unauthorized']")).not.toBeNull();
+    const genericInput = container.querySelector<HTMLInputElement>("input[aria-label='Message expression']")!;
+    expect(genericInput.disabled).toBe(false);
+    expect(genericInput.value).toBe("return 42;");
+  });
+
   it("does not invent expression types when the backend returns none", () => {
     const container = renderPanel([
       input("Message", { isWrapped: true, defaultSyntax: "Literal" })
@@ -674,7 +818,7 @@ describe("activity property organization", () => {
     expect(expanded?.value).toContain('"first": 1');
     expect(container.querySelector("[role='dialog']")).not.toBeNull();
 
-    changeTextArea(expanded!, '{"first":');
+    changeTextField(expanded!, '{"first":');
     expect(container.querySelector(".studio-code-editor-diagnostics")?.textContent).toContain("Invalid JSON");
     expect(changes).toHaveLength(0);
     flushSync(() => container.querySelector<HTMLButtonElement>("button[aria-label='Close Payload editor']")?.click());
@@ -1181,9 +1325,10 @@ async function nextFrame() {
   await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
 }
 
-function changeTextArea(input: HTMLTextAreaElement, value: string) {
+function changeTextField(input: HTMLInputElement | HTMLTextAreaElement, value: string) {
   flushSync(() => {
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(input, value);
+    const prototype = input instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
+    Object.getOwnPropertyDescriptor(prototype, "value")?.set?.call(input, value);
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
 }
