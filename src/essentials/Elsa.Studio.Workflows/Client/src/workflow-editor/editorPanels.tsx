@@ -118,7 +118,7 @@ export function TestRunStatus({
 export function WorkflowRuntimePanel({ testRun, publishedEquivalent, onOpenRun }: {
   testRun: WorkflowTestRunView | null;
   publishedEquivalent?: WorkflowExecutableSummary | null;
-  onOpenRun(workflowExecutionId: string): void;
+  onOpenRun(workflowExecutionId: string, initialTab?: "issues"): void;
 }) {
   if (!testRun) {
     return (
@@ -155,7 +155,7 @@ export function WorkflowRuntimePanel({ testRun, publishedEquivalent, onOpenRun }
             <span>{testRun.incidentCount != null && testRun.incidentCount > 0
               ? `The test run was accepted and recorded ${testRun.incidentCount} incident${testRun.incidentCount === 1 ? "" : "s"}. Review the incident details on the linked Run.`
               : "The test run was accepted with a runtime issue. Incident details may be unavailable in this response; review the linked Run."}</span>
-            {workflowExecutionId ? <button type="button" onClick={() => onOpenRun(workflowExecutionId)}>Review incidents</button> : null}
+            {workflowExecutionId ? <button type="button" onClick={() => onOpenRun(workflowExecutionId, "issues")}>Review incidents</button> : null}
           </div>
         ) : null}
         {equivalent ? (

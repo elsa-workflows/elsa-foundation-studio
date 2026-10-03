@@ -15,36 +15,69 @@ export function applyRuntimeOverlays<TNodeData extends Record<string, unknown>>(
   activityCatalog: ActivityCatalogItem[] = []
 ): Node<TNodeData & { runtime?: WorkflowRuntimeNodeOverlay }>[] {
   type NodeWithRuntime = Node<TNodeData & { runtime?: WorkflowRuntimeNodeOverlay }>;
+  const catalogByVersion = new Map(activityCatalog.map(activity => [activity.activityVersionId, activity]));
+  const representedNodeIds = new Set<string>();
+  const containedNodeIdsByNode = new Map<Node<TNodeData>, Set<string>>();
+  for (const node of nodes) {
+    const runtimeNodeId = typeof node.data.runtimeNodeId === "string" ? node.data.runtimeNodeId : node.id;
+    representedNodeIds.add(runtimeNodeId);
+    const childSlots = Array.isArray(node.data.childSlots) ? node.data.childSlots as ChildSlot[] : [];
+    const containedNodeIds = collectContainedActivityNodeIds(childSlots, catalogByVersion);
+    containedNodeIds.delete(runtimeNodeId);
+    containedNodeIdsByNode.set(node, containedNodeIds);
+    for (const nodeId of containedNodeIds) representedNodeIds.add(nodeId);
+  }
   const activityByExecutionId = new Map(activities.map(activity => [activity.activityExecutionId, activity]));
   const activitiesByNodeId = new Map<string, ActivityExecutionStateSummary[]>();
+  const activitiesByAuthoredId = new Map<string, ActivityExecutionStateSummary[]>();
+  const activitiesByExecutableNodeId = new Map<string, ActivityExecutionStateSummary[]>();
   for (const activity of activities) {
+    const authoredId = activity.authoredActivityId?.trim();
+    const executableId = activity.executableNodeId?.trim();
+    if (authoredId) {
+      activitiesByAuthoredId.set(authoredId, [...(activitiesByAuthoredId.get(authoredId) ?? []), activity]);
+    }
+    if (executableId) {
+      activitiesByExecutableNodeId.set(executableId, [...(activitiesByExecutableNodeId.get(executableId) ?? []), activity]);
+    }
     for (const nodeId of new Set([activity.authoredActivityId, activity.executableNodeId].filter(Boolean))) {
       const bucket = activitiesByNodeId.get(nodeId!) ?? [];
       bucket.push(activity);
       activitiesByNodeId.set(nodeId!, bucket);
     }
   }
-  const catalogByVersion = new Map(activityCatalog.map(activity => [activity.activityVersionId, activity]));
+  const canvasNodeIdForActivity = (activity: ActivityExecutionStateSummary) => {
+    const authoredId = activity.authoredActivityId?.trim();
+    const executableId = activity.executableNodeId?.trim();
+    const authoredPlacements = authoredId ? activitiesByAuthoredId.get(authoredId) ?? [] : [];
+    const authoredIdIsAmbiguous = new Set(authoredPlacements.map(placement => placement.executableNodeId)).size > 1;
+    if (authoredIdIsAmbiguous && executableId && representedNodeIds.has(executableId)) return executableId;
+    if (authoredId && representedNodeIds.has(authoredId)) return authoredId;
+    if (executableId && representedNodeIds.has(executableId)) return executableId;
+    return authoredId || executableId || "";
+  };
   const incidentsByNodeId = groupBy(incidents, incident => {
     const activityExecutionId = incident.activityExecutionId?.trim() || incident.metadata?.["runtime.activityExecutionId"]?.trim();
     const associatedActivity = activityExecutionId ? activityByExecutionId.get(activityExecutionId) : undefined;
-    if (associatedActivity) return associatedActivity.authoredActivityId || associatedActivity.executableNodeId;
+    if (associatedActivity) return canvasNodeIdForActivity(associatedActivity);
     const activitiesWithIncident = activityExecutionId ? [] : activities.filter(activity => activity.incidentIds.includes(incident.incidentId));
-    const relatedNodeIds = [...new Set(activitiesWithIncident.map(activity => activity.authoredActivityId || activity.executableNodeId).filter(Boolean))];
+    const relatedNodeIds = [...new Set(activitiesWithIncident.map(canvasNodeIdForActivity).filter(Boolean))];
     if (relatedNodeIds.length === 1) return relatedNodeIds[0]!;
     const executableNodeId = incident.executableNodeId?.trim() || incident.metadata?.["runtime.executableNodeId"]?.trim();
     if (!executableNodeId) return "";
-    const byExecutableId = activitiesByNodeId.get(executableNodeId)?.[0];
-    return byExecutableId?.authoredActivityId || executableNodeId;
+    const byExecutableId = activitiesByExecutableNodeId.get(executableNodeId)?.[0];
+    if (byExecutableId) return canvasNodeIdForActivity(byExecutableId);
+    const authoredPlacements = activitiesByAuthoredId.get(executableNodeId) ?? [];
+    if (new Set(authoredPlacements.map(activity => activity.executableNodeId)).size > 1) return "";
+    const byNodeId = activitiesByNodeId.get(executableNodeId)?.find(activity => activity.authoredActivityId === executableNodeId);
+    return byNodeId ? canvasNodeIdForActivity(byNodeId) : executableNodeId;
   });
 
   return nodes.map(node => {
     const runtimeNodeId = typeof node.data.runtimeNodeId === "string" ? node.data.runtimeNodeId : node.id;
     const nodeActivities = activitiesByNodeId.get(runtimeNodeId) ?? [];
     const nodeIncidents = incidentsByNodeId.get(runtimeNodeId) ?? [];
-    const childSlots = Array.isArray(node.data.childSlots) ? node.data.childSlots as ChildSlot[] : [];
-    const containedNodeIds = collectContainedActivityNodeIds(childSlots, catalogByVersion);
-    containedNodeIds.delete(runtimeNodeId);
+    const containedNodeIds = containedNodeIdsByNode.get(node) ?? new Set<string>();
     const containedAffectedNodeIds = [...containedNodeIds].filter(nodeId =>
       (incidentsByNodeId.get(nodeId) ?? []).some(isActiveIncident));
     const containedIncidents = containedAffectedNodeIds

@@ -21,7 +21,8 @@ import {
   type ScopeFrame
 } from "../workflowAdapter";
 import { applyRuntimeOverlays, isActiveIncident } from "../workflowRuntimeOverlays";
-import type { ActivityCatalogItem, ActivityNode } from "../workflowTypes";
+import { buildExecutableActivityGraph } from "../executableGraph";
+import type { ActivityCatalogItem, ActivityExecutionStateSummary, ActivityNode, IncidentStateSummary, WorkflowExecutableNode } from "../workflowTypes";
 import { decorateWorkflowCanvasElements } from "../workflow-editor/workflowAccessibility";
 import { writeLine } from "./fixtures";
 
@@ -572,6 +573,73 @@ describe("workflow adapter", () => {
     });
   });
 
+  it("groups repeated authored placements by the executable identity present on the canvas", () => {
+    const canvas = buildCanvas(firstScope(sequenceRoot([node("shared-node")])), [writeLine], []);
+    const templateNode = canvas.nodes[0]!;
+    const repeatedNodes = ["placement-1", "placement-2"].map(executableNodeId => ({
+      ...templateNode,
+      id: executableNodeId,
+      data: { ...templateNode.data, runtimeNodeId: executableNodeId }
+    }));
+    const first = activityExecution({
+      activityExecutionId: "execution-1",
+      authoredActivityId: "shared-node",
+      executableNodeId: "placement-1",
+      incidentIds: ["incident-execution-1", "incident-relation-1"]
+    });
+    const second = activityExecution({
+      activityExecutionId: "execution-2",
+      authoredActivityId: "shared-node",
+      executableNodeId: "placement-2",
+      incidentIds: ["incident-execution-2", "incident-relation-2"]
+    });
+    const exactIncidents = [
+      incident({ incidentId: "incident-execution-1", activityExecutionId: "execution-1", executableNodeId: "placement-1" }),
+      incident({ incidentId: "incident-execution-2", activityExecutionId: "execution-2", executableNodeId: "placement-2" })
+    ];
+    const exactNodes = applyRuntimeOverlays(repeatedNodes, [first, second], exactIncidents);
+    expect(exactNodes.map(node => [node.id, node.data.runtime?.primaryIncidentId])).toEqual([
+      ["placement-1", "incident-execution-1"],
+      ["placement-2", "incident-execution-2"]
+    ]);
+
+    const relationIncidents = [
+      incident({ incidentId: "incident-relation-1", activityExecutionId: null, executableNodeId: null }),
+      incident({ incidentId: "incident-relation-2", activityExecutionId: null, executableNodeId: null })
+    ];
+    const relationNodes = applyRuntimeOverlays(repeatedNodes, [first, second], relationIncidents);
+    expect(relationNodes.map(node => node.data.runtime?.primaryIncidentId)).toEqual([
+      "incident-relation-1",
+      "incident-relation-2"
+    ]);
+
+    const explicitNodeIncident = incident({
+      incidentId: "incident-node-only",
+      activityExecutionId: null,
+      executableNodeId: "placement-2"
+    });
+    const explicitNodeNodes = applyRuntimeOverlays(repeatedNodes, [
+      { ...first, incidentIds: [] },
+      { ...second, incidentIds: [] }
+    ], [explicitNodeIncident]);
+    expect(explicitNodeNodes.map(node => node.data.runtime?.primaryIncidentId)).toEqual([
+      undefined,
+      "incident-node-only"
+    ]);
+
+    const ambiguousAuthoredIncident = incident({
+      incidentId: "incident-ambiguous-authored",
+      activityExecutionId: null,
+      executableNodeId: "shared-node"
+    });
+    const withoutRelations = [
+      { ...first, incidentIds: [] },
+      { ...second, incidentIds: [] }
+    ];
+    const ambiguousNodes = applyRuntimeOverlays(repeatedNodes, withoutRelations, [ambiguousAuthoredIncident]);
+    expect(ambiguousNodes.map(node => node.data.runtime?.primaryIncidentId)).toEqual([undefined, undefined]);
+  });
+
   it("excludes resolved and suppressed incidents from current node health while retaining history", () => {
     const canvas = buildCanvas(firstScope(sequenceRoot([node("write-line-1")])), [writeLine], []);
     const nonBlocking = { ...incident(), incidentId: "incident-nonblocking", isBlocking: false, status: "Open" };
@@ -666,6 +734,66 @@ describe("workflow adapter", () => {
     expect(bpmnParent).toMatchObject({
       id: "bpmn-sequence-element",
       data: { runtime: { status: "Running", incidentCount: 0, containedIncidentCount: 1, containedPrimaryIncidentId: "child-incident" } }
+    });
+  });
+
+  it("keeps incident cues on a parent when repeated authored children use executable IDs", () => {
+    const child = (executableNodeId: string): WorkflowExecutableNode => ({
+      executableNodeId,
+      authoredActivityId: "shared-child",
+      activityType: writeLine.activityTypeKey,
+      activityTypeVersion: writeLine.version,
+      inputBindings: [],
+      childSlots: []
+    });
+    const parent = (executableNodeId: string, authoredActivityId: string, activities: WorkflowExecutableNode[]): WorkflowExecutableNode => ({
+      executableNodeId,
+      authoredActivityId,
+      activityType: sequenceActivity.activityTypeKey,
+      activityTypeVersion: sequenceActivity.version,
+      inputBindings: [],
+      childSlots: [{ name: "Sequence.Activities", activities }]
+    });
+    const graph = buildExecutableActivityGraph(parent("root-executable", "root-authored", [
+      parent("container-executable", "container-authored", [child("placement-1"), child("placement-2")])
+    ]), [sequenceActivity, writeLine]);
+    const canvas = buildCanvas(firstScope(graph.root), [sequenceActivity, writeLine], []);
+    const executions = [
+      activityExecution({
+        activityExecutionId: "container-execution",
+        executableNodeId: "container-executable",
+        authoredActivityId: "container-authored",
+        status: "Running",
+        incidentIds: [],
+        faultCount: 0
+      }),
+      activityExecution({
+        activityExecutionId: "child-execution-1",
+        executableNodeId: "placement-1",
+        authoredActivityId: "shared-child",
+        incidentIds: ["nested-incident"]
+      }),
+      activityExecution({
+        activityExecutionId: "child-execution-2",
+        executableNodeId: "placement-2",
+        authoredActivityId: "shared-child",
+        incidentIds: []
+      })
+    ];
+    const nestedIncident = incident({
+      incidentId: "nested-incident",
+      activityExecutionId: "child-execution-1",
+      executableNodeId: "placement-1"
+    });
+
+    const container = applyRuntimeOverlays(canvas.nodes, executions, [nestedIncident], null, [sequenceActivity, writeLine])[0]!;
+
+    expect(container.data.runtime).toMatchObject({
+      status: "Running",
+      incidentCount: 0,
+      containedIncidentCount: 1,
+      containedAffectedActivityCount: 1,
+      containedPrimaryIncidentId: "nested-incident"
     });
   });
 
@@ -939,7 +1067,7 @@ function node(nodeId: string): ActivityNode {
   };
 }
 
-function activityExecution() {
+function activityExecution(overrides: Partial<ActivityExecutionStateSummary> = {}): ActivityExecutionStateSummary {
   return {
     activityExecutionId: "activity-execution-1",
     workflowExecutionId: "wfexec-1",
@@ -961,11 +1089,12 @@ function activityExecution() {
     incidentIds: ["incident-1"],
     faultCount: 1,
     aggregateFaultCount: 0,
-    metadata: {}
+    metadata: {},
+    ...overrides
   };
 }
 
-function incident() {
+function incident(overrides: Partial<IncidentStateSummary> = {}): IncidentStateSummary {
   return {
     incidentId: "incident-1",
     workflowExecutionId: "wfexec-1",
@@ -979,6 +1108,7 @@ function incident() {
     createdAt: "2026-06-18T01:00:02Z",
     resolvedAt: null,
     isBlocking: true,
-    metadata: {}
+    metadata: {},
+    ...overrides
   };
 }

@@ -1,6 +1,6 @@
 # Workflow run incidents in Studio
 
-This guide covers incident and activity evidence in the Workflows module's run history and run inspector. The cross-repository product contract is maintained in [Foundation spec 191](https://github.com/elsa-workflows/elsa-foundation/tree/main/specs/191-incident-troubleshooting).
+This guide covers incident and activity evidence in the Workflows module's run history and run inspector. The cross-repository product contract is maintained in [Foundation spec 192](https://github.com/elsa-workflows/elsa-foundation/tree/main/specs/192-incident-troubleshooting), tracked by [Foundation program 2334](https://github.com/elsa-workflows/elsa-foundation/issues/2334).
 
 ## Current health and lifecycle
 

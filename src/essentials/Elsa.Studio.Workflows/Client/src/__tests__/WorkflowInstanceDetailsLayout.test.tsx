@@ -13,7 +13,8 @@ import {
 
 vi.mock("../workflow-editor/WorkflowInstances", () => ({
   WorkflowInstances: () => <div>Runs list</div>,
-  WorkflowInstanceDetailsWorkbench: () => <div>Run workbench</div>
+  WorkflowInstanceDetailsWorkbench: ({ initialInspectorTab }: { initialInspectorTab?: string }) =>
+    <div data-initial-inspector-tab={initialInspectorTab}>Run workbench</div>
 }));
 
 let container: HTMLDivElement;
@@ -87,6 +88,7 @@ describe("Run detail page layout", () => {
 
     await vi.waitFor(() => expect(container.textContent).toContain("Run workbench"));
     expect(container.querySelector(".wf-page--run-workbench")).toBeTruthy();
+    expect(container.querySelector("[data-initial-inspector-tab]")?.getAttribute("data-initial-inspector-tab")).toBe("timeline");
 
     flushSync(() => root.render(
       <WorkflowInstancesPage context={{} as StudioEndpointContext} navigate={() => {}} />
@@ -94,6 +96,29 @@ describe("Run detail page layout", () => {
     await vi.waitFor(() => expect(container.textContent).toContain("Runs list"));
     expect(container.querySelector(".wf-page--run-workbench")).toBeNull();
     expect(container.querySelector(".wf-page")).toBeTruthy();
+  });
+
+  it("opens the Issues tab when incident review supplies a tab query", async () => {
+    window.history.replaceState({}, "", "/workflows/instances/run-1?tab=issues");
+    flushSync(() => root.render(
+      <WorkflowInstanceDetailsPage
+        context={{} as StudioEndpointContext}
+        ai={{} as StudioAiContributionApi}
+        navigate={() => {}}
+      />
+    ));
+
+    await vi.waitFor(() => expect(container.querySelector("[data-initial-inspector-tab]")?.getAttribute("data-initial-inspector-tab")).toBe("issues"));
+
+    window.history.replaceState({}, "", "/workflows/instances/run-1");
+    flushSync(() => root.render(
+      <WorkflowInstanceDetailsPage
+        context={{} as StudioEndpointContext}
+        ai={{} as StudioAiContributionApi}
+        navigate={() => {}}
+      />
+    ));
+    await vi.waitFor(() => expect(container.querySelector("[data-initial-inspector-tab]")?.getAttribute("data-initial-inspector-tab")).toBe("timeline"));
   });
 });
 

@@ -2,8 +2,10 @@ import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
+import { buildExecutableActivityGraph } from "../executableGraph";
 import {
   getIncidentRootCause,
+  getIncidentHealthActionState,
   combineActivityExecutions,
   loadExactIncidentActivitySummary,
   loadActiveIncidentActivitySummaries,
@@ -14,7 +16,7 @@ import {
   resolveInitialActivityEvidenceId,
   WorkflowIncidentList
 } from "../workflow-editor/WorkflowInstances";
-import type { ActivityCatalogItem, ActivityExecutionStateSummary, IncidentStateSummary, WorkflowExecutableDetails, WorkflowInstanceDetails } from "../workflowTypes";
+import type { ActivityCatalogItem, ActivityExecutionStateSummary, IncidentStateSummary, WorkflowExecutableDetails, WorkflowExecutableNode, WorkflowInstanceDetails } from "../workflowTypes";
 
 let mounted: { root: Root; container: HTMLDivElement } | null = null;
 
@@ -115,6 +117,56 @@ describe("Runtime-pinned workflow instance rendering", () => {
       nodeId: "authored-node",
       activityExecution: null
     });
+  });
+
+  it("maps repeated authored activity associations to the executable node shown in the pinned graph", () => {
+    const child = (executableNodeId: string): WorkflowExecutableNode => ({
+      executableNodeId,
+      authoredActivityId: "shared-authored-node",
+      activityType: "Example.Activity",
+      activityTypeVersion: "1.0.0",
+      inputBindings: [],
+      childSlots: []
+    });
+    const graph = buildExecutableActivityGraph({
+      executableNodeId: "root-executable",
+      authoredActivityId: "root-authored",
+      activityType: "Example.Root",
+      activityTypeVersion: "1.0.0",
+      inputBindings: [],
+      childSlots: [{ name: "Sequence.Activities", activities: [child("placement-1"), child("placement-2")] }]
+    }, [], [], [], null, [
+      { executableNodeId: "placement-1", displayName: "First placement" },
+      { executableNodeId: "placement-2", displayName: "Second placement" }
+    ]);
+    const first = activityExecution({
+      activityExecutionId: "execution-1",
+      authoredActivityId: "shared-authored-node",
+      executableNodeId: "placement-1",
+      incidentIds: ["relation-incident"]
+    });
+    const second = activityExecution({
+      activityExecutionId: "execution-2",
+      authoredActivityId: "shared-authored-node",
+      executableNodeId: "placement-2",
+      incidentIds: []
+    });
+
+    expect(resolveIncidentActivityAssociation(incident({ activityExecutionId: "execution-1" }), [first, second], graph)?.nodeId)
+      .toBe("placement-1");
+    expect(resolveIncidentActivityAssociation(incident({
+      incidentId: "relation-incident",
+      activityExecutionId: null,
+      executableNodeId: null
+    }), [first, second], graph)?.nodeId).toBe("placement-1");
+    expect(resolveIncidentActivityAssociation(incident({
+      activityExecutionId: null,
+      executableNodeId: "placement-2"
+    }), [first, second], graph)?.nodeId).toBe("placement-2");
+    expect(resolveIncidentActivityAssociation(incident({
+      activityExecutionId: null,
+      executableNodeId: "shared-authored-node"
+    }), [first, second], graph)).toEqual({ nodeId: null, activityExecution: null });
   });
 
   it("loads an active exact execution beyond the summary page for occurrence and input navigation", async () => {
@@ -401,6 +453,66 @@ describe("Runtime-pinned workflow instance rendering", () => {
     expect(mounted?.container.textContent).toContain("Run-level issue · no activity association was recorded.");
     expect(buttonByText(mounted!.container, "Show affected activity")).toBeUndefined();
   });
+
+  it("uses the frozen occurrence presentation for the incident heading", () => {
+    const graph = buildExecutableActivityGraph({
+      executableNodeId: "root-executable",
+      authoredActivityId: "root-authored",
+      activityType: "Example.Root",
+      activityTypeVersion: "1.0.0",
+      inputBindings: [],
+      childSlots: [{ name: "Sequence.Activities", activities: [{
+        executableNodeId: "placement-2",
+        authoredActivityId: "shared-authored-node",
+        activityType: "Example.Activity",
+        activityTypeVersion: "1.0.0",
+        inputBindings: [],
+        childSlots: []
+      }] }]
+    }, [], [], [], null, [{ executableNodeId: "placement-2", displayName: "Pinned occurrence name" }]);
+    const activity = activityExecution({
+      activityExecutionId: "execution-2",
+      authoredActivityId: "shared-authored-node",
+      executableNodeId: "placement-2"
+    });
+    const catalogItem = {
+      activityVersionId: "example-activity@1",
+      activityTypeKey: activity.activityType,
+      version: activity.activityTypeVersion,
+      category: "Tests",
+      displayName: "Current catalog name",
+      executionType: "Activity",
+      inputs: [{ referenceKey: "text", name: "Text", typeName: "string", displayName: "Text" }],
+      outputs: []
+    } satisfies ActivityCatalogItem;
+
+    renderIncidentList(
+      [incident({ activityExecutionId: "execution-2", executableNodeId: "placement-2", metadata: { "runtime.inputKey": "text" } })],
+      [activity],
+      vi.fn(),
+      vi.fn(),
+      [catalogItem],
+      null,
+      graph
+    );
+
+    expect(mounted?.container.querySelector(".wf-instance-incident-summary strong")?.textContent)
+      .toBe("Pinned occurrence name · Text input");
+  });
+
+  it("reports active and blocking totals together in the header health action", () => {
+    const health = getIncidentHealthActionState([
+      incident({ incidentId: "blocking", isBlocking: true }),
+      incident({ incidentId: "active-1", isBlocking: false }),
+      incident({ incidentId: "active-2", isBlocking: false }),
+      incident({ incidentId: "resolved", status: "Resolved" })
+    ]);
+
+    expect(health).toEqual({
+      health: "blocking",
+      label: "Needs intervention · 1 blocking · 3 active"
+    });
+  });
 });
 
 function renderIncidentList(
@@ -409,7 +521,8 @@ function renderIncidentList(
   onShowAffectedActivity: (incident: IncidentStateSummary) => void,
   onViewInput: (incident: IncidentStateSummary) => void,
   activityCatalog: ActivityCatalogItem[] = [],
-  associationLookupMessage: string | null = null
+  associationLookupMessage: string | null = null,
+  executableGraph: Parameters<typeof WorkflowIncidentList>[0]["executableGraph"] = null
 ) {
   if (mounted) {
     flushSync(() => mounted!.root.unmount());
@@ -420,7 +533,7 @@ function renderIncidentList(
   const root = createRoot(container);
   mounted = { root, container };
   flushSync(() => root.render(
-    <WorkflowIncidentList incidents={incidents} activities={activities} activityCatalog={activityCatalog} associationLookupMessage={associationLookupMessage} onShowAffectedActivity={onShowAffectedActivity} onViewInput={onViewInput} />
+    <WorkflowIncidentList incidents={incidents} activities={activities} activityCatalog={activityCatalog} executableGraph={executableGraph} associationLookupMessage={associationLookupMessage} onShowAffectedActivity={onShowAffectedActivity} onViewInput={onViewInput} />
   ));
 }
 

@@ -172,7 +172,7 @@ describe("accepted test runs with incidents", () => {
     const review = [...container.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Review incidents");
     expect(review).toBeTruthy();
     flushSync(() => review?.click());
-    expect(onOpenRun).toHaveBeenCalledWith("run-1");
+    expect(onOpenRun).toHaveBeenCalledWith("run-1", "issues");
   });
 
   it("warns from an AcceptedButFaulted receipt even when the incident count is unavailable", () => {
@@ -192,7 +192,26 @@ describe("accepted test runs with incidents", () => {
     expect(container.textContent).toContain("Incident details may be unavailable");
     const review = [...container.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Review incidents");
     flushSync(() => review?.click());
-    expect(onOpenRun).toHaveBeenCalledWith("run-legacy");
+    expect(onOpenRun).toHaveBeenCalledWith("run-legacy", "issues");
+  });
+
+  it("keeps the Run ID link on the default timeline destination", () => {
+    const onOpenRun = vi.fn();
+    const testRun: WorkflowTestRunView = {
+      testRunId: "test-run-generic",
+      definitionId: "definition-1",
+      definitionVersionId: "draft:1",
+      workflowExecutionId: "run-generic",
+      status: "DispatchAccepted",
+      commandDispatchStatus: "Accepted"
+    };
+    flushSync(() => root.render(<WorkflowRuntimePanel testRun={testRun} onOpenRun={onOpenRun} />));
+
+    const runLink = [...container.querySelectorAll<HTMLButtonElement>("button")]
+      .find(button => button.textContent === "run-generic");
+    flushSync(() => runLink?.click());
+
+    expect(onOpenRun).toHaveBeenCalledWith("run-generic");
   });
 
   it("keeps an ordinary accepted legacy receipt green when no fault evidence is present", () => {
