@@ -85,7 +85,7 @@ function renderPanel(
     const handleChange = React.useCallback((nextActivity: ActivityNode) => {
       options.onChange?.(nextActivity);
       setCurrentActivity(nextActivity);
-    }, [options.onChange]);
+    }, []);
     return (
       <ActivityPropertiesPanel
         draftId={options.draftId}
@@ -156,6 +156,48 @@ function editableJavaScriptEditor(onRender?: (propertyName: string) => void): St
 }
 
 describe("activity property organization", () => {
+  it("reports assistance as unavailable rather than an uninstalled provider without a tooling client", () => {
+    const container = renderPanel([input("Message", { isWrapped: true, defaultSyntax: "JavaScript" })], {
+      activity: activity({ message: { typeName: "System.String", expression: { type: "JavaScript", value: "args.customerName" } } })
+    });
+
+    expect(container.querySelector("[data-provider-readiness='unavailable']")).not.toBeNull();
+    expect(container.querySelector("[data-provider-readiness='missing']")).toBeNull();
+    expect(container.querySelector<HTMLInputElement>("input[aria-label='Message expression']")?.value).toBe("args.customerName");
+    clickButton(container, "Open expanded Message editor");
+    expect(container.querySelector("[role='dialog'] [data-provider-readiness='unavailable']")).not.toBeNull();
+    expect(container.querySelector<HTMLTextAreaElement>("textarea[aria-label='Message expanded value']")?.value).toBe("args.customerName");
+  });
+
+  it("preserves generic inline editing and an installed expanded-only text editor without a runtime descriptor", async () => {
+    const changed = vi.fn();
+    const expandedOnly: StudioExpressionEditorContribution = {
+      id: "test.liquid.expanded-only",
+      supports: context => context.syntax === "Liquid" && context.surface === "expanded",
+      metadata: { editingMode: "text" },
+      surfaces: {
+        expanded: ({ value, onChange }) => <textarea aria-label="Liquid expanded-only source" value={String(value ?? "")}
+          onChange={event => onChange(event.target.value)} />
+      }
+    };
+    const container = renderPanel([input("Template", { isWrapped: true })], {
+      expressionDescriptors: backendExpressionDescriptors.filter(descriptor => descriptor.type !== "Liquid"),
+      expressionEditors: [expandedOnly], expressionTooling: readinessTooling(["JavaScript"]), onChange: changed,
+      activity: activity({ template: { typeName: "System.String", expression: { type: "Liquid", value: "{{ customerName }}" } } })
+    });
+
+    await vi.waitFor(() => expect(container.querySelector("[data-provider-readiness='missing']")).not.toBeNull());
+    const compact = container.querySelector<HTMLInputElement>("input[aria-label='Template expression']")!;
+    expect(compact.value).toBe("{{ customerName }}");
+    changeTextField(compact, "{{ customerName | upcase }}");
+    clickButton(container, "Open expanded Template editor");
+    const expanded = container.querySelector<HTMLTextAreaElement>("textarea[aria-label='Liquid expanded-only source']")!;
+    expect(expanded.value).toBe("{{ customerName | upcase }}");
+    expect(container.querySelector("[role='dialog'] [data-editor-readiness='ready']")).not.toBeNull();
+    changeTextField(expanded, "{{ customerName | downcase }}");
+    expect(changed.mock.calls.at(-1)?.[0].template.expression).toEqual({ type: "Liquid", value: "{{ customerName | downcase }}" });
+  });
+
   it("keeps generic text editing available when an expression editor adapter is missing", async () => {
     const changed = vi.fn();
     const tooling = readinessTooling(["JavaScript"]);
@@ -969,6 +1011,7 @@ describe("activity property organization", () => {
     const expanded = container.querySelector<HTMLTextAreaElement>("textarea[aria-label='Payload JSON value']");
     expect(expanded?.value).toContain('"first": 1');
     expect(container.querySelector("[role='dialog']")).not.toBeNull();
+    expect(container.querySelector("[role='dialog'] .wf-expression-readiness")).toBeNull();
 
     changeTextField(expanded!, '{"first":');
     expect(container.querySelector(".studio-code-editor-diagnostics")?.textContent).toContain("Invalid JSON");

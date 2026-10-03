@@ -109,7 +109,7 @@ jobs:
           repository: elsa-workflows/elsa-foundation
           # Program #2310 M1 is stacked across repositories. Keep the paired, reviewed source
           # immutable until Foundation #2373 ships; main does not yet compose Liquid.
-          ref: e780a86a151e816a04136ae0ac8fd4eee99c0ce0
+          ref: f81be4beed6973378eb678b2327d789c19d8095e
           path: .normal-host-foundation
           persist-credentials: false
 

@@ -36,6 +36,12 @@ import {
 const contractVersion = 1;
 const wireContractVersion = { major: 1, minor: 0 } as const;
 const valueShapesKey = Symbol("expression-value-shapes");
+// Foundation v1 enum ordinals (ExpressionToolingModels.cs). Named values remain
+// supported for hosts using a string-enum JSON converter.
+const outcomeStateNames = ["Success", "SupportedEmpty", "Unavailable", "Unauthorized", "Incompatible", "Stale", "Canceled"] as const;
+const symbolKindNames = ["Variable", "WorkflowInput", "ActivityResult", "Function", "Filter", "Tag", "Namespace", "Member", "Extension"] as const;
+const valueKindNames = ["Unknown", "Scalar", "Object", "Array", "Map", "Function", "Reference"] as const;
+const severityNames = ["Error", "Warning", "Information", "Hint"] as const;
 
 type AuthoringContextWithShapes = StudioExpressionAuthoringContext & {
   [valueShapesKey]?: ReadonlyMap<string, StudioExpressionValueShape>;
@@ -515,7 +521,7 @@ function parseSymbol(
   const record = asRecord(value);
   const name = readString(record, "name");
   if (!record || !name) return undefined;
-  const wireKind = readString(record, "kind") ?? "Value";
+  const wireKind = enumName(record.kind, symbolKindNames) ?? "Value";
   const id = `${wireKind}:${readString(record, "symbolId") ?? name}`;
   const shapeId = asRecord(record.valueShape) ? `symbol:${id}` : undefined;
   if (shapeId && shapes) parseValueShape(record.valueShape, shapeId, shapes);
@@ -539,7 +545,7 @@ function parseValueShape(
   const record = asRecord(value);
   if (!record) return undefined;
   const displayName = readString(record, "displayName");
-  const kind = valueShapeKind(readString(record, "kind"));
+  const kind = valueShapeKind(enumName(record.kind, valueKindNames));
   const item = asRecord(record.item);
   if (item) parseValueShape(item, `${id}:item`, shapes);
   const members = Array.isArray(record.members)
@@ -606,7 +612,7 @@ function parseCompletionItem(value: unknown): StudioExpressionCompletionItem | u
     detail: readString(record, "detail"),
     documentation: readString(record, "documentation"),
     insertText: readString(record, "insertText"),
-    kind: symbolKind(readString(record, "kind") ?? "Value")
+    kind: symbolKind(enumName(record.kind, symbolKindNames) ?? "Value")
   };
 }
 
@@ -629,7 +635,7 @@ function parseDiagnostic(
   const range = parseRange(record?.range, true);
   if (!record || !message) return undefined;
   return {
-    severity: diagnosticSeverity(readString(record, "severity")),
+    severity: diagnosticSeverity(enumName(record.severity, severityNames)),
     code: readString(record, "code"),
     message,
     range,
@@ -692,8 +698,8 @@ function diagnosticSeverity(value?: string): StudioExpressionValidationDiagnosti
 }
 
 function parseState(value: unknown): StudioExpressionToolingState | undefined {
-  if (typeof value !== "string") return undefined;
-  switch (value.replaceAll("-", "").toLowerCase()) {
+  const name = enumName(value, outcomeStateNames);
+  switch (name?.replaceAll("-", "").toLowerCase()) {
     case "success": return "ready";
     case "supportedempty": return "supported-empty";
     case "unavailable": return "unavailable";
@@ -703,6 +709,13 @@ function parseState(value: unknown): StudioExpressionToolingState | undefined {
     case "canceled": return "canceled";
     default: return undefined;
   }
+}
+
+function enumName(value: unknown, names: readonly string[]): string | undefined {
+  if (typeof value === "string") return value;
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 && value < names.length
+    ? names[value]
+    : undefined;
 }
 
 function result<T>(

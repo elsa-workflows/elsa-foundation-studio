@@ -13,6 +13,7 @@ export default defineConfig({
   // suite reports only route names, status codes, and value-free assertions on failure.
   use: {
     ...devices["Desktop Chrome"],
+    actionTimeout: 30_000,
     trace: "off",
     screenshot: "off",
     video: "off"

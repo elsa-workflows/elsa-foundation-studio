@@ -266,7 +266,7 @@ function useExpressionProviderReadiness(
         continue;
       }
       if (!tooling) {
-        readiness.set(type, "missing");
+        readiness.set(type, "unavailable");
         continue;
       }
       if (!currentSnapshot) {
@@ -542,8 +542,8 @@ function PropertyRow({
   const syntax = wrapped?.expression.type ?? (secretOnly ? secretSyntax : "Literal");
   const expressionDescriptor = expressionDescriptors.find(descriptor => descriptor.type === syntax);
   const installedTextEditor = expressionEditors.find(editor => editor.metadata?.editingMode === "text" &&
-    !!editor.surfaces.inline && editor.supports({ activity, descriptor: effectiveInput, expressionDescriptors,
-      readOnly, surface: "inline", syntax }));
+    (["inline", "expanded"] as const).some(surface => !!editor.surfaces[surface] &&
+      editor.supports({ activity, descriptor: effectiveInput, expressionDescriptors, readOnly, surface, syntax })));
   const editingMode = expressionDescriptor?.editingMode ?? (installedTextEditor ? "text" : undefined);
   // A masked input shows what it stores only under author code or a reference (showsMaskedValue); under any other
   // syntax, Literal and Object included, its value is masked. This flag is read, from the row's current state, by
@@ -1230,7 +1230,7 @@ function ExpandedPropertyEditor({
             <span>{formatTypeName(input.typeName)}</span>
           </div>
           {input.description ? <p>{input.description}</p> : null}
-          {useTextFallback || ExpressionEditorComponent ? (
+          {useTextFallback ? (
             <ExpressionReadinessStatus
               editorAvailable={!!ExpressionEditorComponent}
               providerReadiness={providerReadiness}

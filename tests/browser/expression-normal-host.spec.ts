@@ -1,4 +1,4 @@
-import { completeTest, createPersistedExpressionDraft, discoverActivityVersion, expect, missingJavaScriptEditorTest, missingLiquidProviderTest, readActivityDefinitionDraft, type NormalHostPair, type PersistedExpressionDraft, type SafeBackendTraffic } from "./expression-normal-host-fixtures";
+import { completeTest, createPersistedExpressionDraft, discoverActivityVersion, expect, missingJavaScriptEditorTest, missingLiquidProviderTest, readActivityDefinitionDraft, readAuthenticatedBackendJson, type NormalHostPair, type PersistedExpressionDraft, type SafeBackendTraffic } from "./expression-normal-host-fixtures";
 import type { Locator, Page } from "@playwright/test";
 
 completeTest("persisted workflow drafts use live JavaScript and Liquid assistance on the normal host", async ({ page, hostPair, signInToStudio, recordSafeBackendTraffic, recordSafeConsoleErrors }) => {
@@ -17,30 +17,14 @@ completeTest("persisted workflow drafts use live JavaScript and Liquid assistanc
   const compactJavaScript = page.locator(".studio-code-editor-rich-compact .cm-content");
   await expect(compactJavaScript).toBeVisible();
 
-  await expect.poll(() => hasSuccessfulRequest(traffic, "/expression-tooling/context", "JavaScript")).toBe(true);
-  await compactJavaScript.press("End");
-  await compactJavaScript.press("Control+Space");
-  await expect(page.locator(".cm-tooltip-autocomplete")).toContainText(draft.outputName);
-  await compactJavaScript.press("Enter");
-  await expect(compactJavaScript).toContainText(draft.outputName);
-  await expect.poll(() => hasSuccessfulRequest(traffic, "/expression-tooling/completions", "JavaScript")).toBe(true);
-
-  await replaceEditorSource(page, compactJavaScript, `args.predecessor.${draft.outputName}`);
-  await compactJavaScript.press("End");
-  await compactJavaScript.press("Alt+i");
-  await expect(page.getByRole("status", { name: "Hover information" })).toBeVisible();
-  await expect.poll(() => hasSuccessfulRequest(traffic, "/expression-tooling/hover", "JavaScript")).toBe(true);
-  await page.keyboard.press("Escape");
-
-  await replaceEditorSource(page, compactJavaScript, "if (");
-  await expect.poll(() => hasSuccessfulRequest(traffic, "/expression-tooling/validate", "JavaScript")).toBe(true);
-  await expect(page.locator(".studio-code-editor-diagnostics")).toBeVisible();
+  await exerciseWorkflowAssistance(page, hostPair, compactJavaScript, draft, traffic, "JavaScript");
 
   await replaceEditorSource(page, compactJavaScript, `args.customerName + args.predecessor.${draft.outputName}`);
   const expandedButton = page.getByRole("button", { name: `Open expanded ${draft.inputName} editor` });
   await expandedButton.click();
   const expandedJavaScript = page.getByRole("dialog").locator(".studio-code-editor-rich-expanded .cm-content");
   await expect(expandedJavaScript).toContainText("args.customerName");
+  await exerciseWorkflowAssistance(page, hostPair, expandedJavaScript, draft, traffic, "JavaScript");
   await replaceEditorSource(page, expandedJavaScript, `args.customerName + args.predecessor.${draft.outputName} + '!'`);
   await page.getByRole("dialog").getByRole("button", { name: `Close ${draft.inputName} editor` }).click();
   await expect(page.getByRole("button", { name: "JavaScript expression. Activate to edit." })).toContainText("args.customerName");
@@ -52,29 +36,12 @@ completeTest("persisted workflow drafts use live JavaScript and Liquid assistanc
   await liquidPreview.click();
   const compactLiquid = page.locator(".studio-code-editor-rich-compact .cm-content");
   await expect(compactLiquid).toBeVisible();
-  await expect.poll(() => hasSuccessfulRequest(traffic, "/expression-tooling/context", "Liquid")).toBe(true);
-  await replaceEditorSource(page, compactLiquid, "{{ predecessor.");
-  await compactLiquid.press("Control+Space");
-  await expect(page.locator(".cm-tooltip-autocomplete")).toContainText(draft.outputName);
-  await compactLiquid.press("Enter");
-  await expect.poll(() => hasSuccessfulRequest(traffic, "/expression-tooling/completions", "Liquid")).toBe(true);
-  await replaceEditorSource(page, compactLiquid, `{{ predecessor.${draft.outputName} }}`);
-  await compactLiquid.press("End");
-  // Step back over the closing ` }}` so hover targets the discovered output token.
-  await compactLiquid.press("ArrowLeft");
-  await compactLiquid.press("ArrowLeft");
-  await compactLiquid.press("ArrowLeft");
-  await compactLiquid.press("Alt+i");
-  await expect(page.getByRole("status", { name: "Hover information" })).toBeVisible();
-  await expect.poll(() => hasSuccessfulRequest(traffic, "/expression-tooling/hover", "Liquid")).toBe(true);
-  await page.keyboard.press("Escape");
-  await replaceEditorSource(page, compactLiquid, "{{ customerName");
-  await expect.poll(() => hasSuccessfulRequest(traffic, "/expression-tooling/validate", "Liquid")).toBe(true);
-  await expect(page.locator(".studio-code-editor-diagnostics")).toBeVisible();
+  await exerciseWorkflowAssistance(page, hostPair, compactLiquid, draft, traffic, "Liquid");
   await replaceEditorSource(page, compactLiquid, `{{ customerName }} {{ predecessor.${draft.outputName} }}`);
   await page.getByRole("button", { name: `Open expanded ${draft.inputName} editor` }).click();
   const expandedLiquid = page.getByRole("dialog").locator(".studio-code-editor-rich-expanded .cm-content");
   await expect(expandedLiquid).toContainText("customerName");
+  await exerciseWorkflowAssistance(page, hostPair, expandedLiquid, draft, traffic, "Liquid");
   await replaceEditorSource(page, expandedLiquid, `{{ customerName }} {{ predecessor.${draft.outputName} | string }}`);
   await page.getByRole("dialog").getByRole("button", { name: `Close ${draft.inputName} editor` }).click();
   await expect(page.getByRole("button", { name: "Liquid expression. Activate to edit." })).toContainText("string");
@@ -98,7 +65,7 @@ completeTest("Activity Definition graph authoring edits a persisted activity exp
   const textInput = writeLine.inputs.find(input => String(input.name).toLowerCase() === "text");
   if (!textInput?.name || !textInput.referenceKey) throw new Error("The live WriteLine version does not expose its text contract input.");
 
-  await page.goto(new URL("/studio/workflows/activity-definitions", hostPair.studioUrl).toString());
+  await page.goto(new URL("/workflows/activity-definitions", hostPair.studioUrl).toString());
   await expect(page.getByRole("heading", { name: "Activity Definitions" })).toBeVisible();
   await page.getByRole("button", { name: "Create Activity Definition" }).click();
   const createDialog = page.getByRole("dialog", { name: "Create Activity Definition" });
@@ -149,13 +116,27 @@ completeTest("Activity Definition graph authoring edits a persisted activity exp
   expect(activityDraftId).toBeTruthy();
   await expect.poll(async () => {
     const savedDraft = await readActivityDefinitionDraft(page, hostPair, activityDraftId!);
-    const children = savedDraft?.provider?.payload?.rootActivity?.structure?.payload?.activities;
+    const payload = savedDraft?.provider?.payload;
+    if (!payload) throw new Error("The fresh Activity Definition read omitted the provider payload.");
+    const root = payload.rootActivity;
+    if (!root) throw new Error("The fresh Activity Definition provider payload omitted the root activity.");
+    const children = root.structure?.payload?.activities;
+    if (!Array.isArray(children)) throw new Error("The fresh Activity Definition root omitted its child activity collection.");
     const savedActivity = Array.isArray(children)
       ? children.find((activity: { activityVersionId?: string }) => activity.activityVersionId === writeLine.versionId)
       : null;
     const savedInput = savedActivity?.inputs?.find((input: { referenceKey?: string }) => input.referenceKey === textInput.referenceKey);
     return { expressionType: savedInput?.value?.expressionType, source: savedInput?.value?.value };
   }).toEqual({ expressionType: "Liquid", source: "{{ customerName | string }}" });
+  // Reopen through the normal API facade, not just the already-mounted editor state.
+  await page.reload();
+  await expect(page.getByRole("tab", { name: "Designer" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator(".ad-save-chip")).toHaveText(/^Saved revision \d+$/);
+  await page.getByRole("button", { name: "Fit View", exact: true }).click();
+  // Native canvas keyboard selection is not obscured by the small-viewport minimap.
+  await page.locator(".react-flow__node").filter({ hasText: writeLine.displayName }).press("Enter", { timeout: 30_000 });
+  await expect(page.getByRole("button", { name: "Liquid expression. Activate to edit." }))
+    .toContainText("{{ customerName | string }}");
   expect(traffic.some(request => request.path === "/capabilities" && request.status === 200)).toBe(true);
   expect(consoleErrors).toEqual([]);
 });
@@ -178,7 +159,10 @@ missingJavaScriptEditorTest("missing JavaScript editor leaves generic source edi
   await expect(dialog.getByRole("textbox", { name: `${draft.inputName} expanded value` })).toHaveValue(`args.predecessor.${draft.outputName}`);
   await dialog.getByRole("button", { name: `${draft.inputName} expression syntax` }).click();
   await page.getByRole("option", { name: "Liquid", exact: true }).click();
-  await expect(dialog.locator(".studio-code-editor-rich-expanded .cm-content")).toBeVisible();
+  const expandedLiquid = dialog.locator(".studio-code-editor-rich-expanded .cm-content");
+  await expect(expandedLiquid).toBeVisible();
+  await exerciseWorkflowAssistance(page, hostPair, expandedLiquid, draft, traffic, "Liquid");
+  await replaceEditorSource(page, expandedLiquid, "{{ customerName }}");
   await dialog.getByRole("button", { name: `Close ${draft.inputName} editor` }).click();
   await page.getByRole("button", { name: "Liquid expression. Activate to edit." }).click();
   await expect(page.locator(".studio-code-editor-rich-compact .cm-content")).toBeVisible();
@@ -219,6 +203,8 @@ missingLiquidProviderTest("missing Liquid provider preserves authored Liquid and
   await page.getByRole("button", { name: "JavaScript expression. Activate to edit." }).click();
   await page.getByRole("button", { name: `Open expanded ${javascriptDraft.inputName} editor` }).click();
   await expect(page.getByRole("dialog").getByText("Runtime assistance: available for JavaScript.")).toBeVisible();
+  await exerciseWorkflowAssistance(page, hostPair,
+    page.getByRole("dialog").locator(".studio-code-editor-rich-expanded .cm-content"), javascriptDraft, traffic, "JavaScript");
 
   // Reopen the exact Liquid draft after checking JavaScript in an independent persisted draft.
   await openWorkflowDraft(page, hostPair, draft);
@@ -230,7 +216,7 @@ missingLiquidProviderTest("missing Liquid provider preserves authored Liquid and
 });
 
 async function openWorkflowDraft(page: Page, pair: NormalHostPair, draft: PersistedExpressionDraft) {
-  await page.goto(new URL(`/studio/workflows/definitions?definition=${encodeURIComponent(draft.definitionId)}`, pair.studioUrl).toString());
+  await page.goto(new URL(`/workflows/definitions?definition=${encodeURIComponent(draft.definitionId)}`, pair.studioUrl).toString());
   await expect(workflowTargetNode(page, draft)).toBeVisible();
 }
 
@@ -249,14 +235,124 @@ async function replaceEditorSource(page: Page, editor: Locator, source: string) 
   await page.keyboard.insertText(source);
 }
 
+async function exerciseWorkflowAssistance(
+  page: Page,
+  pair: NormalHostPair,
+  editor: Locator,
+  draft: PersistedExpressionDraft,
+  traffic: SafeBackendTraffic[],
+  syntax: "JavaScript" | "Liquid"
+) {
+  // Leading whitespace deliberately changes the seeded JavaScript source as well.
+  const completionSource = syntax === "JavaScript" ? " args.predecessor." : "{{ predecessor.";
+  let phase = await replacePersistedWorkflowSource(page, pair, editor, draft, traffic, syntax, completionSource);
+  await expect(editor.locator("xpath=ancestor::section[@data-studio-code-editor='true'][1]")
+    .locator(".studio-code-editor-diagnostics")).toContainText(`${syntax}/Syntax`);
+  // Source replacement refreshes context asynchronously. Retry the hotkey with its result,
+  // rather than treating an earlier context request as readiness for this document.
+  await expect(async () => {
+    await editor.press("End");
+    await editor.press("Control+Space");
+    const menu = page.locator(".cm-tooltip-autocomplete");
+    await expect(menu).toContainText(draft.outputName, { timeout: 1_000 });
+    expect(hasFreshAssistance(traffic.slice(phase.start), draft, syntax, "/expression-tooling/completions", phase.previousRevision)).toBe(true);
+    // The runtime output need not sort first among provider functions. Navigate the
+    // actual completion collection before testing Enter, rather than accepting any row.
+    const selected = menu.locator('[aria-selected="true"]');
+    for (let step = 0; step < await menu.getByRole("option").count(); step++) {
+      if ((await selected.textContent({ timeout: 1_000 }))?.includes(draft.outputName)) break;
+      await editor.press("ArrowDown");
+    }
+    await expect(selected).toContainText(draft.outputName, { timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
+  // CodeMirror deliberately suppresses acceptance during its short interaction guard.
+  // Retry the same real key action without restarting completion or forcing an editor delay.
+  await expect(async () => {
+    await editor.press("Enter");
+    await expect(editor).toContainText(draft.outputName, { timeout: 1_000 });
+  }).toPass({ timeout: 5_000 });
+
+  phase = await replacePersistedWorkflowSource(page, pair, editor, draft, traffic, syntax, syntax === "JavaScript"
+    ? `args.predecessor.${draft.outputName}` : `{{ predecessor.${draft.outputName} }}`);
+  await expect(async () => {
+    await editor.press("End");
+    if (syntax === "Liquid") {
+      // Move over the closing ` }}` to the discovered output token on each retry.
+      for (let step = 0; step < 3; step++) await editor.press("ArrowLeft");
+    }
+    await editor.press("Alt+i");
+    await expect(page.getByRole("status", { name: "Hover information" })).toContainText(draft.outputName, { timeout: 1_000 });
+    expect(hasFreshAssistance(traffic.slice(phase.start), draft, syntax, "/expression-tooling/hover", phase.previousRevision)).toBe(true);
+  }).toPass({ timeout: 15_000 });
+  await editor.press("Escape");
+  await expect(page.getByRole("status", { name: "Hover information" })).not.toBeVisible();
+  await expect(editor).toBeVisible();
+
+  phase = await replacePersistedWorkflowSource(page, pair, editor, draft, traffic, syntax,
+    syntax === "JavaScript" ? "if (" : "{{ customerName");
+  const diagnosticCode = `${syntax}/Syntax`;
+  await expect.poll(() => hasFreshAssistance(traffic.slice(phase.start), draft, syntax, "/expression-tooling/validate",
+    phase.previousRevision, { diagnosticCode }),
+    { timeout: 15_000 }).toBe(true);
+  await expect(editor.locator("xpath=ancestor::section[@data-studio-code-editor='true'][1]")
+    .locator(".studio-code-editor-diagnostics")).toContainText(diagnosticCode);
+}
+
+async function replacePersistedWorkflowSource(page: Page, pair: NormalHostPair, editor: Locator,
+  draft: PersistedExpressionDraft, traffic: SafeBackendTraffic[], syntax: string, source: string) {
+  const phase = captureAssistancePhase(traffic, draft, syntax);
+  await replaceEditorSource(page, editor, source);
+  await expect(page.locator(".wf-status")).toHaveText("Autosaving...");
+  await expect(page.locator(".wf-status")).toHaveText("Autosaved");
+  await expect.poll(() => readPersistedSource(page, pair, draft)).toEqual(source);
+  // Both context and validation change provider identities. Opening assistance before
+  // either settles would race the legitimate cancellation of pre-save results.
+  await expect.poll(() => {
+    const phaseTraffic = traffic.slice(phase.start);
+    const saveIndex = phaseTraffic.findLastIndex(request => request.method === "PUT" && request.status === 200 &&
+      request.path === `/design/workflows/drafts/${draft.draftId}`);
+    return saveIndex >= 0 && hasFreshAssistance(phaseTraffic.slice(saveIndex + 1), draft, syntax,
+      "/expression-tooling/validate", phase.previousRevision, { allowSupportedEmpty: true });
+  }, { timeout: 30_000 }).toBe(true);
+  return phase;
+}
+
+function matchesDraftLocation(request: SafeBackendTraffic, draft: PersistedExpressionDraft, syntax: string) {
+  return request.workflowDraftId === draft.draftId && request.expressionType === syntax &&
+    request.nodeId === draft.targetNodeId && request.propertyKey === draft.propertyKey;
+}
+
+function captureAssistancePhase(traffic: SafeBackendTraffic[], draft: PersistedExpressionDraft, syntax: string) {
+  return {
+    start: traffic.length,
+    previousRevision: Math.max(0, ...traffic.filter(request => request.path.endsWith("/expression-tooling/context") &&
+      matchesDraftLocation(request, draft, syntax) && request.documentRevision !== undefined)
+      .map(request => Number(request.documentRevision)).filter(Number.isFinite))
+  };
+}
+
+function hasFreshAssistance(traffic: SafeBackendTraffic[], draft: PersistedExpressionDraft,
+  syntax: string, relation: string, previousRevision: number,
+  { diagnosticCode, allowSupportedEmpty = false }: { diagnosticCode?: string; allowSupportedEmpty?: boolean } = {}) {
+  const context = traffic.filter(request => request.path.endsWith("/expression-tooling/context") &&
+    matchesDraftLocation(request, draft, syntax)).at(-1);
+  return traffic.some(request => request.path.endsWith(relation) && request.status === 200 &&
+    (request.outcomeState === 0 || (allowSupportedEmpty && relation === "/expression-tooling/validate" && request.outcomeState === 1)) &&
+    matchesDraftLocation(request, draft, syntax) &&
+    request.contextRevision !== undefined && request.responseContextRevision === request.contextRevision &&
+    request.responseDocumentRevision === request.documentRevision && Number(request.documentRevision) > previousRevision &&
+    (diagnosticCode === undefined || request.diagnosticCodes?.includes(diagnosticCode)) &&
+    context?.status === 200 && context.outcomeState === 0 &&
+      context.responseDocumentRevision === request.documentRevision && context.documentRevision === request.documentRevision &&
+      context.responseContextRevision === request.contextRevision);
+}
+
 function hasSuccessfulRequest(traffic: SafeBackendTraffic[], relation: string, expressionType?: string) {
   return traffic.some(request => request.path.endsWith(relation) && request.status === 200 && (expressionType === undefined || request.expressionType === expressionType));
 }
 
 async function readPersistedSource(page: Page, pair: NormalHostPair, draft: PersistedExpressionDraft) {
-  const response = await page.request.get(new URL(`/design/workflows/drafts/${encodeURIComponent(draft.draftId)}`, pair.foundationUrl).toString());
-  if (!response.ok()) return null;
-  const record = await response.json();
+  const record = await readAuthenticatedBackendJson(page, pair, `/design/workflows/drafts/${encodeURIComponent(draft.draftId)}`);
   const target = record?.state?.rootActivity?.structure?.payload?.activities?.find(
     (activity: { nodeId?: string }) => activity.nodeId === draft.targetNodeId
   );

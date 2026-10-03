@@ -124,6 +124,7 @@ async function copyHostConfiguration(source, destination, variant, backendOrigin
 
 export async function startNormalHostPair(variant = "complete") {
   if (!hostVariants.includes(variant)) throw new Error(`Unknown expression host variant: ${variant}`);
+  const studioHostId = "expression-normal-host";
   const foundationRoot = await resolveFoundationRoot();
   const directory = await mkdtemp(join(tmpdir(), "elsa-expression-normal-host-"));
   const hosts = [];
@@ -158,13 +159,13 @@ export async function startNormalHostPair(variant = "complete") {
     const frontend = await startOwnedHost(
       join(studioRoot, studioProject, "bin/Release/net10.0/Elsa.Studio.Web.dll"),
       frontendContent,
-      { Studio__BackendBaseUrl: backend.baseUrl, Studio__BackendServerBaseUrl: backend.baseUrl,
+      { Studio__HostId: studioHostId, Studio__BackendBaseUrl: backend.baseUrl, Studio__BackendServerBaseUrl: backend.baseUrl,
         Studio__BackendModuleManagementApiKey: managementKey,
         Nuplane__Setup__StateFilePath: join(frontendContent, "nuplane-state.json") },
       "/studio-runtime.js", 600_000, studioPort.origin
     );
     hosts.push(frontend);
-    return { studioUrl: frontend.baseUrl, foundationUrl: backend.baseUrl, directory, variant, stop };
+    return { studioUrl: frontend.baseUrl, foundationUrl: backend.baseUrl, studioHostId, directory, variant, stop };
   } catch (error) {
     await stop();
     throw error;

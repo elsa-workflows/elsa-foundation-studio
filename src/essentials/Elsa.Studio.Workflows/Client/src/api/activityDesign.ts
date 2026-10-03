@@ -5,8 +5,11 @@ import type {
   ActivityAvailabilitySettings,
   ActivityCatalogItem,
   ActivityCatalogResponse,
-  SaveActivityAvailabilitySettingsRequest
+  ActivityNode,
+  SaveActivityAvailabilitySettingsRequest,
+  WorkflowDefinitionState
 } from "../workflowTypes";
+import { canonicalizeStateForWire, expandStateFromWire } from "../activityInputWire";
 import {
   normalizeActivityAvailabilityDiagnostics,
   normalizeActivityAvailabilitySettings
@@ -257,7 +260,10 @@ export async function getActivityAuthoringCapabilities(context: StudioEndpointCo
 
 export async function createActivityDefinition(context: StudioEndpointContext, request: CreateActivityDefinitionRequest) {
   const path = await resolveCapabilityLink(context, capabilityIds.activityDesign, "activity-definitions");
-  return context.http.postJson<CreateActivityDefinitionResponse>(path, request);
+  return context.http.postJson<CreateActivityDefinitionResponse>(path, {
+    ...request,
+    provider: mapActivityDefinitionProvider(request.provider, canonicalizeStateForWire)
+  });
 }
 
 export async function createActivityDefinitionDraft(
@@ -266,7 +272,11 @@ export async function createActivityDefinitionDraft(
   request: CreateActivityDefinitionDraftRequest
 ) {
   const path = await resolveCapabilityLink(context, capabilityIds.activityDesign, "activity-definition-drafts", { definitionId });
-  return context.http.postJson<ActivityDefinitionDraftView>(path, request);
+  const wireRequest = request.provider
+    ? { ...request, provider: mapActivityDefinitionProvider(request.provider, canonicalizeStateForWire) }
+    : request;
+  const draft = await context.http.postJson<ActivityDefinitionDraftView>(path, wireRequest);
+  return mapActivityDefinitionProviderResource(draft, expandStateFromWire);
 }
 
 export async function migrateActivityDefinitionDraft(
@@ -275,7 +285,8 @@ export async function migrateActivityDefinitionDraft(
   request: MigrateActivityDefinitionDraftRequest
 ) {
   const draftPath = await resolveCapabilityLink(context, capabilityIds.activityDesign, "activity-definition-draft", { draftId });
-  return context.http.postJson<ActivityDefinitionDraftView>(`${draftPath}/migrate-provider`, request);
+  const draft = await context.http.postJson<ActivityDefinitionDraftView>(`${draftPath}/migrate-provider`, request);
+  return mapActivityDefinitionProviderResource(draft, expandStateFromWire);
 }
 
 export async function previewActivityDefinitionFork(
@@ -329,7 +340,8 @@ export async function getActivityDefinitionDraft(
   signal?: AbortSignal
 ) {
   const path = await resolveCapabilityLink(context, capabilityIds.activityDesign, "activity-definition-draft", { draftId });
-  return context.http.getJson<ActivityDefinitionDraftView>(path, { signal });
+  const draft = await context.http.getJson<ActivityDefinitionDraftView>(path, { signal });
+  return mapActivityDefinitionProviderResource(draft, expandStateFromWire);
 }
 
 export async function getActivityDefinitionVersion(
@@ -338,7 +350,8 @@ export async function getActivityDefinitionVersion(
   signal?: AbortSignal
 ) {
   const path = await resolveCapabilityLink(context, capabilityIds.activityDesign, "activity-definition-version", { versionId });
-  return context.http.getJson<ActivityDefinitionVersionView>(path, { signal });
+  const version = await context.http.getJson<ActivityDefinitionVersionView>(path, { signal });
+  return mapActivityDefinitionProviderResource(version, expandStateFromWire);
 }
 
 export async function replaceActivityDefinitionDraft(
@@ -347,7 +360,12 @@ export async function replaceActivityDefinitionDraft(
   request: ReplaceActivityDefinitionDraftRequest
 ) {
   const path = await resolveCapabilityLink(context, capabilityIds.activityDesign, "activity-definition-draft", { draftId });
-  return context.http.putJson<ActivityDefinitionDraftView>(path, request);
+  const wireRequest = {
+    ...request,
+    provider: mapActivityDefinitionProvider(request.provider, canonicalizeStateForWire)
+  };
+  const draft = await context.http.putJson<ActivityDefinitionDraftView>(path, wireRequest);
+  return mapActivityDefinitionProviderResource(draft, expandStateFromWire);
 }
 
 export async function createActivityDefinitionConflictCopy(
@@ -356,7 +374,12 @@ export async function createActivityDefinitionConflictCopy(
   request: Omit<ReplaceActivityDefinitionDraftRequest, "expectedRevision"> & { expectedSourceRevision: number }
 ) {
   const path = await resolveCapabilityLink(context, capabilityIds.activityDesign, "activity-draft-conflict-copies", { draftId });
-  return context.http.postJson<ActivityDefinitionDraftView>(path, request);
+  const wireRequest = {
+    ...request,
+    provider: mapActivityDefinitionProvider(request.provider, canonicalizeStateForWire)
+  };
+  const draft = await context.http.postJson<ActivityDefinitionDraftView>(path, wireRequest);
+  return mapActivityDefinitionProviderResource(draft, expandStateFromWire);
 }
 
 export async function validateActivityDefinitionDraft(
@@ -384,7 +407,8 @@ export async function applyActivityDefinitionContractProposal(
   request: ApplyActivityContractProposalRequest
 ) {
   const path = await resolveCapabilityLink(context, capabilityIds.activityDesign, "activity-draft-contract-proposals-apply", { draftId });
-  return context.http.postJson<ActivityDefinitionDraftView>(path, request);
+  const draft = await context.http.postJson<ActivityDefinitionDraftView>(path, request);
+  return mapActivityDefinitionProviderResource(draft, expandStateFromWire);
 }
 
 export async function listActivityDefinitionDrafts(
@@ -501,6 +525,41 @@ function normalizeManagementPage<T>(page: ActivityManagementPage<T>): ActivityMa
       asOf: typeof page?.snapshot?.asOf === "string" ? page.snapshot.asOf : new Date(0).toISOString()
     }
   };
+}
+
+type ActivityDefinitionProviderPayload = { providerKey: string; payload?: unknown };
+type ActivityDefinitionProviderResource = { provider: ActivityDefinitionProviderPayload };
+type WorkflowStateMapper = (state: WorkflowDefinitionState) => WorkflowDefinitionState;
+
+function mapActivityDefinitionProvider<T extends ActivityDefinitionProviderPayload>(
+  provider: T,
+  mapState: WorkflowStateMapper
+): T {
+  const payload = provider.payload;
+  if (
+    provider.providerKey !== "elsa.activity-graph" ||
+    !isRecord(payload) ||
+    !isActivityGraphRoot(payload.rootActivity)
+  ) return provider;
+
+  const rootActivity = mapState({ rootActivity: payload.rootActivity }).rootActivity;
+  return { ...provider, payload: { ...payload, rootActivity } } as T;
+}
+
+function mapActivityDefinitionProviderResource<T extends ActivityDefinitionProviderResource>(
+  resource: T,
+  mapState: WorkflowStateMapper
+): T {
+  const provider = mapActivityDefinitionProvider(resource.provider, mapState);
+  return provider === resource.provider ? resource : { ...resource, provider } as T;
+}
+
+function isActivityGraphRoot(value: unknown): value is ActivityNode {
+  return isRecord(value) && typeof value.nodeId === "string" && typeof value.activityVersionId === "string";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function setOptionalParameter(parameters: URLSearchParams, name: string, value: string | null | undefined) {
