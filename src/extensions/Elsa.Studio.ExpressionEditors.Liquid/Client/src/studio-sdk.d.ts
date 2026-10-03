@@ -98,6 +98,7 @@ declare module "@elsa-workflows/studio-sdk" {
     displayName?: string;
     installHint?: string;
     packageId?: string;
+    editingMode?: "text";
     toolingCapabilities?: Partial<StudioExpressionToolingCapabilities>;
   }
 

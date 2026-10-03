@@ -1,12 +1,22 @@
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { StudioCodeEditor } from "../StudioCodeEditor";
 import { javaScriptLanguageAdapter } from "../languages/javascript";
-import type { StudioCodeDocument, StudioCodeEditorProps } from "../types";
+import type { StudioCodeCompletion, StudioCodeDocument, StudioCodeEditorProps } from "../types";
 
 beforeEach(() => {
   window.dispatchEvent(new Event("elsa:auth-session-started"));
+});
+
+const rangeGetClientRects = Object.getOwnPropertyDescriptor(Range.prototype, "getClientRects");
+beforeAll(() => Object.defineProperty(Range.prototype, "getClientRects", {
+  configurable: true,
+  value: () => [] as unknown as DOMRectList
+}));
+afterAll(() => {
+  if (rangeGetClientRects) Object.defineProperty(Range.prototype, "getClientRects", rangeGetClientRects);
+  else Reflect.deleteProperty(Range.prototype, "getClientRects");
 });
 
 describe("StudioCodeEditor", () => {
@@ -207,6 +217,101 @@ describe("StudioCodeEditor", () => {
     expect(controlMTab.defaultPrevented).toBe(false);
     unmount();
   });
+
+  it.each(["compact", "expanded"] as const)("accepts the selected rich %s completion on Enter", async profile => {
+    const onChange = vi.fn();
+    const onExpand = vi.fn();
+    const completionProvider = vi.fn(() => [{ label: "total", apply: "total" }]);
+    const { container, unmount } = renderEditor({
+      document: codeDocument({ uri: `elsa://functions/enter-selected-${profile}.js`, value: "" }),
+      languageAdapter: javaScriptLanguageAdapter,
+      profile,
+      completionProvider,
+      onChange,
+      onExpand
+    });
+
+    try {
+      const content = await activateRichEditor(container, profile);
+      const clock = vi.spyOn(Date, "now").mockReturnValue(1_000);
+      try {
+        key(content, " ", { code: "Space", ctrlKey: true });
+        await waitFor(() => !!container.querySelector(".cm-tooltip-autocomplete"));
+
+        expect(container.querySelector(".cm-tooltip-autocomplete")?.textContent).toContain("total");
+
+        const earlyEnter = key(content, "Enter");
+        expect(earlyEnter.defaultPrevented).toBe(true);
+        expect(onExpand).not.toHaveBeenCalled();
+        expect(onChange).not.toHaveBeenCalled();
+
+        clock.mockReturnValue(1_075);
+        expect(key(content, "Enter").defaultPrevented).toBe(true);
+        expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ value: "total" }));
+        expect(onExpand).not.toHaveBeenCalled();
+      } finally {
+        clock.mockRestore();
+      }
+    } finally {
+      unmount();
+    }
+  }, 20000);
+
+  it("does not expand a compact editor while its completion request is pending", async () => {
+    let resolveCompletions: ((value: StudioCodeCompletion[]) => void) | undefined;
+    const completionProvider = vi.fn(() => new Promise<StudioCodeCompletion[]>(resolve => {
+      resolveCompletions = resolve;
+    }));
+    const onExpand = vi.fn();
+    const { container, unmount } = renderEditor({
+      document: codeDocument({ uri: "elsa://functions/enter-pending-compact.js", value: "" }),
+      languageAdapter: javaScriptLanguageAdapter,
+      profile: "compact",
+      completionProvider,
+      onExpand
+    });
+
+    try {
+      const content = await activateRichEditor(container, "compact");
+      key(content, " ", { code: "Space", ctrlKey: true });
+      await waitFor(() => completionProvider.mock.calls.length === 1);
+
+      expect(key(content, "Enter").defaultPrevented).toBe(true);
+      expect(onExpand).not.toHaveBeenCalled();
+
+      resolveCompletions?.([{ label: "total", apply: "total" }]);
+      await waitFor(() => !!container.querySelector(".cm-tooltip-autocomplete"));
+    } finally {
+      unmount();
+    }
+  }, 20000);
+
+  it.each(["compact", "expanded"] as const)("keeps rich %s Enter behavior when no completion is active", async profile => {
+    const onChange = vi.fn();
+    const onExpand = vi.fn();
+    const { container, unmount } = renderEditor({
+      document: codeDocument({ uri: `elsa://functions/enter-empty-${profile}.js`, value: "" }),
+      languageAdapter: javaScriptLanguageAdapter,
+      profile,
+      onChange,
+      onExpand
+    });
+
+    try {
+      const content = await activateRichEditor(container, profile);
+      expect(key(content, "Enter").defaultPrevented).toBe(true);
+
+      if (profile === "compact") {
+        expect(onExpand).toHaveBeenCalledOnce();
+        expect(onChange).not.toHaveBeenCalled();
+      } else {
+        expect(onExpand).not.toHaveBeenCalled();
+        expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ value: "\n" }));
+      }
+    } finally {
+      unmount();
+    }
+  }, 20000);
 
   it("preserves selected fallback source while indenting and outdenting complete lines", () => {
     const onIndent = vi.fn();
@@ -580,6 +685,12 @@ function renderEditor(props: Partial<StudioCodeEditorProps> = {}) {
 
 function editorInput(container: HTMLElement) {
   return container.querySelector<HTMLTextAreaElement>(".studio-code-editor-input")!;
+}
+
+async function activateRichEditor(container: HTMLElement, profile: "compact" | "expanded") {
+  if (profile === "compact") click(container.querySelector<HTMLButtonElement>(".studio-code-editor-preview")!);
+  await waitFor(() => !!container.querySelector<HTMLElement>(".cm-content"));
+  return container.querySelector<HTMLElement>(".cm-content")!;
 }
 
 function fill(element: HTMLTextAreaElement, value: string) {

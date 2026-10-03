@@ -16,6 +16,7 @@ describe("Liquid expression editor module", () => {
     expect(contribution.supports(context("JavaScript"))).toBe(false);
     expect(contribution.surfaces.inline).toBe(LiquidInlineEditor);
     expect(contribution.surfaces.expanded).toBe(LiquidExpandedEditor);
+    expect(contribution.metadata?.editingMode).toBe("text");
     expect(contribution.metadata?.toolingCapabilities).toMatchObject({
       highlighting: true,
       signatures: true,

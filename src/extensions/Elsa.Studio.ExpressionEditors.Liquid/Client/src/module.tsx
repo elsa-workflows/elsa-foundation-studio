@@ -21,6 +21,7 @@ export function register(api: ElsaStudioModuleApi) {
       expanded: LiquidExpandedEditor
     },
     metadata: {
+      editingMode: "text",
       toolingCapabilities: {
         highlighting: true,
         signatures: true,

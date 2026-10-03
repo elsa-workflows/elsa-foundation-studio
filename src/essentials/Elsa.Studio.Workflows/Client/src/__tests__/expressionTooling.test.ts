@@ -87,7 +87,7 @@ const contextPayload = {
   }
 };
 
-function outcome(payload: unknown, state = "Success", documentRevision = "3", contextRevision = "context-1") {
+function outcome(payload: unknown, state: string | number = "Success", documentRevision = "3", contextRevision = "context-1") {
   return {
     result: {
       state,
@@ -148,6 +148,72 @@ function client(context: StudioEndpointContext, authorizationScope?: string) {
 }
 
 describe("expression tooling transport", () => {
+  it("parses normal-host numeric enums across descriptors, context, assistance and diagnostics", async () => {
+    const numericContext = {
+      ...contextPayload,
+      expectedResultShape: { kind: 1, displayName: "String", isNullable: false },
+      rootSymbols: [
+        { symbolId: "input", name: "customer", kind: 1, valueShape: { kind: 2, members: [] } },
+        { symbolId: "variable", name: "globalLabel", kind: 0, valueShape: { kind: 1 } },
+        { symbolId: "output", name: "predecessor.Line", kind: 2, valueShape: { kind: 1 } },
+        { symbolId: "function", name: "getName", kind: 3, valueShape: { kind: 5 } }
+      ]
+    };
+    const api = createContext(vi.fn(async (url: string) => {
+      if (url.endsWith("/context")) return outcome(numericContext, 0);
+      if (url.endsWith("/completions") || url.endsWith("/symbols")) return outcome({ items: [{ label: "getName", kind: 3 }] }, 0);
+      if (url.endsWith("/hover")) return outcome({ contents: "Actual provider hover" }, 0);
+      if (url.endsWith("/validate")) return outcome({ diagnostics: [
+        { code: "JavaScript/Syntax", severity: 0, message: "Invalid expression" },
+        { code: "WARN", severity: 1, message: "Warning" },
+        { code: "INFO", severity: 2, message: "Information" },
+        { code: "HINT", severity: 3, message: "Hint" }
+      ] }, 0);
+      throw new Error(`Unexpected POST ${url}`);
+    }));
+    const originalGet = api.getJson.getMockImplementation()!;
+    api.getJson.mockImplementation(async url => {
+      const response = await originalGet(url);
+      return "result" in response ? { ...response, result: { ...response.result, state: 0 } } : response;
+    });
+    const tooling = client(api.context);
+    await expect(tooling.describe()).resolves.toMatchObject({ state: "ready" });
+    const resolved = await tooling.getAuthoringContext(document, {});
+    expect(resolved).toMatchObject({ state: "ready", data: {
+      expectedResultShape: { kind: "scalar" },
+      workflowInputs: [{ name: "customer", kind: "value" }],
+      visibleVariables: [{ name: "globalLabel" }],
+      visibleActivityOutputs: [{ name: "predecessor.Line" }],
+      rootSymbols: [{}, {}, {}, { name: "getName", kind: "function" }]
+    } });
+    const context = resolved.data!;
+    await expect(tooling.getValueShape(document, context, context.rootSymbols![0].shapeId!))
+      .resolves.toMatchObject({ data: { kind: "object" } });
+    await expect(tooling.getValueShape(document, context, context.rootSymbols![3].shapeId!))
+      .resolves.toMatchObject({ data: { kind: "callable" } });
+    await expect(tooling.getCatalog(document, context)).resolves.toMatchObject({ data: { symbols: [{ kind: "function" }] } });
+    await expect(tooling.getCompletions(document, context, { line: 0, column: 1 }))
+      .resolves.toMatchObject({ state: "ready", data: { items: [{ kind: "function" }] } });
+    await expect(tooling.getHover(document, context, { line: 0, column: 1 }))
+      .resolves.toMatchObject({ state: "ready", data: { contents: "Actual provider hover" } });
+    await expect(tooling.validate(document, context)).resolves.toMatchObject({ state: "ready", data: { diagnostics: [
+      { code: "JavaScript/Syntax", severity: "error" }, { severity: "warning" }, { severity: "info" }, { severity: "info" }
+    ] } });
+  });
+
+  it.each([[0, "ready"], [1, "supported-empty"], [2, "unavailable"], [3, "unauthorized"],
+    [4, "incompatible"], [5, "stale"], [6, "canceled"]] as const)("maps numeric outcome %i to %s", async (wireState, state) => {
+    const api = createContext(vi.fn(async () => outcome(contextPayload, wireState)));
+    await expect(client(api.context).getAuthoringContext(document, {})).resolves.toMatchObject({ state });
+  });
+
+  it.each([-1, 7, 0.5, "0"])("rejects unrecognized numeric-like outcome %s", async wireState => {
+    const api = createContext(vi.fn(async () => outcome(contextPayload, wireState)));
+    const resolved = await client(api.context).getAuthoringContext(document, {});
+    expect(resolved.state).toBe("incompatible");
+    expect(resolved).not.toHaveProperty("data");
+  });
+
   it("describes provider-owned capabilities before a document context is requested", async () => {
     const api = createContext();
 

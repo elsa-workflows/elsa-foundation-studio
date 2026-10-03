@@ -22,6 +22,7 @@ export function register(api: ElsaStudioModuleApi) {
       expanded: JavaScriptExpandedEditor
     },
     metadata: {
+      editingMode: "text",
       toolingCapabilities: {
         highlighting: true,
         signatures: true,

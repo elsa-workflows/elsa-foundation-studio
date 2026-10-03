@@ -67,8 +67,8 @@ describe("Activity Definition authoring", () => {
           rootActivity: {
             nodeId: "root",
             activityVersionId: "flowchart-v1",
-            inputs: {},
-            outputs: {},
+            inputs: [],
+            outputs: [],
             structure: {
               kind: "elsa.flowchart.structure",
               schemaVersion: "1.0.0",

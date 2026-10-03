@@ -888,6 +888,8 @@ export interface StudioExpressionEditorMetadata {
   displayName?: string;
   installHint?: string;
   packageId?: string;
+  /** Keeps existing text source editable without a runtime descriptor; never advertises a syntax choice. */
+  editingMode?: "text";
   /** Editor-owned capabilities composed with, but never attributed to, the server descriptor. */
   toolingCapabilities?: Partial<StudioExpressionToolingCapabilities>;
 }
