@@ -2795,7 +2795,7 @@ describe("workflows module", () => {
     expect(container.textContent).toContain("Test Run");
     expect(container.textContent).toContain("2 activities");
     expect(container.textContent).toContain("1 incidents");
-    await click(rowByLabel(container, "Inspect workflow run wfexec-test"));
+    await click(rowByLabel(container, "Inspect workflow run wfexec-test · Completed · Current health unavailable"));
 
     expect(window.location.pathname).toBe("/workflows/instances/wfexec-test");
     expect(fetchMock).toHaveBeenCalledWith(
