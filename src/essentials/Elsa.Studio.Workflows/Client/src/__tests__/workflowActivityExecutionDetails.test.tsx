@@ -221,6 +221,26 @@ function valueEvidence(overrides: Partial<ActivityExecutionInspectionValueSnapsh
 }
 
 describe("WorkflowActivityExecutionDetails", () => {
+  it("uses projected incident counts and falls back only to available legacy IDs", () => {
+    vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([]));
+    const container = render(<WorkflowActivityExecutionDetails context={context} activity={activity} activityCatalog={catalog} />);
+    const incidentCount = () => [...container.querySelectorAll<HTMLElement>(".wf-activity-meta-item")]
+      .find(item => item.querySelector("dt")?.textContent === "Incidents")
+      ?.querySelector(".wf-activity-meta-value")?.textContent;
+    const cases: Array<[Partial<ActivityExecutionStateSummary>, string]> = [
+      [{ incidentCount: 1, incidentIds: undefined }, "1"],
+      [{ incidentCount: 0, incidentIds: ["stale-id"] }, "0"],
+      [{ incidentCount: null, incidentIds: ["stale-id"] }, "Unavailable"],
+      [{ incidentCount: undefined, incidentIds: ["legacy-1", "legacy-2"] }, "2"],
+      [{ incidentCount: undefined, incidentIds: undefined }, "Unavailable"]
+    ];
+
+    for (const [summary, expected] of cases) {
+      rerender(<WorkflowActivityExecutionDetails context={context} activity={{ ...activity, ...summary }} activityCatalog={catalog} />);
+      expect(incidentCount()).toBe(expected);
+    }
+  });
+
   it("uses frozen source-reference wording before the live catalog fallback", async () => {
     vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([]));
     const container = render(
@@ -1094,6 +1114,13 @@ describe("buildInstanceCanvas", () => {
     );
 
     expect(loaded.incomplete).toBe(false);
+    expect(loaded.activities[0]).toMatchObject({ incidentCount: 1, incidentIds: [targetIncident.incidentId] });
+    expect(combineActivityExecutions([
+      { ...activity, activityExecutionId: "older-execution", incidentCount: 0, incidentIds: ["stale-id"] }
+    ], loaded.activities)[0]).toMatchObject({
+      incidentCount: 1,
+      incidentIds: [targetIncident.incidentId]
+    });
     expect(descended.nodes.find(node => node.id === "wl-1")?.data.runtime).toMatchObject({
       primaryIncidentId: targetIncident.incidentId,
       hasBlockingIncident: true

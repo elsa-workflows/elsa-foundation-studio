@@ -60,7 +60,7 @@ export function applyRuntimeOverlays<TNodeData extends Record<string, unknown>>(
     const activityExecutionId = incident.activityExecutionId?.trim() || incident.metadata?.["runtime.activityExecutionId"]?.trim();
     const associatedActivity = activityExecutionId ? activityByExecutionId.get(activityExecutionId) : undefined;
     if (associatedActivity) return canvasNodeIdForActivity(associatedActivity);
-    const activitiesWithIncident = activityExecutionId ? [] : activities.filter(activity => activity.incidentIds.includes(incident.incidentId));
+    const activitiesWithIncident = activityExecutionId ? [] : activities.filter(activity => activity.incidentIds?.includes(incident.incidentId) ?? false);
     const relatedNodeIds = [...new Set(activitiesWithIncident.map(canvasNodeIdForActivity).filter(Boolean))];
     if (relatedNodeIds.length === 1) return relatedNodeIds[0]!;
     const executableNodeId = incident.executableNodeId?.trim() || incident.metadata?.["runtime.executableNodeId"]?.trim();

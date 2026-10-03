@@ -888,6 +888,7 @@ export function activityExecutionSummaryFromInspection(inspection: IncidentActiv
     startedAt: inspection.startedAt,
     completedAt: inspection.completedAt,
     bookmarkIds: inspection.bookmarks.map(bookmark => bookmark.bookmarkId),
+    incidentCount: inspection.incidents.length,
     incidentIds: inspection.incidents.map(incident => incident.incidentId),
     metadata: inspection.metadata
   };
@@ -1450,7 +1451,7 @@ export function resolveIncidentActivityAssociation(
 
   const incidentExecutions = explicitExecutionId
     ? []
-    : activities.filter(activity => activity.incidentIds.includes(incident.incidentId));
+    : activities.filter(activity => activity.incidentIds?.includes(incident.incidentId) ?? false);
   if (incidentExecutions.length === 1) {
     const exact = incidentExecutions[0]!;
     return { nodeId: getNodeId(exact), activityExecution: exact };
@@ -1650,7 +1651,9 @@ export function WorkflowActivityExecutionDetails({
   const completedLabel = formatDate(activity.completedAt);
   const durationLabel = formatDuration(activity.startedAt, activity.completedAt) || "Unknown";
   const bookmarkCount = activity.bookmarkIds?.length ?? 0;
-  const incidentCount = activity.incidentIds?.length ?? 0;
+  const incidentCount = activity.incidentCount !== undefined
+    ? activity.incidentCount
+    : Array.isArray(activity.incidentIds) ? activity.incidentIds.length : null;
   const markCopied = (label: string) => setCopyStatus(`Copied ${label}.`);
   const markCopyFailed = (label: string) => setCopyStatus(`Could not copy ${label}.`);
 
@@ -1702,7 +1705,7 @@ export function WorkflowActivityExecutionDetails({
         <dl className="wf-activity-summary-grid">
           <ActivityMetadataValue label="Started" value={startedLabel} copiedLabel="start time" onCopied={markCopied} onCopyFailed={markCopyFailed} />
           <ActivityMetadataValue label="Duration" value={durationLabel} copiedLabel="duration" onCopied={markCopied} onCopyFailed={markCopyFailed} />
-          <ActivityMetadataValue label="Incidents" value={String(incidentCount)} copiedLabel="incident count" onCopied={markCopied} onCopyFailed={markCopyFailed} />
+          <ActivityMetadataValue label="Incidents" value={incidentCount == null ? "Unavailable" : String(incidentCount)} copiedLabel="incident count" onCopied={markCopied} onCopyFailed={markCopyFailed} />
         </dl>
 
         {copyStatus ? <p className="wf-copy-status" role="status" aria-live="polite">{copyStatus}</p> : null}

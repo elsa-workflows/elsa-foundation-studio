@@ -1121,7 +1121,8 @@ export interface ActivityExecutionStateSummary {
   iterationId?: string | null;
   callStackDepth?: number | null;
   bookmarkIds: string[];
-  incidentIds: string[];
+  incidentCount?: number | null;
+  incidentIds?: string[] | null;
   faultCount?: number;
   aggregateFaultCount?: number;
   metadata: Record<string, string>;
