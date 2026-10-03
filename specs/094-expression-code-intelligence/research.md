@@ -149,3 +149,27 @@
 **Decision**: Limit the spike to two engineer-days and a disposable prototype. Adoption requires all of the following evidence: runtime-specific declarations contain no DOM or Node surface; analysis runs in a cancellable worker and rejects stale results; the service loads lazily and stays within the existing Workflows bundle gate; current completion, keyboard and screen-reader flows remain operable; and disabling the prototype restores the baseline local-plus-authorized completion path without source loss. If any gate fails or remains unproved at the timebox, reject the dependency and continue with the baseline projection.
 
 **Rationale**: A timebox and binary exit criteria prevent an optional inference experiment from delaying the required runtime-compatible experience or becoming an unreviewed architecture commitment.
+
+### Exit decision — 2026-10-03, Studio #553
+
+**Decision**: Reject the current TypeScript 5.9.3 language-service candidate. Continue T032/T034 with expression-safe local JavaScript assistance and authorized runtime-owned metadata behind the existing CodeMirror/editor contracts. No service dependency, prototype code, production integration or budget increase is adopted.
+
+The disposable browser prototype demonstrates nested members, local-object members, callback-parameter quick info, a callable signature, lazy worker loading, request cancellation before analysis, stale-response rejection and exact source/cursor preservation when disabled. Its virtual host uses `noLib`/`noResolve`, two in-memory files and module-resolution hooks that return no targets; the declaration fixture excludes DOM/Node, denied ambient globals and `Math.random`. The fixture is a manually authored curated subset, not generated metadata or proof of every customized host surface. TypeScript's actual resolution enum is `Classic`; `ModuleResolutionKind.None` does not exist and must not be claimed as the isolation boundary.
+
+The emitted worker is approximately 3.59 MB raw / 1.03 MB gzip. The unchanged Workflows baseline build passes, but a scratch copy containing that actual worker fails the byte-identical checker's 500,000-byte individual-chunk ceiling. This is a controlled checker/asset experiment, not a shipping integration run. The lazy-load observation does not make the worker compliant with the size limit.
+
+Cancellation during a synchronous TypeScript analysis call remains unproved: the same worker cannot process its cancel message while executing that call. Keyboard filtering/acceptance is browser-fixture evidence only; no real screen-reader session or expression-only normal-host non-regression matrix is proved for the spike candidate. The separate M2 baseline normal-host pass does not prove candidate non-regression. Consequently not every adoption gate passes. Earlier incorrect query offsets and the nonexistent enum/audit wording are corrected before retaining final evidence; those earlier claims are not acceptance.
+
+A synthetic `import("node:fs")` host-boundary query did not return within the browser test's 30-second timeout. It is removed from the passing scenario, and authored-import behavior remains unproved; neither the cause of that timeout nor runtime authorization of import syntax is inferred.
+
+The root reviews the prototype, independently repeats the browser command and unchanged scratch checker, and records exact commands, sizes and evidence bounds in [verification.md](verification.md). The optional spike's technical decision is settled, not the M3 product milestone or final human acceptance. Revisit only with a materially different candidate that proves every existing adoption gate; do not relax them or delay the baseline help path.
+
+Primary API references: [TypeScript Language Service host](https://github.com/microsoft/TypeScript/wiki/Using-the-Language-Service-API) and [noLib](https://www.typescriptlang.org/tsconfig/noLib.html).
+
+## Decision 17: Preserve rich runtime metadata through the existing context relation
+
+**Decision**: For subsequent M3 implementation, consume search/paged runtime symbols through the existing rich authoring-context relation rather than reconstructing signatures from the lossy symbol-item relation. Foundation will compose immutable profile metadata through the existing symbol-filter chain before paging and revision checks; Studio will preserve signatures, return-shape references, documentation, cancellation and authorization boundaries when mapping that existing response. This records planned work, not shipped behavior.
+
+**Rationale**: The current context `RootSymbols` already carries the required symbol/signature/value-shape model and accepts search, skip and take. The existing symbol-item projection discards signatures. Reusing the context response avoids a new wire field, SDK type, endpoint or parallel catalog authority. Its provider-capability lookup and explicit outcome mapping remain consequential and must be tested, not bypassed.
+
+**Consequences**: Runtime catalogs stay Foundation-owned. Local inference remains advisory; unknown or truncated shapes must not be diagnosed as closed schemas. Language modules own cursor/member/call spelling while the shared editor keeps engine-neutral presentation and lifecycle behavior.
