@@ -161,9 +161,29 @@ describe("Activity Definition graph payload wire boundary", () => {
       conversion: { mode: "Explicit", target: "string" },
       argumentExtras: { evaluatorType: "liquid-evaluator", futureArgumentField: "retain-child" }
     });
+    expect(savedPayload.rootActivity.nullable.expression.value).toBeNull();
+    expect(savedPayload.rootActivity.structure?.payload.activities[0].nullable.expression.value).toBeNull();
     expect(savedPayload.rootActivity.structure?.payload.activities[0].childExtension).toEqual({ retain: "child" });
     expect(savedPayload.rootActivity.outputs).toEqual(authoringPayload.rootActivity.outputs);
     expect(saved.layout).toEqual(layout);
+
+    const movedLayout = moveRootLayout(saved.layout, 40, 64);
+    await replaceActivityDefinitionDraft(context, "draft-1", {
+      expectedRevision: saved.revision,
+      contract: saved.contract,
+      provider: { ...saved.provider, payload: savedPayload },
+      layout: movedLayout
+    });
+    const resavedPayload = (putJson.mock.calls[1]?.[1] as { provider: typeof provider }).provider.payload as ReturnType<typeof graphWirePayload>;
+    expect(putJson.mock.calls[1]?.[1]).toMatchObject({ layout: [{ nodeId: "root", data: { x: 40, y: 64, customLayoutValue: "retain" } }] });
+    expect(resavedPayload.rootActivity.inputs).toContainEqual({
+      referenceKey: "nullable",
+      value: { value: null, expressionType: "Literal" }
+    });
+    expect(resavedPayload.rootActivity.structure?.payload.activities[0].inputs).toContainEqual({
+      referenceKey: "nullable",
+      value: { value: null, expressionType: "Literal" }
+    });
   });
 
   it("normalizes provider-bearing create, migration, conflict-copy, and contract-application boundaries", async () => {
@@ -231,10 +251,11 @@ describe("Activity Definition graph payload wire boundary", () => {
 
   it("expands graph payloads on full-draft and version reads, while leaving other and redacted providers unchanged", async () => {
     const wirePayload = graphWirePayload();
+    const layout = [{ nodeId: "root", data: { x: 16, y: 24, customLayoutValue: "retain" } }];
     const getJson = vi.fn(async (url: string) => {
       if (url === "/capabilities") return capabilities();
       if (url === "/design/activities/drafts/draft-1") {
-        return fullDraft({ providerKey: "elsa.activity-graph", schemaVersion: "2", manifestFingerprint: "fp", payload: wirePayload });
+        return fullDraft({ providerKey: "elsa.activity-graph", schemaVersion: "2", manifestFingerprint: "fp", payload: wirePayload }, layout);
       }
       if (url === "/design/activities/versions/version-1") return fullVersion({
         providerKey: "elsa.activity-graph", schemaVersion: "2", manifestFingerprint: "fp", payload: wirePayload
@@ -254,6 +275,7 @@ describe("Activity Definition graph payload wire boundary", () => {
     const context = { baseUrl: "test://activity-definition-graph-reads", http: { getJson, putJson } } as unknown as StudioEndpointContext;
 
     const draft = await getActivityDefinitionDraft(context, "draft-1");
+    const draftPayload = draft.provider.payload as ReturnType<typeof graphAuthoringPayload>;
     const version = await getActivityDefinitionVersion(context, "version-1");
     const redacted = await getActivityDefinitionDraft(context, "redacted");
     const other = await getActivityDefinitionDraft(context, "other-provider");
@@ -265,12 +287,30 @@ describe("Activity Definition graph payload wire boundary", () => {
       layout: []
     });
 
-    expect((draft.provider.payload as ReturnType<typeof graphAuthoringPayload>).rootActivity.text.expression.value).toBe("return 'root';");
+    expect(draftPayload.rootActivity.text.expression.value).toBe("return 'root';");
     expect((version.provider.payload as ReturnType<typeof graphAuthoringPayload>).rootActivity.structure?.payload.activities[0].text.expression.value).toBe("{{ variables.message }}");
     expect(Object.hasOwn(redacted.provider, "payload")).toBe(false);
     expect(other.provider.payload).toEqual({ rootActivity: { text: { expression: { type: "JavaScript", value: "leave alone" } } } });
     expect((putJson.mock.calls[0]?.[1] as { provider: { payload: unknown } }).provider.payload).toEqual(foreignPayload);
     expect(foreignSaved.provider.payload).toEqual(foreignPayload);
+
+    const movedLayout = moveRootLayout(draft.layout, 32, 64);
+    await replaceActivityDefinitionDraft(context, "draft-1", {
+      expectedRevision: draft.revision,
+      contract: draft.contract,
+      provider: { ...draft.provider, payload: draftPayload },
+      layout: movedLayout
+    });
+    const savedGraphRequest = putJson.mock.calls[1]?.[1] as { provider: { payload: ReturnType<typeof graphWirePayload> }; layout: unknown };
+    expect(savedGraphRequest.layout).toEqual([{ nodeId: "root", data: { x: 32, y: 64, customLayoutValue: "retain" } }]);
+    expect(savedGraphRequest.provider.payload.rootActivity.inputs).toContainEqual({
+      referenceKey: "nullable",
+      value: { value: null, expressionType: "Literal" }
+    });
+    expect(savedGraphRequest.provider.payload.rootActivity.structure?.payload.activities[0].inputs).toContainEqual({
+      referenceKey: "nullable",
+      value: { value: null, expressionType: "Literal" }
+    });
   });
 });
 
@@ -294,6 +334,12 @@ function contract() {
   return { contractSchemaVersion: "1", inputs: [], outputs: [], outcomes: [] };
 }
 
+function moveRootLayout(layout: ActivityDefinitionDraftView["layout"], x: number, y: number) {
+  return layout.map(record => record.nodeId === "root"
+    ? { ...record, data: { ...(record.data as Record<string, unknown>), x, y } }
+    : record);
+}
+
 function graphAuthoringPayload() {
   return {
     payloadExtension: { retain: "payload" },
@@ -303,6 +349,7 @@ function graphAuthoringPayload() {
       inputs: [{ referenceKey: "existing", value: { value: "seed", expressionType: "Literal" }, futureArgumentField: "retain-existing" }],
       outputs: [{ referenceKey: "foreign-output", value: { value: "seed", expressionType: "Literal" }, futureOutputField: "retain-output" }],
       rootExtension: { retain: "root" },
+      nullable: { typeName: "System.Object", expression: { type: "Literal", value: null } },
       text: {
         typeName: "System.String",
         expression: { type: "JavaScript", value: "return 'root';" },
@@ -319,6 +366,7 @@ function graphAuthoringPayload() {
             inputs: [],
             outputs: [],
             childExtension: { retain: "child" },
+            nullable: { typeName: "System.Object", expression: { type: "Literal", value: null } },
             text: {
               typeName: "System.String",
               expression: { type: "Liquid", value: "{{ variables.message }}" },
@@ -341,6 +389,7 @@ function graphWirePayload() {
       activityVersionId: "root-version",
       inputs: [
         { referenceKey: "existing", value: { value: "seed", expressionType: "Literal" }, futureArgumentField: "retain-existing" },
+        { referenceKey: "nullable", value: { value: null, expressionType: "Literal" } },
         {
           referenceKey: "text",
           value: { value: "return 'root';", expressionType: "JavaScript" },
@@ -359,6 +408,9 @@ function graphWirePayload() {
             nodeId: "child",
             activityVersionId: "write-line-version",
             inputs: [{
+              referenceKey: "nullable",
+              value: { value: null, expressionType: "Literal" }
+            }, {
               referenceKey: "text",
               value: { value: "{{ variables.message }}", expressionType: "Liquid" },
               conversion: { mode: "Explicit", target: "string" },
