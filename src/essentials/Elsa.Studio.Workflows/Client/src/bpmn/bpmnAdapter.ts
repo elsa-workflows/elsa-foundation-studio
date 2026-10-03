@@ -1,5 +1,6 @@
 import type { Edge, Node, XYPosition } from "@xyflow/react";
-import type { ActivityCatalogItem, ActivityNode, DesignMetadataRecord } from "../workflowTypes";
+import type { ActivityCatalogItem, ActivityNode, ActivityPresentationRecord, DesignMetadataRecord } from "../workflowTypes";
+import { indexActivityPresentation, resolveActivityLabel } from "../activityPresentation";
 import type { WorkflowRuntimeNodeOverlay } from "../workflowAdapter";
 import { collectActivityNodeIds, getActivityDisplay, getChildSlots, readStructureDesignFacet, resolveActivityIcon, type ActivityCatalogLookup, type CanvasScope, type ChildSlot, type WorkflowNodeIcon } from "../workflowAdapter";
 import {
@@ -55,14 +56,20 @@ export function findBpmnElement(owner: ActivityNode | null | undefined, elementI
   return readBpmnElements(owner).find(element => element.elementId === elementId) ?? null;
 }
 
-export function buildBpmnCanvas(scope: CanvasScope, catalog: ActivityCatalogItem[], layout: DesignMetadataRecord[]): BpmnCanvas {
+export function buildBpmnCanvas(
+  scope: CanvasScope,
+  catalog: ActivityCatalogItem[],
+  layout: DesignMetadataRecord[],
+  activityPresentation?: ActivityPresentationRecord[]
+): BpmnCanvas {
   const catalogByVersion = new Map(catalog.map(activity => [activity.activityVersionId, activity]));
+  const presentationByNodeId = indexActivityPresentation(activityPresentation);
   const activitiesByNodeId = new Map(scope.slot.activities.map(activity => [activity.nodeId, activity]));
   const layoutByNodeId = new Map(layout.map(record => [record.nodeId, record]));
 
   const nodes = readBpmnElements(scope.owner).map((element, index) => {
     const position = layoutByNodeId.get(element.elementId) ?? defaultBpmnPosition(index);
-    return createBpmnNode(element, activitiesByNodeId, catalogByVersion, { x: position.x, y: position.y });
+    return createBpmnNode(element, activitiesByNodeId, catalogByVersion, presentationByNodeId, { x: position.x, y: position.y });
   });
 
   return { nodes, edges: bpmnEdges(scope.owner) };
@@ -86,6 +93,7 @@ function createBpmnNode(
   element: BpmnElement,
   activitiesByNodeId: Map<string, ActivityNode>,
   catalogByVersion: Map<string, ActivityCatalogItem>,
+  presentationByNodeId: Map<string, ActivityPresentationRecord>,
   position: XYPosition
 ): Node<BpmnNodeData> {
   const boundActivityNode = element.childNodeId ? activitiesByNodeId.get(element.childNodeId) : undefined;
@@ -95,7 +103,10 @@ function createBpmnNode(
         nodeId: boundActivityNode.nodeId,
         activityVersionId: boundActivityNode.activityVersionId,
         activityTypeKey: catalogItem?.activityTypeKey,
-        label: catalogItem ? getActivityDisplay(catalogItem) : boundActivityNode.activityVersionId,
+        label: resolveActivityLabel(
+          presentationByNodeId.get(boundActivityNode.nodeId),
+          catalogItem,
+          boundActivityNode.activityVersionId),
         icon: resolveActivityIcon(catalogItem)
       }
     : undefined;

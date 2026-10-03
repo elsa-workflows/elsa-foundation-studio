@@ -265,7 +265,7 @@ export function WorkflowInstances({ context, navigate }: {
               type="button"
               className="wf-grid-row"
               role="row"
-              aria-label={`Inspect workflow run ${instance.workflowExecutionId}`}
+              aria-label={`Inspect workflow run ${instance.workflowExecutionId} · ${instance.status}${instance.subStatus ? ` · ${instance.subStatus}` : ""} · ${formatCurrentIncidentHealth(instance)}`}
               key={instance.workflowExecutionId}
               onClick={() => openInstance(instance.workflowExecutionId)}
             >
@@ -1247,7 +1247,7 @@ export function buildInstanceCanvas(
   const scopeOwnerCatalogItem = activityCatalog.find(activity => activity.activityVersionId === scopeOwner.activityVersionId);
   const support = getActivityDesignerSupport(scopeOwner, scopeOwnerCatalogItem);
   const baseCanvas = support === "bpmn" && scope
-    ? buildBpmnCanvas(scope, activityCatalog, definitionVersion.layout)
+    ? buildBpmnCanvas(scope, activityCatalog, definitionVersion.layout, definitionVersion.activityPresentation)
     : support === "unsupported" || !scope
     ? buildUnsupportedActivityCanvas(
         scopeOwner,
@@ -2427,7 +2427,6 @@ export function WorkflowIncidentList({
               <button
                 type="button"
                 className="wf-instance-incident-summary"
-                aria-label={`Select incident ${incident.failureType}`}
                 onClick={() => onSelectEvidence?.(incident.incidentId)}
               >
                 <strong>{activityLabel ? `${activityLabel}${inputLabel ? ` · ${inputLabel}` : ""}` : inputLabel ? `Input · ${inputLabel}` : incident.failureType}</strong>

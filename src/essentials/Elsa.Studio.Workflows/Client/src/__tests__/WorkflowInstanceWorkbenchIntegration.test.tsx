@@ -242,6 +242,17 @@ describe("workflow run workbench incident navigation", () => {
     expect(api.getActivityExecutionInspection).not.toHaveBeenCalled();
   });
 
+  it("keeps the visible incident summary in the selection button's accessible name", async () => {
+    renderWorkbench();
+    await vi.waitFor(() => expect(container.querySelector(".wf-instance-incident-summary")).toBeTruthy());
+
+    const summary = container.querySelector<HTMLButtonElement>(".wf-instance-incident-summary")!;
+    expect(summary.hasAttribute("aria-label")).toBe(false);
+    expect(summary.textContent).toContain("Write Line · Text input");
+    expect(summary.textContent).toContain("The Text input failed.");
+    expect(summary.textContent).toContain("Needs intervention · Open");
+  });
+
   it("clears input focus when a different incident is selected", async () => {
     const firstActivity = {
       ...activityExecution(),
@@ -257,8 +268,8 @@ describe("workflow run workbench incident navigation", () => {
       authoredActivityId: "target-second",
       incidentIds: ["incident-second"]
     };
-    const firstIncident = incident({ incidentId: "incident-first", activityExecutionId: "execution-first", executableNodeId: "compiled-first", failureType: "FirstFailure" });
-    const secondIncident = incident({ incidentId: "incident-second", activityExecutionId: "execution-second", executableNodeId: "compiled-second", failureType: "SecondFailure" });
+    const firstIncident = incident({ incidentId: "incident-first", activityExecutionId: "execution-first", executableNodeId: "compiled-first", failureType: "FirstFailure", message: "First failure." });
+    const secondIncident = incident({ incidentId: "incident-second", activityExecutionId: "execution-second", executableNodeId: "compiled-second", failureType: "SecondFailure", message: "Second failure." });
     api.getWorkflowInstance.mockResolvedValue(workflowDetails({ activities: [firstActivity, secondActivity], incidents: [firstIncident, secondIncident] }));
     api.getActivityExecutionInspection.mockImplementation((_context, workflowExecutionId: string, activityExecutionId: string) =>
       Promise.resolve(activityInspection({ activityExecutionId, workflowExecutionId })));
@@ -269,7 +280,8 @@ describe("workflow run workbench incident navigation", () => {
     await vi.waitFor(() => expect(container.querySelector<HTMLDetailsElement>(".wf-input-inspection-row details")?.open).toBe(true));
 
     click(container.querySelector<HTMLButtonElement>("[data-tab-id='issues']"));
-    click(container.querySelector<HTMLButtonElement>("[aria-label='Select incident SecondFailure']"));
+    click([...container.querySelectorAll<HTMLButtonElement>(".wf-instance-incident-summary")]
+      .find(button => button.textContent?.includes("Second failure.")));
     click(container.querySelector<HTMLButtonElement>("[data-tab-id='activity']"));
 
     await vi.waitFor(() => expect(container.textContent).toContain("execution-second"));

@@ -98,6 +98,8 @@ describe("workflow run history", () => {
       return page("blocking-run", {
         items: [{
           ...page("blocking-run").items[0],
+          status: "Faulted",
+          subStatus: "Retrying",
           incidentCount: 4,
           activeIncidentCount: 2,
           blockingIncidentCount: 1
@@ -110,6 +112,8 @@ describe("workflow run history", () => {
     await waitFor(() => expect(container.textContent).toContain("blocking-run"));
     expect(container.textContent).toContain("Needs intervention");
     expect(container.textContent).toContain("4 incidents");
+    expect(container.querySelector(".wf-grid-row")?.getAttribute("aria-label"))
+      .toContain("Faulted · Retrying · 2 active · 1 blocking · Needs intervention");
     expect(getJson.mock.calls.map(([url]) => url)).toContain("/runtime/workflows/instances/health?incidentHealth=blocking&take=25");
 
     select(container.querySelector<HTMLSelectElement>("select[aria-label='Workflow run incident health']")!, "active");

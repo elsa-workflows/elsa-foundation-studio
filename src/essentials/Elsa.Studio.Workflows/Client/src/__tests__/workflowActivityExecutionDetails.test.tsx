@@ -17,6 +17,7 @@ import {
 import type { ScopeFrame } from "../workflowAdapter";
 import type {
   ActivityCatalogItem,
+  ActivityNode,
   ActivityExecutionInspection,
   ActivityExecutionInspectionValueSnapshot,
   ActivityExecutionStateSummary,
@@ -24,6 +25,7 @@ import type {
   WorkflowDefinitionVersionDetails,
   WorkflowInstanceDetails
 } from "../workflowTypes";
+import { bpmnStructureKind } from "../bpmn/bpmnTypes";
 import type { ExecutableGraphNodeFacts } from "../executableGraph";
 import { flowchartActivity, flowchartNode, forEachActivity, forEachNode, leafNode, writeLine } from "./fixtures";
 
@@ -1052,6 +1054,37 @@ describe("buildInstanceCanvas", () => {
 
     const descended = buildInstanceCanvas(definitionVersion, instanceCatalog, instanceDetails([]), null, frames, () => {});
     expect(descended.nodes.map(node => node.id).sort()).toEqual(["wl-1", "wl-2"]);
+  });
+
+  it("uses frozen BPMN activity labels in the historical run canvas", () => {
+    const bpmnRoot: ActivityNode = {
+      nodeId: "bpmn-root",
+      activityVersionId: "bpmn@1",
+      inputs: [],
+      outputs: [],
+      structure: {
+        kind: bpmnStructureKind,
+        schemaVersion: "1.0.0",
+        payload: {
+          elements: [
+            { elementId: "frozen-task", elementType: "task", childNodeId: "node-frozen" },
+            { elementId: "named-task", elementType: "task", name: "BPMN element name", childNodeId: "node-named" }
+          ],
+          sequenceFlows: [],
+          activities: [leafNode("node-frozen"), leafNode("node-named")]
+        }
+      }
+    };
+    const version: WorkflowDefinitionVersionDetails = {
+      ...definitionVersion,
+      state: { rootActivity: bpmnRoot },
+      activityPresentation: [{ nodeId: "node-frozen", displayName: "Frozen run label" }]
+    };
+
+    const canvas = buildInstanceCanvas(version, instanceCatalog, instanceDetails([]), null, [], () => {});
+
+    expect(canvas.nodes.find(node => node.id === "frozen-task")?.data.label).toBe("Frozen run label");
+    expect(canvas.nodes.find(node => node.id === "named-task")?.data.label).toBe("BPMN element name");
   });
 
   it("gives an unsupported scope owner no slot navigation, matching the editor's static placeholder", () => {
