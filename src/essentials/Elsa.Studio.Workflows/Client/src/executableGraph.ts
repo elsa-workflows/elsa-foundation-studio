@@ -171,6 +171,21 @@ export function findExecutableNodeFacts(
   return undefined;
 }
 
+export function findExecutableGraphNodeId(
+  graph: ExecutableActivityGraph | null | undefined,
+  identity: { executableNodeId?: string | null; authoredActivityId?: string | null } | null | undefined
+) {
+  if (!graph || !identity) return null;
+  if (identity.executableNodeId) {
+    for (const [nodeId, facts] of graph.factsByNodeId) {
+      if (facts.executableNodeId === identity.executableNodeId) return nodeId;
+    }
+  }
+  return identity.authoredActivityId && graph.factsByNodeId.has(identity.authoredActivityId)
+    ? identity.authoredActivityId
+    : null;
+}
+
 // True when the graph node was minted for a catalog miss ("not available in this environment").
 export function isGhostFact(fact: ExecutableGraphNodeFacts | undefined): boolean {
   return !!fact && !fact.available;
