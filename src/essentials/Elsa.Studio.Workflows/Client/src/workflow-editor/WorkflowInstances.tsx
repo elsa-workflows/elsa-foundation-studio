@@ -661,8 +661,16 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
       : current);
   };
 
+  const beginEvidenceNavigation = () => {
+    const requestId = ++incidentNavigationRequest.current;
+    setIncidentAssociationMessage(null);
+    setFocusInputKey(null);
+    setFocusedRuntimeNodeId(null);
+    return requestId;
+  };
+
   const selectEvidence = (evidenceId: string | null) => {
-    incidentNavigationRequest.current += 1;
+    beginEvidenceNavigation();
     setSelectedEvidenceId(evidenceId);
   };
 
@@ -682,9 +690,8 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
   };
 
   const openIncidentInIssues = (incidentId?: string | null, nodeId?: string | null) => {
-    const requestId = ++incidentNavigationRequest.current;
+    const requestId = beginEvidenceNavigation();
     const isCurrent = () => incidentNavigationRequest.current === requestId;
-    setIncidentAssociationMessage(null);
     const incident = data?.details.incidents?.find(item => item.incidentId === incidentId);
     const existingAssociation = incident
       ? resolveIncidentActivityAssociation(incident, associationActivities, data?.executableGraph)
@@ -692,7 +699,6 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
     const targetNodeId = nodeId ?? existingAssociation?.nodeId ?? null;
     setSelectedEvidenceId(incidentId ?? null);
     setActiveInspectorTab("issues");
-    setFocusInputKey(null);
     setFocusedRuntimeNodeId(targetNodeId);
     focusNodePath(targetNodeId);
     openInspector();
@@ -707,9 +713,8 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
   };
 
   const showIncidentActivity = (incident: IncidentStateSummary, showInput: boolean) => {
-    const requestId = ++incidentNavigationRequest.current;
+    const requestId = beginEvidenceNavigation();
     const isCurrent = () => incidentNavigationRequest.current === requestId;
-    setIncidentAssociationMessage(null);
     const existingAssociation = resolveIncidentActivityAssociation(incident, associationActivities, data?.executableGraph);
     setSelectedEvidenceId(incident.incidentId);
     setActiveInspectorTab(existingAssociation?.activityExecution ? "activity" : "issues");
@@ -736,7 +741,6 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
   };
 
   const selectActivityExecution = (activityExecutionId: string) => {
-    incidentNavigationRequest.current += 1;
     const activity = associationActivities.find(item => item.activityExecutionId === activityExecutionId);
     if (!activity) return;
     const incident = choosePreferredIncident((data?.details.incidents ?? []).filter(item =>
@@ -745,17 +749,16 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
       openIncidentInIssues(incident.incidentId, findExecutableGraphNodeId(data?.executableGraph, activity) ?? (activity.authoredActivityId || activity.executableNodeId));
       return;
     }
+    beginEvidenceNavigation();
     const nodeId = findExecutableGraphNodeId(data?.executableGraph, activity) ?? (activity.authoredActivityId || activity.executableNodeId);
     setSelectedEvidenceId(activityExecutionId);
     setActiveInspectorTab("activity");
-    setFocusInputKey(null);
     setFocusedRuntimeNodeId(nodeId);
     focusNodePath(nodeId);
     openInspector();
   };
 
   const selectGraphActivity = (nodeId: string) => {
-    incidentNavigationRequest.current += 1;
     const nodeIncidents = (data?.details.incidents ?? []).filter(incident =>
       isActiveIncident(incident) && resolveIncidentActivityAssociation(incident, associationActivities, data?.executableGraph)?.nodeId === nodeId);
     const incidentToOpen = choosePreferredIncident(nodeIncidents);
@@ -763,9 +766,9 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
       openIncidentInIssues(incidentToOpen.incidentId, nodeId);
       return;
     }
+    beginEvidenceNavigation();
     setSelectedEvidenceId(nodeId);
     setActiveInspectorTab("activity");
-    setFocusInputKey(null);
     setFocusedRuntimeNodeId(nodeId);
     openInspector();
   };

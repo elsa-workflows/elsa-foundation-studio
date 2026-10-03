@@ -242,6 +242,77 @@ describe("workflow run workbench incident navigation", () => {
     expect(api.getActivityExecutionInspection).not.toHaveBeenCalled();
   });
 
+  it("clears input focus when a different incident is selected", async () => {
+    const firstActivity = {
+      ...activityExecution(),
+      activityExecutionId: "execution-first",
+      executableNodeId: "compiled-first",
+      authoredActivityId: "target-first",
+      incidentIds: ["incident-first"]
+    };
+    const secondActivity = {
+      ...activityExecution(),
+      activityExecutionId: "execution-second",
+      executableNodeId: "compiled-second",
+      authoredActivityId: "target-second",
+      incidentIds: ["incident-second"]
+    };
+    const firstIncident = incident({ incidentId: "incident-first", activityExecutionId: "execution-first", executableNodeId: "compiled-first", failureType: "FirstFailure" });
+    const secondIncident = incident({ incidentId: "incident-second", activityExecutionId: "execution-second", executableNodeId: "compiled-second", failureType: "SecondFailure" });
+    api.getWorkflowInstance.mockResolvedValue(workflowDetails({ activities: [firstActivity, secondActivity], incidents: [firstIncident, secondIncident] }));
+    api.getActivityExecutionInspection.mockImplementation((_context, workflowExecutionId: string, activityExecutionId: string) =>
+      Promise.resolve(activityInspection({ activityExecutionId, workflowExecutionId })));
+
+    renderWorkbench();
+    await vi.waitFor(() => expect(container.querySelector(".wf-instance-detail-workbench")).toBeTruthy());
+    click(buttonByText(container, "View input evidence"));
+    await vi.waitFor(() => expect(container.querySelector<HTMLDetailsElement>(".wf-input-inspection-row details")?.open).toBe(true));
+
+    click(container.querySelector<HTMLButtonElement>("[data-tab-id='issues']"));
+    click(container.querySelector<HTMLButtonElement>("[aria-label='Select incident SecondFailure']"));
+    click(container.querySelector<HTMLButtonElement>("[data-tab-id='activity']"));
+
+    await vi.waitFor(() => expect(container.textContent).toContain("execution-second"));
+    await vi.waitFor(() => expect(container.querySelector(".wf-input-inspection-row details")).toBeTruthy());
+    expect(container.querySelector<HTMLDetailsElement>(".wf-input-inspection-row details")?.open).toBe(false);
+  });
+
+  it("clears a denied incident lookup message when a healthy activity is selected", async () => {
+    const deniedIncident = incident({
+      incidentId: "incident-denied",
+      activityExecutionId: "execution-denied",
+      executableNodeId: "compiled-denied",
+      failureType: "DeniedFailure"
+    });
+    const healthyActivity = {
+      ...activityExecution(),
+      activityExecutionId: "execution-healthy",
+      executableNodeId: "compiled-healthy",
+      authoredActivityId: "healthy-node",
+      incidentCount: 0,
+      incidentIds: []
+    };
+    api.getWorkflowInstance.mockResolvedValue(workflowDetails({ activities: [healthyActivity], incidents: [deniedIncident] }));
+    api.supportsActivityExecutionInspection.mockReset().mockResolvedValueOnce(false).mockResolvedValue(true);
+    api.getActivityExecutionInspection.mockImplementation((_context, workflowExecutionId: string, activityExecutionId: string) =>
+      activityExecutionId === "execution-denied"
+        ? Promise.reject(Object.assign(new Error("Forbidden"), { status: 403 }))
+        : Promise.resolve(activityInspection({ activityExecutionId, workflowExecutionId })));
+
+    renderWorkbench();
+    await vi.waitFor(() => expect(container.querySelector(".wf-instance-detail-workbench")).toBeTruthy());
+    click(buttonByText(container, "View input evidence"));
+    await vi.waitFor(() => expect(container.textContent).toContain("You do not have permission to inspect this activity execution"));
+
+    click(container.querySelector<HTMLButtonElement>("[data-tab-id='timeline']"));
+    click(container.querySelector<HTMLButtonElement>(".wf-timeline-entry"));
+    await vi.waitFor(() => expect(container.querySelector("[data-tab-id='activity']")?.getAttribute("aria-selected")).toBe("true"));
+    await vi.waitFor(() => expect(container.textContent).toContain("execution-healthy"));
+    click(container.querySelector<HTMLButtonElement>("[data-tab-id='issues']"));
+
+    expect(container.textContent).not.toContain("You do not have permission to inspect this activity execution");
+  });
+
   it("keeps the newest incident selected when exact activity lookups finish out of order", async () => {
     const firstIncident = incident({ incidentId: "incident-first", activityExecutionId: "execution-first", executableNodeId: "compiled-first", failureType: "FirstFailure", metadata: {} });
     const secondIncident = incident({ incidentId: "incident-second", activityExecutionId: "execution-second", executableNodeId: "compiled-second", failureType: "SecondFailure", metadata: {} });
