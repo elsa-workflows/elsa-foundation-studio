@@ -640,6 +640,91 @@ describe("workflow adapter", () => {
     expect(ambiguousNodes.map(node => node.data.runtime?.primaryIncidentId)).toEqual([undefined, undefined]);
   });
 
+  it("keeps pinned repeated-authored placements separate when executable IDs collide with authored identity", () => {
+    const graph = buildExecutableActivityGraph({
+      executableNodeId: "root-executable",
+      authoredActivityId: "root-authored",
+      activityType: sequenceActivity.activityTypeKey,
+      activityTypeVersion: sequenceActivity.version,
+      inputBindings: [],
+      childSlots: [{ name: "Sequence.Activities", activities: [
+        {
+          executableNodeId: "first-executable",
+          authoredActivityId: "shared-node-id",
+          activityType: writeLine.activityTypeKey,
+          activityTypeVersion: writeLine.version,
+          inputBindings: [],
+          childSlots: []
+        },
+        {
+          executableNodeId: "shared-node-id",
+          authoredActivityId: "shared-node-id",
+          activityType: writeLine.activityTypeKey,
+          activityTypeVersion: writeLine.version,
+          inputBindings: [],
+          childSlots: []
+        }
+      ] }]
+    }, [sequenceActivity, writeLine]);
+    const canvas = buildCanvas(firstScope(graph.root), [sequenceActivity, writeLine], []);
+    const first = activityExecution({
+      activityExecutionId: "first-execution",
+      authoredActivityId: "shared-node-id",
+      executableNodeId: "first-executable",
+      status: "Running",
+      scheduledAt: "2026-10-01T12:00:00Z",
+      startedAt: "2026-10-01T12:00:00Z",
+      completedAt: null,
+      incidentIds: ["first-incident"],
+      faultCount: 1
+    });
+    const second = activityExecution({
+      activityExecutionId: "second-execution",
+      authoredActivityId: "shared-node-id",
+      executableNodeId: "shared-node-id",
+      status: "Completed",
+      scheduledAt: "2026-10-01T12:01:00Z",
+      startedAt: "2026-10-01T12:01:00Z",
+      completedAt: "2026-10-01T12:02:00Z",
+      incidentIds: ["second-incident"],
+      faultCount: 2
+    });
+    const firstIncident = incident({ incidentId: "first-incident", activityExecutionId: "first-execution", executableNodeId: "first-executable" });
+    const secondIncident = incident({ incidentId: "second-incident", activityExecutionId: "second-execution", executableNodeId: "shared-node-id" });
+    const placed = applyRuntimeOverlays(canvas.nodes, [first, second], [firstIncident, secondIncident], "second-incident", [sequenceActivity, writeLine], graph);
+    const firstNode = placed.find(node => node.id === "first-executable")!;
+    const secondNode = placed.find(node => node.id === "shared-node-id")!;
+
+    expect(firstNode.data.runtime).toMatchObject({
+      status: "Running",
+      activityExecutionId: "first-execution",
+      faultCount: 1,
+      primaryIncidentId: "first-incident",
+      selected: false
+    });
+    expect(secondNode.data.runtime).toMatchObject({
+      status: "Completed",
+      activityExecutionId: "second-execution",
+      faultCount: 2,
+      primaryIncidentId: "second-incident",
+      selected: true
+    });
+
+    const nodeOnlyIncident = incident({
+      incidentId: "first-node-only-incident",
+      activityExecutionId: null,
+      executableNodeId: "first-executable"
+    });
+    const pageBound = applyRuntimeOverlays(canvas.nodes, [first], [nodeOnlyIncident], nodeOnlyIncident.incidentId, [sequenceActivity, writeLine], graph);
+    expect(pageBound.find(node => node.id === "first-executable")?.data.runtime).toMatchObject({
+      activityExecutionId: "first-execution",
+      incidentCount: 1,
+      primaryIncidentId: "first-node-only-incident",
+      selected: true
+    });
+    expect(pageBound.find(node => node.id === "shared-node-id")?.data.runtime).toBeUndefined();
+  });
+
   it("excludes resolved and suppressed incidents from current node health while retaining history", () => {
     const canvas = buildCanvas(firstScope(sequenceRoot([node("write-line-1")])), [writeLine], []);
     const nonBlocking = { ...incident(), incidentId: "incident-nonblocking", isBlocking: false, status: "Open" };

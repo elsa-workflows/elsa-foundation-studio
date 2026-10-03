@@ -169,6 +169,48 @@ describe("Runtime-pinned workflow instance rendering", () => {
     }), [first, second], graph)).toEqual({ nodeId: null, activityExecution: null });
   });
 
+  it("prefers pinned executable identity when a node ID collides with another node's authored ID", () => {
+    const graph = buildExecutableActivityGraph({
+      executableNodeId: "root-executable",
+      authoredActivityId: "root-authored",
+      activityType: "Example.Root",
+      activityTypeVersion: "1.0.0",
+      inputBindings: [],
+      childSlots: [{ name: "Sequence.Activities", activities: [
+        {
+          executableNodeId: "first-executable",
+          authoredActivityId: "shared-node-id",
+          activityType: "Example.Activity",
+          activityTypeVersion: "1.0.0",
+          inputBindings: [],
+          childSlots: []
+        },
+        {
+          executableNodeId: "shared-node-id",
+          authoredActivityId: "second-authored-node",
+          activityType: "Example.Activity",
+          activityTypeVersion: "1.0.0",
+          inputBindings: [],
+          childSlots: []
+        }
+      ] }]
+    }, []);
+    const onlyFirstExecutionIsLoaded = activityExecution({
+      activityExecutionId: "first-execution",
+      authoredActivityId: "shared-node-id",
+      executableNodeId: "first-executable",
+      incidentIds: []
+    });
+    const pageBoundIncident = incident({
+      incidentId: "page-bound-node-only",
+      activityExecutionId: "second-execution-not-loaded",
+      executableNodeId: "shared-node-id"
+    });
+
+    expect(resolveIncidentActivityAssociation(pageBoundIncident, [onlyFirstExecutionIsLoaded], graph))
+      .toEqual({ nodeId: "second-authored-node", activityExecution: null });
+  });
+
   it("loads an active exact execution beyond the summary page for occurrence and input navigation", async () => {
     const first = activityExecution({ activityExecutionId: "repeat-1" });
     const second = activityExecution({ activityExecutionId: "repeat-2" });

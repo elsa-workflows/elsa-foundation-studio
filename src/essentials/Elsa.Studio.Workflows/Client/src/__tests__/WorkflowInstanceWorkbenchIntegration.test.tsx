@@ -438,6 +438,145 @@ describe("workflow run workbench incident navigation", () => {
     expect(incidentCount).toBe("0");
   });
 
+  it("removes a transiently failed association from Load more after exact on-demand inspection succeeds", async () => {
+    api.getWorkflowInstance.mockResolvedValue(workflowDetails({ activities: [], incidents: [incident()] }));
+    api.supportsActivityExecutionInspection.mockResolvedValue(true);
+    let lookupAttempt = 0;
+    api.getActivityExecutionInspection.mockImplementation(async (_context, workflowExecutionId: string, activityExecutionId: string) => {
+      lookupAttempt++;
+      if (lookupAttempt === 1) throw new Error("Runtime temporarily unavailable");
+      return activityInspection({ workflowExecutionId, activityExecutionId });
+    });
+
+    renderWorkbench();
+    await vi.waitFor(() => expect(buttonByText(container, "Load more affected activities (1)")).toBeTruthy());
+    click(buttonByText(container, "View input evidence"));
+    await vi.waitFor(() => expect(container.querySelector("[data-tab-id='activity']")?.getAttribute("aria-selected")).toBe("true"));
+    click(container.querySelector<HTMLButtonElement>("[data-tab-id='issues']"));
+
+    await vi.waitFor(() => expect(buttonByText(container, "Load more affected activities (1)")).toBeUndefined());
+    expect(container.textContent).not.toContain("Some affected activities are not shown yet");
+  });
+
+  it("clears a denied association after on-demand success while preserving another pending activity", async () => {
+    const deniedIncident = incident({ incidentId: "incident-denied", activityExecutionId: "execution-denied", failureType: "DeniedFailure" });
+    const pendingIncident = incident({ incidentId: "incident-pending", activityExecutionId: "execution-pending", executableNodeId: "compiled-pending", failureType: "PendingFailure" });
+    api.getWorkflowInstance.mockResolvedValue(workflowDetails({ activities: [], incidents: [deniedIncident, pendingIncident] }));
+    api.supportsActivityExecutionInspection.mockResolvedValue(true);
+    let deniedAttempts = 0;
+    api.getActivityExecutionInspection.mockImplementation(async (_context, workflowExecutionId: string, activityExecutionId: string) => {
+      if (activityExecutionId === "execution-denied") {
+        deniedAttempts++;
+        if (deniedAttempts === 1) throw Object.assign(new Error("Forbidden"), { status: 403 });
+        return activityInspection({ workflowExecutionId, activityExecutionId });
+      }
+      throw new Error("Runtime temporarily unavailable");
+    });
+
+    renderWorkbench();
+    await vi.waitFor(() => expect(container.textContent).toContain("You do not have permission to inspect 1 exact activity execution"));
+    expect(container.textContent).toContain("Some affected activities are not shown yet (1 remaining)");
+    click(buttonByText(container, "View input evidence"));
+    await vi.waitFor(() => expect(container.querySelector("[data-tab-id='activity']")?.getAttribute("aria-selected")).toBe("true"));
+    click(container.querySelector<HTMLButtonElement>("[data-tab-id='issues']"));
+
+    await vi.waitFor(() => expect(container.textContent).not.toContain("You do not have permission to inspect 1 exact activity execution"));
+    expect(container.textContent).toContain("Some affected activities are not shown yet (1 remaining)");
+    expect(buttonByText(container, "Load more affected activities (1)")).toBeTruthy();
+  });
+
+  it("marks exact inspection supported after an on-demand success and keeps other unsupported associations pending", async () => {
+    const firstIncident = incident({ incidentId: "incident-first", activityExecutionId: "execution-first", failureType: "FirstFailure" });
+    const secondIncident = incident({ incidentId: "incident-second", activityExecutionId: "execution-second", executableNodeId: "compiled-second", failureType: "SecondFailure" });
+    api.getWorkflowInstance.mockResolvedValue(workflowDetails({ activities: [], incidents: [firstIncident, secondIncident] }));
+    api.supportsActivityExecutionInspection.mockReset().mockResolvedValueOnce(false).mockResolvedValue(true);
+    api.getActivityExecutionInspection.mockImplementation((_context, workflowExecutionId: string, activityExecutionId: string) =>
+      Promise.resolve(activityInspection({ workflowExecutionId, activityExecutionId })));
+
+    renderWorkbench();
+    await vi.waitFor(() => expect(container.textContent).toContain("Exact affected activity evidence is unavailable from this server."));
+    click(buttonByText(container, "View input evidence"));
+    await vi.waitFor(() => expect(container.querySelector("[data-tab-id='activity']")?.getAttribute("aria-selected")).toBe("true"));
+    click(container.querySelector<HTMLButtonElement>("[data-tab-id='issues']"));
+
+    await vi.waitFor(() => expect(buttonByText(container, "Load more affected activities (1)")).toBeTruthy());
+    expect(container.textContent).not.toContain("Exact affected activity evidence is unavailable from this server.");
+    expect(container.textContent).toContain("Some affected activities are not shown yet (1 remaining)");
+  });
+
+  it("keeps exact successes authoritative when an older Load more batch settles", async () => {
+    const lastIndex = 52;
+    const executionId = (index: number) => `execution-${index}`;
+    const incidentAt = (index: number) => incident({
+      incidentId: `incident-${index}`,
+      activityExecutionId: executionId(index),
+      executableNodeId: `compiled-${index}`,
+      failureType: `Failure-${index}`
+    });
+    const incidents = Array.from({ length: lastIndex + 1 }, (_, index) => incidentAt(index));
+    const pendingBatch = [deferred<ActivityExecutionInspection>(), deferred<ActivityExecutionInspection>(), deferred<ActivityExecutionInspection>()];
+    const callsByExecutionId = new Map<string, number>();
+    api.getWorkflowInstance.mockResolvedValue(workflowDetails({ activities: [], incidents }));
+    api.supportsActivityExecutionInspection.mockResolvedValue(true);
+    api.getActivityExecutionInspection.mockImplementation((_context, workflowExecutionId: string, activityExecutionId: string) => {
+      const index = Number(activityExecutionId.replace("execution-", ""));
+      if (index < 50) {
+        return Promise.resolve(activityInspection({ activityExecutionId, workflowExecutionId, executableNodeId: `compiled-${index}`, incidents: [incidents[index]!] }));
+      }
+      const callCount = (callsByExecutionId.get(activityExecutionId) ?? 0) + 1;
+      callsByExecutionId.set(activityExecutionId, callCount);
+      if (callCount === 1) return pendingBatch[index - 50]!.promise;
+      return Promise.resolve(activityInspection({
+        activityExecutionId,
+        workflowExecutionId,
+        executableNodeId: `compiled-${index}`,
+        status: "Completed",
+        incidents: [incidents[index]!]
+      }));
+    });
+
+    renderWorkbench();
+    await vi.waitFor(() => expect(buttonByText(container, "Load more affected activities (3)")).toBeTruthy());
+    click(buttonByText(container, "Load more affected activities (3)"));
+    await vi.waitFor(() => expect(api.getActivityExecutionInspection).toHaveBeenCalledTimes(53));
+
+    for (let index = 50; index <= lastIndex; index++) {
+      const row = [...container.querySelectorAll<HTMLElement>(".wf-instance-incident")]
+        .find(candidate => candidate.textContent?.includes(`Failure-${index}`));
+      click(buttonByText(row!, "View input evidence"));
+      await vi.waitFor(() => expect(container.querySelector("[data-tab-id='activity']")?.getAttribute("aria-selected")).toBe("true"));
+      await vi.waitFor(() => expect(container.querySelector(".wf-activity-overview-status")?.textContent).toContain("Completed"));
+      if (index < lastIndex) {
+        click(container.querySelector<HTMLButtonElement>("[data-tab-id='issues']"));
+        await vi.waitFor(() => expect(container.querySelector("[data-tab-id='issues']")?.getAttribute("aria-selected")).toBe("true"));
+      }
+    }
+
+    click(container.querySelector<HTMLButtonElement>("[data-tab-id='issues']"));
+    await vi.waitFor(() => expect(buttonByText(container, "Load more affected activities (3)")).toBeUndefined());
+    expect(container.textContent).not.toContain("You do not have permission to inspect 1 exact activity execution");
+
+    pendingBatch[0]!.reject(new Error("Runtime temporarily unavailable"));
+    pendingBatch[1]!.reject(Object.assign(new Error("Forbidden"), { status: 403 }));
+    pendingBatch[2]!.resolve(activityInspection({
+      activityExecutionId: executionId(lastIndex),
+      executableNodeId: `compiled-${lastIndex}`,
+      status: "Faulted",
+      incidents: [incidents[lastIndex]!]
+    }));
+    await pendingBatch[2]!.promise;
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(container.textContent).not.toContain("Some affected activities are not shown yet");
+    expect(container.textContent).not.toContain("You do not have permission to inspect 1 exact activity execution");
+    click(buttonByText([...container.querySelectorAll<HTMLElement>(".wf-instance-incident")]
+      .find(candidate => candidate.textContent?.includes(`Failure-${lastIndex}`))!, "View input evidence"));
+    await vi.waitFor(() => expect(container.querySelector(".wf-activity-overview-status")?.textContent).toContain("Completed"));
+    const incidentCount = [...container.querySelectorAll(".wf-activity-summary-grid dt")]
+      .find(label => label.textContent === "Incidents")?.nextElementSibling?.textContent;
+    expect(incidentCount).toBe("1");
+  });
+
   it("keeps the newest incident selected when exact activity lookups finish out of order", async () => {
     const firstIncident = incident({ incidentId: "incident-first", activityExecutionId: "execution-first", executableNodeId: "compiled-first", failureType: "FirstFailure", metadata: {} });
     const secondIncident = incident({ incidentId: "incident-second", activityExecutionId: "execution-second", executableNodeId: "compiled-second", failureType: "SecondFailure", metadata: {} });
@@ -495,8 +634,12 @@ function click(button: HTMLButtonElement | undefined | null) {
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>(done => { resolve = done; });
-  return { promise, resolve };
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((done, fail) => {
+    resolve = done;
+    reject = fail;
+  });
+  return { promise, resolve, reject };
 }
 
 function workflowDetails({ activities = [activityExecution()], incidents = [incident()] }: {

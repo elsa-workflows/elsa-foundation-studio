@@ -45,15 +45,12 @@ export function applyRuntimeOverlays<TNodeData extends Record<string, unknown>>(
     if (executableId) {
       activitiesByExecutableNodeId.set(executableId, [...(activitiesByExecutableNodeId.get(executableId) ?? []), activity]);
     }
-    for (const nodeId of new Set([activity.authoredActivityId, activity.executableNodeId].filter(Boolean))) {
-      const bucket = activitiesByNodeId.get(nodeId!) ?? [];
-      bucket.push(activity);
-      activitiesByNodeId.set(nodeId!, bucket);
-    }
   }
   const canvasNodeIdForActivity = (activity: ActivityExecutionStateSummary) => {
     const authoredId = activity.authoredActivityId?.trim();
     const executableId = activity.executableNodeId?.trim();
+    const pinnedNodeId = executableId ? canvasNodeIdByExecutableId.get(executableId) : undefined;
+    if (pinnedNodeId) return pinnedNodeId;
     const authoredPlacements = authoredId ? activitiesByAuthoredId.get(authoredId) ?? [] : [];
     const authoredIdIsAmbiguous = new Set(authoredPlacements.map(placement => placement.executableNodeId)).size > 1;
     if (authoredIdIsAmbiguous && executableId && representedNodeIds.has(executableId)) return executableId;
@@ -61,6 +58,13 @@ export function applyRuntimeOverlays<TNodeData extends Record<string, unknown>>(
     if (executableId && representedNodeIds.has(executableId)) return executableId;
     return authoredId || executableId || "";
   };
+  for (const activity of activities) {
+    const nodeId = canvasNodeIdForActivity(activity);
+    if (!nodeId) continue;
+    const bucket = activitiesByNodeId.get(nodeId) ?? [];
+    bucket.push(activity);
+    activitiesByNodeId.set(nodeId, bucket);
+  }
   const incidentsByNodeId = groupBy(incidents, incident => {
     const activityExecutionId = incident.activityExecutionId?.trim() || incident.metadata?.["runtime.activityExecutionId"]?.trim();
     const associatedActivity = activityExecutionId ? activityByExecutionId.get(activityExecutionId) : undefined;
@@ -70,6 +74,8 @@ export function applyRuntimeOverlays<TNodeData extends Record<string, unknown>>(
     if (relatedNodeIds.length === 1) return relatedNodeIds[0]!;
     const executableNodeId = incident.executableNodeId?.trim() || incident.metadata?.["runtime.executableNodeId"]?.trim();
     if (!executableNodeId) return "";
+    const pinnedNodeId = canvasNodeIdByExecutableId.get(executableNodeId);
+    if (pinnedNodeId) return pinnedNodeId;
     const byExecutableId = activitiesByExecutableNodeId.get(executableNodeId)?.[0];
     if (byExecutableId) return canvasNodeIdForActivity(byExecutableId);
     const authoredPlacements = activitiesByAuthoredId.get(executableNodeId) ?? [];
@@ -77,7 +83,7 @@ export function applyRuntimeOverlays<TNodeData extends Record<string, unknown>>(
     const byNodeId = activitiesByNodeId.get(executableNodeId)?.find(activity => activity.authoredActivityId === executableNodeId);
     return byNodeId
       ? canvasNodeIdForActivity(byNodeId)
-      : canvasNodeIdByExecutableId.get(executableNodeId) ?? executableNodeId;
+      : executableNodeId;
   });
 
   return nodes.map(node => {

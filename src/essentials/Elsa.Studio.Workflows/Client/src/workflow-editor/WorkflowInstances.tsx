@@ -639,9 +639,21 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
     }
     const exact = result.summary;
     if (isCurrent()) setIncidentAssociationMessage(null);
-    setData(current => current && generation === loadGeneration.current && current.details.instance.workflowExecutionId === workflowExecutionId
-      ? { ...current, incidentActivityExecutions: combineActivityExecutions(current.incidentActivityExecutions, [exact]) }
-      : current);
+    setData(current => {
+      if (!current || generation !== loadGeneration.current || current.details.instance.workflowExecutionId !== workflowExecutionId)
+        return current;
+      const pendingIncidentActivityExecutionIds = current.pendingIncidentActivityExecutionIds
+        .filter(id => id !== activityExecutionId);
+      return {
+        ...current,
+        incidentActivityExecutions: combineActivityExecutions(current.incidentActivityExecutions, [exact]),
+        pendingIncidentActivityExecutionIds,
+        incidentAssociationLookupIncomplete: pendingIncidentActivityExecutionIds.length > 0,
+        incidentActivityLookupSupported: true,
+        unavailableIncidentActivityFailures: current.unavailableIncidentActivityFailures
+          .filter(failure => failure.activityExecutionId !== activityExecutionId)
+      };
+    });
     return resolveIncidentActivityAssociation(incident, combineActivityExecutions(activities, [exact]), data?.executableGraph);
   }, [context, data]);
 
@@ -654,17 +666,25 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
       { ...data.details, activities: associationActivities },
       activityExecutionId => getActivityExecutionInspection(context, workflowExecutionId, activityExecutionId),
       pendingIds);
-    setData(current => current && generation === loadGeneration.current && current.details.instance.workflowExecutionId === workflowExecutionId
-      ? {
-          ...current,
-          incidentActivityExecutions: combineActivityExecutions(current.incidentActivityExecutions, result.activities),
-          pendingIncidentActivityExecutionIds: result.pendingActivityExecutionIds,
-          incidentAssociationLookupIncomplete: result.incomplete,
-          unavailableIncidentActivityFailures: combineUnavailableIncidentActivityFailures(
-            current.unavailableIncidentActivityFailures,
-            result.unavailableFailures)
-        }
-      : current);
+    setData(current => {
+      if (!current || generation !== loadGeneration.current || current.details.instance.workflowExecutionId !== workflowExecutionId)
+        return current;
+      const confirmedActivityExecutionIds = new Set(current.incidentActivityExecutions.map(activity => activity.activityExecutionId));
+      const pendingIncidentActivityExecutionIds = result.pendingActivityExecutionIds
+        .filter(id => !confirmedActivityExecutionIds.has(id));
+      const unavailableIncidentActivityFailures = combineUnavailableIncidentActivityFailures(
+        current.unavailableIncidentActivityFailures.filter(failure => !confirmedActivityExecutionIds.has(failure.activityExecutionId)),
+        result.unavailableFailures.filter(failure => !confirmedActivityExecutionIds.has(failure.activityExecutionId)));
+      return {
+        ...current,
+        incidentActivityExecutions: combineActivityExecutions(
+          current.incidentActivityExecutions,
+          result.activities.filter(activity => !confirmedActivityExecutionIds.has(activity.activityExecutionId))),
+        pendingIncidentActivityExecutionIds,
+        incidentAssociationLookupIncomplete: pendingIncidentActivityExecutionIds.length > 0,
+        unavailableIncidentActivityFailures
+      };
+    });
   };
 
   const beginEvidenceNavigation = () => {
@@ -1573,6 +1593,8 @@ export function resolveIncidentActivityAssociation(
 
   const explicitNodeId = incident.executableNodeId?.trim() || incident.metadata?.["runtime.executableNodeId"]?.trim();
   if (explicitNodeId) {
+    const pinnedNodeId = findExecutableGraphNodeId(executableGraph, { executableNodeId: explicitNodeId });
+    if (pinnedNodeId) return { nodeId: pinnedNodeId, activityExecution: null };
     const nodeActivity = activities.find(activity => activity.executableNodeId === explicitNodeId);
     if (!nodeActivity) {
       const authoredMatches = activities.filter(activity => activity.authoredActivityId === explicitNodeId);
@@ -1581,7 +1603,7 @@ export function resolveIncidentActivityAssociation(
       }
       if (authoredMatches.length === 1) return { nodeId: getNodeId(authoredMatches[0]!), activityExecution: null };
     }
-    const nodeId = nodeActivity ? getNodeId(nodeActivity) : findExecutableGraphNodeId(executableGraph, { executableNodeId: explicitNodeId }) ?? explicitNodeId;
+    const nodeId = nodeActivity ? getNodeId(nodeActivity) : explicitNodeId;
     return { nodeId, activityExecution: null };
   }
 
