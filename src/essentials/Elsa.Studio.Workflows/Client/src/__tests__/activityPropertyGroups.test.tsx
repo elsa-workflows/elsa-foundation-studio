@@ -2,13 +2,19 @@ import React from "react";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
-import { authSessionEndedEvent, authSessionStartedEvent } from "@elsa-workflows/studio-sdk";
+import {
+  authSessionEndedEvent,
+  authSessionStartedEvent,
+  expressionToolingAuthorizationRevokedEvent,
+  expressionToolingAuthorizationRestoredEvent
+} from "@elsa-workflows/studio-sdk";
 import type {
   StudioActivityDescriptor,
   StudioActivityInputDescriptor,
   StudioActivityPropertyEditorContribution,
   StudioExpressionDescriptor,
   StudioExpressionEditorContribution,
+  StudioExpressionAuthoringContext,
   StudioExpressionToolingClient,
   StudioExpressionToolingDescriptor,
   StudioExpressionToolingResult
@@ -16,6 +22,7 @@ import type {
 import { ActivityPropertiesPanel } from "../ActivityPropertiesPanel";
 import { createObjectExpressionEditorContribution } from "../objectExpressionEditor";
 import type { ActivityNode } from "../workflowTypes";
+import { expressionAuthoringContextResult } from "./expressionToolingTestFixtures";
 
 let active: { root: Root; container: HTMLElement } | null = null;
 // Replaces the rendered activity from outside the panel, as an undo or selecting another activity does.
@@ -32,6 +39,9 @@ const backendExpressionDescriptors: StudioExpressionDescriptor[] = [
   { type: "Variable", displayName: "Variable", editingMode: "reference" },
   { type: "Input", displayName: "Input", editingMode: "reference" }
 ];
+const emptyPropertyEditors: StudioActivityPropertyEditorContribution[] = [];
+const emptyExpressionEditors: StudioExpressionEditorContribution[] = [];
+const emptyVisibleVariables: [] = [];
 
 afterEach(() => {
   replaceActivity = noRenderedPanel;
@@ -51,6 +61,7 @@ function renderPanel(
     expressionDescriptors?: StudioExpressionDescriptor[];
     expressionTooling?: StudioExpressionToolingClient;
     expressionDescriptorStatus?: "loading" | "ready" | "failed";
+    expressionEditorSessionScope?: string;
     draftId?: string;
     onRetryDescriptors?(): void;
     onChange?(activity: ActivityNode): void;
@@ -71,23 +82,24 @@ function renderPanel(
   function Harness() {
     const [currentActivity, setCurrentActivity] = React.useState(initialActivity);
     replaceActivity = setCurrentActivity;
-    const handleChange = (nextActivity: ActivityNode) => {
+    const handleChange = React.useCallback((nextActivity: ActivityNode) => {
       options.onChange?.(nextActivity);
       setCurrentActivity(nextActivity);
-    };
+    }, [options.onChange]);
     return (
       <ActivityPropertiesPanel
         draftId={options.draftId}
         activity={currentActivity}
         descriptor={descriptor}
-        editors={options.editors ?? []}
-        expressionEditors={options.expressionEditors ?? []}
+        editors={options.editors ?? emptyPropertyEditors}
+        expressionEditors={options.expressionEditors ?? emptyExpressionEditors}
         expressionTooling={options.expressionTooling}
         expressionDescriptors={options.expressionDescriptors ?? backendExpressionDescriptors}
         expressionDescriptorStatus={options.expressionDescriptorStatus ?? "ready"}
+        expressionEditorSessionScope={options.expressionEditorSessionScope}
         onRetryDescriptors={options.onRetryDescriptors}
         descriptorStatus="ready"
-        visibleVariables={[]}
+        visibleVariables={emptyVisibleVariables}
         scopeStatus="ready"
         onChange={handleChange}
       />
@@ -122,6 +134,25 @@ function readinessTooling(expressionTypes: string[] = [], state = "ready") {
     describe: vi.fn(async () => ({ state, contractVersion: 1, expressionType: "",
       data: expressionTypes.map(expressionType => ({ expressionType })) }))
   } as unknown as StudioExpressionToolingClient;
+}
+
+function authoringContext(): StudioExpressionToolingResult<StudioExpressionAuthoringContext> {
+  return expressionAuthoringContextResult({ contextVersion: "fresh-context", semanticValidation: false });
+}
+
+function editableJavaScriptEditor(onRender?: (propertyName: string) => void): StudioExpressionEditorContribution {
+  return {
+    id: "test.javascript.editable",
+    supports: context => context.syntax === "JavaScript",
+    metadata: { editingMode: "text" },
+    surfaces: {
+      inline: ({ value, onChange, context }) => {
+        onRender?.(context.descriptor.name);
+        return <input aria-label={`${context.descriptor.name} rich source`} value={String(value ?? "")}
+          onFocus={context.onFocus} onChange={event => onChange(event.target.value)} />;
+      }
+    }
+  };
 }
 
 describe("activity property organization", () => {
@@ -216,6 +247,22 @@ describe("activity property organization", () => {
     expect(container.querySelector("[data-editor-readiness='missing']")).not.toBeNull();
   });
 
+  it.each(["synchronous", "asynchronous"] as const)("keeps editing available after a %s descriptor failure", async mode => {
+    const tooling = readinessTooling(["JavaScript"]);
+    const failure = new Error("The descriptor service is unavailable.");
+    if (mode === "synchronous") vi.spyOn(tooling, "describe").mockImplementation(() => { throw failure; });
+    else vi.spyOn(tooling, "describe").mockRejectedValue(failure);
+    const container = renderPanel([input("Message", { isWrapped: true, defaultSyntax: "JavaScript" })], {
+      expressionTooling: tooling,
+      activity: activity({ message: { typeName: "System.String", expression: { type: "JavaScript", value: "args.customerName" } } })
+    });
+
+    await vi.waitFor(() => expect(container.querySelector("[data-provider-readiness='unavailable']")).not.toBeNull());
+    const field = container.querySelector<HTMLInputElement>("input[aria-label='Message expression']")!;
+    expect(field.value).toBe("args.customerName");
+    expect(field.disabled).toBe(false);
+  });
+
   it("ignores a stale describe result after replacing the host tooling client", async () => {
     const pendingFirstResults: Array<(result: StudioExpressionToolingResult<StudioExpressionToolingDescriptor[]>) => void> = [];
     const firstTooling = {
@@ -254,6 +301,111 @@ describe("activity property organization", () => {
     const genericInput = container.querySelector<HTMLInputElement>("input[aria-label='Message expression']")!;
     expect(genericInput.disabled).toBe(false);
     expect(genericInput.value).toBe("return 42;");
+  });
+
+  it("clears provider readiness for a matching editor-scope revocation while preserving editable source", async () => {
+    const scope = "workflow-editor-matching";
+    const container = renderPanel([input("Message", { isWrapped: true, defaultSyntax: "JavaScript" })], {
+      expressionTooling: readinessTooling(["JavaScript"]),
+      expressionEditorSessionScope: scope,
+      activity: activity({ message: { typeName: "System.String", expression: { type: "JavaScript", value: "return 42;" } } })
+    });
+    await vi.waitFor(() => expect(container.querySelector("[data-provider-readiness='ready']")).not.toBeNull());
+
+    flushSync(() => window.dispatchEvent(new CustomEvent(expressionToolingAuthorizationRevokedEvent, {
+      detail: { scope }
+    })));
+
+    expect(container.querySelector("[data-provider-readiness='ready']")).toBeNull();
+    expect(container.querySelector("[data-provider-readiness='unauthorized']")).not.toBeNull();
+    const source = container.querySelector<HTMLInputElement>("input[aria-label='Message expression']")!;
+    expect(source.disabled).toBe(false);
+    expect(source.value).toBe("return 42;");
+  });
+
+  it("ignores a scoped revocation belonging to another editor", async () => {
+    const container = renderPanel([input("Message", { isWrapped: true, defaultSyntax: "JavaScript" })], {
+      expressionTooling: readinessTooling(["JavaScript"]),
+      expressionEditorSessionScope: "workflow-editor-current"
+    });
+    await vi.waitFor(() => expect(container.querySelector("[data-provider-readiness='ready']")).not.toBeNull());
+
+    flushSync(() => window.dispatchEvent(new CustomEvent(expressionToolingAuthorizationRevokedEvent, {
+      detail: { scope: "workflow-editor-other" }
+    })));
+
+    expect(container.querySelector("[data-provider-readiness='ready']")).not.toBeNull();
+    expect(container.querySelector("[data-provider-readiness='unauthorized']")).toBeNull();
+  });
+
+  it("keeps provider readiness blocked until a fresh authorized context confirms the restored scope", async () => {
+    let resolveFreshContext!: (result: StudioExpressionToolingResult<StudioExpressionAuthoringContext>) => void;
+    const getAuthoringContext = vi.fn()
+      .mockImplementationOnce(() => new Promise<StudioExpressionToolingResult<StudioExpressionAuthoringContext>>(resolve => {
+        resolveFreshContext = resolve;
+      }))
+      .mockResolvedValue(authoringContext());
+    const tooling = Object.assign(readinessTooling(["JavaScript"]), {
+      getAuthoringContext,
+      validate: vi.fn()
+    }) as unknown as StudioExpressionToolingClient;
+    const scope = "workflow-editor-restored";
+    const editor = editableJavaScriptEditor();
+    const container = renderPanel([input("Message", { isWrapped: true, defaultSyntax: "JavaScript" })], {
+      expressionTooling: tooling,
+      expressionEditorSessionScope: scope,
+      expressionEditors: [editor],
+      activity: activity({ message: { typeName: "System.String", expression: { type: "JavaScript", value: "return 42;" } } })
+    });
+    await vi.waitFor(() => expect(container.querySelector("[data-provider-readiness='ready']")).not.toBeNull());
+    const restored = vi.fn();
+    window.addEventListener(expressionToolingAuthorizationRestoredEvent, restored);
+    onTestFinished(() => window.removeEventListener(expressionToolingAuthorizationRestoredEvent, restored));
+
+    flushSync(() => {
+      window.dispatchEvent(new CustomEvent(expressionToolingAuthorizationRevokedEvent, { detail: { scope } }));
+      window.dispatchEvent(new Event(authSessionStartedEvent));
+    });
+    expect(container.querySelector("[data-provider-readiness='unauthorized']")).not.toBeNull();
+    expect(tooling.describe).toHaveBeenCalledOnce();
+    expect(getAuthoringContext).not.toHaveBeenCalled();
+
+    flushSync(() => container.querySelector<HTMLInputElement>("input[aria-label='Message rich source']")!.focus());
+    await vi.waitFor(() => expect(getAuthoringContext).toHaveBeenCalledOnce());
+    expect(container.querySelector("[data-provider-readiness='unauthorized']")).not.toBeNull();
+    expect(tooling.describe).toHaveBeenCalledOnce();
+    expect(restored).not.toHaveBeenCalled();
+
+    resolveFreshContext(authoringContext());
+    await vi.waitFor(() => expect(container.querySelector("[data-provider-readiness='ready']")).not.toBeNull());
+    expect(restored).toHaveBeenCalledOnce();
+    expect(tooling.describe).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps an unrelated rich input mounted when another expression source changes", async () => {
+    let unrelatedEditorRenders = 0;
+    const editor = editableJavaScriptEditor(propertyName => {
+      if (propertyName === "Second") unrelatedEditorRenders++;
+    });
+    const container = renderPanel([
+      input("First", { isWrapped: true, defaultSyntax: "JavaScript" }),
+      input("Second", { isWrapped: true, defaultSyntax: "JavaScript" })
+    ], {
+      expressionTooling: readinessTooling(["JavaScript"]),
+      expressionEditors: [editor],
+      activity: activity({
+        first: { typeName: "System.String", expression: { type: "JavaScript", value: "first()" } },
+        second: { typeName: "System.String", expression: { type: "JavaScript", value: "second()" } }
+      })
+    });
+    await vi.waitFor(() => expect(container.querySelectorAll("[data-provider-readiness='ready']")).toHaveLength(2));
+    const renderCountBeforeEdit = unrelatedEditorRenders;
+
+    changeTextField(container.querySelector<HTMLInputElement>("input[aria-label='First rich source']")!, "firstUpdated()");
+
+    expect(unrelatedEditorRenders).toBe(renderCountBeforeEdit);
+    expect(container.querySelector<HTMLInputElement>("input[aria-label='Second rich source']")?.value).toBe("second()");
+    expect(container.querySelector<HTMLInputElement>("input[aria-label='First rich source']")?.value).toBe("firstUpdated()");
   });
 
   it("does not invent expression types when the backend returns none", () => {

@@ -7,7 +7,7 @@ completeTest("persisted workflow drafts use live JavaScript and Liquid assistanc
   await signInToStudio(page, hostPair);
   const draft = await createPersistedExpressionDraft(page, hostPair);
   await openWorkflowDraft(page, hostPair, draft);
-  await selectActivity(page, "WriteLine");
+  await selectWorkflowTarget(page, draft);
 
   const syntax = page.getByRole("button", { name: `${draft.inputName} expression syntax` });
   await expect(syntax).toBeVisible();
@@ -107,8 +107,13 @@ completeTest("Activity Definition graph authoring edits a persisted activity exp
   await createDialog.getByRole("textbox", { name: "Display name" }).fill("Expression authoring browser definition");
   await createDialog.getByRole("button", { name: "Create definition" }).click();
   await expect(page.getByRole("tab", { name: "Designer" })).toHaveAttribute("aria-selected", "true");
+  const saveStatus = page.locator(".ad-save-chip");
+  await expect(saveStatus).toHaveText(/^Saved revision \d+$/);
+  const initialSavedStatus = await saveStatus.textContent();
   await page.getByRole("button", { name: "Add activity" }).click();
-  await page.getByRole("option", { name: writeLine.displayName, exact: true }).click();
+  const writeLineOption = page.locator(`[role="option"][id$="-option-${writeLine.versionId}"]`);
+  await expect(writeLineOption).toBeVisible();
+  await writeLineOption.click();
   await page.locator(".wf-node").filter({ hasText: writeLine.displayName }).click();
 
   const syntax = page.getByRole("button", { name: `${textInput.name} expression syntax` });
@@ -136,21 +141,21 @@ completeTest("Activity Definition graph authoring edits a persisted activity exp
   await expect(expandedLiquid).toContainText("customerName");
   await replaceEditorSource(page, expandedLiquid, "{{ customerName | string }}");
   await page.getByRole("dialog").getByRole("button", { name: `Close ${textInput.name} editor` }).click();
-  await page.getByRole("button", { name: "Save now" }).click();
-  await expect(page.locator(".ad-save-chip")).toContainText("Saved revision");
+  await expect(saveStatus).not.toHaveText(initialSavedStatus ?? "");
+  await expect(saveStatus).toHaveText(/^Saved revision \d+$/);
 
   const currentUrl = new URL(page.url());
   const activityDraftId = currentUrl.searchParams.get("draft");
   expect(activityDraftId).toBeTruthy();
-  const savedDraft = await readActivityDefinitionDraft(page, hostPair, activityDraftId!);
-  const root = savedDraft?.provider?.payload?.rootActivity;
-  const children = root?.structure?.payload?.activities;
-  const savedActivity = Array.isArray(children)
-    ? children.find((activity: { activityVersionId?: string }) => activity.activityVersionId === writeLine.versionId)
-    : null;
-  const savedInput = savedActivity?.inputs?.find((input: { referenceKey?: string }) => input.referenceKey === textInput.referenceKey);
-  expect(savedInput?.value?.expressionType).toBe("Liquid");
-  expect(savedInput?.value?.value).toBe("{{ customerName | string }}");
+  await expect.poll(async () => {
+    const savedDraft = await readActivityDefinitionDraft(page, hostPair, activityDraftId!);
+    const children = savedDraft?.provider?.payload?.rootActivity?.structure?.payload?.activities;
+    const savedActivity = Array.isArray(children)
+      ? children.find((activity: { activityVersionId?: string }) => activity.activityVersionId === writeLine.versionId)
+      : null;
+    const savedInput = savedActivity?.inputs?.find((input: { referenceKey?: string }) => input.referenceKey === textInput.referenceKey);
+    return { expressionType: savedInput?.value?.expressionType, source: savedInput?.value?.value };
+  }).toEqual({ expressionType: "Liquid", source: "{{ customerName | string }}" });
   expect(traffic.some(request => request.path === "/capabilities" && request.status === 200)).toBe(true);
   expect(consoleErrors).toEqual([]);
 });
@@ -161,7 +166,7 @@ missingJavaScriptEditorTest("missing JavaScript editor leaves generic source edi
   await signInToStudio(page, hostPair);
   const draft = await createPersistedExpressionDraft(page, hostPair);
   await openWorkflowDraft(page, hostPair, draft);
-  await selectActivity(page, "WriteLine");
+  await selectWorkflowTarget(page, draft);
 
   const javascriptInput = page.getByRole("textbox", { name: `${draft.inputName} expression` });
   await expect(javascriptInput).toHaveValue("args.predecessor.");
@@ -177,7 +182,7 @@ missingJavaScriptEditorTest("missing JavaScript editor leaves generic source edi
   await dialog.getByRole("button", { name: `Close ${draft.inputName} editor` }).click();
   await page.getByRole("button", { name: "Liquid expression. Activate to edit." }).click();
   await expect(page.locator(".studio-code-editor-rich-compact .cm-content")).toBeVisible();
-  await expect.poll(() => hasSuccessfulRequest(traffic, "/expression-tooling/context", "JavaScript")).toBe(true);
+  await expect.poll(() => hasSuccessfulRequest(traffic, "/expression-tooling/context", "Liquid")).toBe(true);
   await expect.poll(() => hasSuccessfulRequest(traffic, "/expression-tooling/descriptors")).toBe(true);
   expect(consoleErrors).toEqual([]);
 });
@@ -188,7 +193,7 @@ missingLiquidProviderTest("missing Liquid provider preserves authored Liquid and
   await signInToStudio(page, hostPair);
   const draft = await createPersistedExpressionDraft(page, hostPair, "Liquid");
   await openWorkflowDraft(page, hostPair, draft);
-  await selectActivity(page, "WriteLine");
+  await selectWorkflowTarget(page, draft);
 
   const liquidPreview = page.getByRole("button", { name: "Liquid expression. Activate to edit." });
   await expect(liquidPreview).toContainText("customerName");
@@ -210,14 +215,14 @@ missingLiquidProviderTest("missing Liquid provider preserves authored Liquid and
   // A separate persisted JavaScript draft proves the independent provider remains available.
   const javascriptDraft = await createPersistedExpressionDraft(page, hostPair, "JavaScript");
   await openWorkflowDraft(page, hostPair, javascriptDraft);
-  await selectActivity(page, "WriteLine");
+  await selectWorkflowTarget(page, javascriptDraft);
   await page.getByRole("button", { name: "JavaScript expression. Activate to edit." }).click();
   await page.getByRole("button", { name: `Open expanded ${javascriptDraft.inputName} editor` }).click();
   await expect(page.getByRole("dialog").getByText("Runtime assistance: available for JavaScript.")).toBeVisible();
 
   // Reopen the exact Liquid draft after checking JavaScript in an independent persisted draft.
   await openWorkflowDraft(page, hostPair, draft);
-  await selectActivity(page, "WriteLine");
+  await selectWorkflowTarget(page, draft);
   await expect(page.getByRole("button", { name: "Liquid expression. Activate to edit." })).toContainText(preservedLiquid);
   await expect.poll(() => hasSuccessfulRequest(traffic, "/expression-tooling/descriptors")).toBe(true);
   await expect.poll(() => readPersistedSource(page, hostPair, draft)).toEqual(preservedLiquid);
@@ -226,11 +231,15 @@ missingLiquidProviderTest("missing Liquid provider preserves authored Liquid and
 
 async function openWorkflowDraft(page: Page, pair: NormalHostPair, draft: PersistedExpressionDraft) {
   await page.goto(new URL(`/studio/workflows/definitions?definition=${encodeURIComponent(draft.definitionId)}`, pair.studioUrl).toString());
-  await expect(page.locator(".wf-node").filter({ hasText: "WriteLine" }).first()).toBeVisible();
+  await expect(workflowTargetNode(page, draft)).toBeVisible();
 }
 
-async function selectActivity(page: Page, label: string) {
-  await page.locator(".wf-node").filter({ hasText: label }).click();
+function workflowTargetNode(page: Page, draft: PersistedExpressionDraft) {
+  return page.locator(`.wf-canvas .react-flow__node[data-id="${draft.targetNodeId}"] .wf-node`);
+}
+
+async function selectWorkflowTarget(page: Page, draft: PersistedExpressionDraft) {
+  await workflowTargetNode(page, draft).click();
   await expect(page.getByRole("button", { name: /expression syntax$/ })).toBeVisible();
 }
 
@@ -248,7 +257,10 @@ async function readPersistedSource(page: Page, pair: NormalHostPair, draft: Pers
   const response = await page.request.get(new URL(`/design/workflows/drafts/${encodeURIComponent(draft.draftId)}`, pair.foundationUrl).toString());
   if (!response.ok()) return null;
   const record = await response.json();
-  const input = record?.state?.rootActivity?.structure?.payload?.activities?.[1]?.inputs?.find(
+  const target = record?.state?.rootActivity?.structure?.payload?.activities?.find(
+    (activity: { nodeId?: string }) => activity.nodeId === draft.targetNodeId
+  );
+  const input = target?.inputs?.find(
     (candidate: { referenceKey?: string }) => candidate.referenceKey === draft.propertyKey
   );
   return input?.value?.value ?? null;

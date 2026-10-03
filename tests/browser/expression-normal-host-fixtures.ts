@@ -16,6 +16,7 @@ export type SafeBackendTraffic = { path: string; status?: number; expressionType
 export type PersistedExpressionDraft = {
   definitionId: string;
   draftId: string;
+  targetNodeId: string;
   propertyKey: string;
   inputName: string;
   outputName: string;
@@ -113,6 +114,7 @@ export async function createPersistedExpressionDraft(
   const sequence = await findActivityVersion(client, pair, "Elsa.Activities.Sequence.Activities.Sequence");
   const textInput = writeLine.inputs.find(input => String(input.name).toLowerCase() === "text");
   const predecessorOutput = readLine.outputs[0];
+  const targetNodeId = "target";
   if (!textInput?.referenceKey || !predecessorOutput?.name) {
     throw new Error("The live activity catalog does not expose the expected text input and predecessor output.");
   }
@@ -135,7 +137,7 @@ export async function createPersistedExpressionDraft(
               variables: [{ referenceKey: "browser-scoped-key", name: "scopedLabel", type: { alias: "String", collectionKind: "single" }, storageDriverType: null, default: null }],
               activities: [
                 { nodeId: "predecessor", activityVersionId: readLine.versionId, inputs: [], outputs: [] },
-                { nodeId: "target", activityVersionId: writeLine.versionId, inputs: [{
+                { nodeId: targetNodeId, activityVersionId: writeLine.versionId, inputs: [{
                   referenceKey: textInput.referenceKey,
                   value: { value: initialSyntax === "JavaScript" ? "args.predecessor." : "{{ customerName }}", expressionType: initialSyntax },
                   autoEvaluate: null,
@@ -162,11 +164,11 @@ export async function createPersistedExpressionDraft(
   if (!reopenedResponse.ok()) throw new Error(`Fresh persisted workflow draft read failed with HTTP ${reopenedResponse.status()}.`);
   const reopened = await reopenedResponse.json();
   const activities = reopened?.state?.rootActivity?.structure?.payload?.activities;
-  const target = Array.isArray(activities) ? activities.find((activity: { nodeId?: string }) => activity.nodeId === "target") : null;
+  const target = Array.isArray(activities) ? activities.find((activity: { nodeId?: string }) => activity.nodeId === targetNodeId) : null;
   if (reopened?.id !== draftId || target?.inputs?.[0]?.referenceKey !== textInput.referenceKey) {
     throw new Error("The fresh workflow draft read did not preserve the dynamically discovered target activity input.");
   }
-  return { definitionId, draftId, propertyKey: textInput.referenceKey, inputName: textInput.name, outputName: predecessorOutput.name, initialSyntax };
+  return { definitionId, draftId, targetNodeId, propertyKey: textInput.referenceKey, inputName: textInput.name, outputName: predecessorOutput.name, initialSyntax };
 }
 
 export async function discoverActivityVersion(

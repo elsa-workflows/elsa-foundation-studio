@@ -10,15 +10,18 @@ The 2026-07-28 evidence below is retained as historical baseline evidence. It is
 
 ### Program #2310 implementation checkpoint, 2026-10-03
 
-On the uncommitted `claude/551-expression-normal-host` implementation over planning revision `24a937bf3f271a201fbbc18809a54dd9d15c4e51`:
+On `claude/551-expression-normal-host`, with draft PR #557 stacked on Program #2310 planning revision `24a937bf3f271a201fbbc18809a54dd9d15c4e51`:
 
-- `activityPropertyGroups.test.tsx`: 104 passing tests, including independent editor/provider readiness, authorization-session invalidation, stale-result rejection, and authored Liquid editing when its runtime descriptor is absent.
+- `activityPropertyGroups.test.tsx`: 110 passing tests, including independent editor/provider readiness, global and scoped authorization invalidation, fresh-context confirmation, stale-result rejection, authored Liquid editing when its runtime descriptor is absent, synchronous/asynchronous descriptor faults, and unrelated-row render isolation. The three activity-expression orchestration tests also passed (113 focused tests in total).
+- Root review corrected the render-isolation fixture to count only the unrelated row. A same-task uncommitted focus/blur sequence failed once and passed on rerun; the fixture now explicitly commits focus before testing blur. All three orchestration tests passed again with the immediate-validation and zero-pending-timer assertions retained.
 - JavaScript and Liquid module tests: four passing tests each.
-- Workflows `typecheck`, scoped ESLint, and `git diff --check`: passed.
+- Scoped ESLint and `git diff --check` passed. The latest Workflows typecheck exposed widened string literals and an incomplete capabilities object in new test mocks. Shared SDK-typed result factories now correct those fixtures; a passing typecheck/regression rerun is pending. Earlier typecheck evidence is not current-head proof.
 - Normal-host lifecycle tests: five passed. Playwright collection: four real-host scenarios discovered, covering workflows, Activity Definitions, missing JavaScript editor, and missing Liquid provider.
-- The full serial client build (`pnpm -r --workspace-concurrency=1 build`) passed, including the Workflows production bundle check: entry 127.43 kB / 127.50 kB, Definitions total 375.87 kB / 384.50 kB, upgrades total 366.89 kB / 375.50 kB. The scoped Studio .NET build was still queued at this checkpoint.
+- The full serial client build (`pnpm -r --workspace-concurrency=1 build`) and scoped Studio .NET Release build passed. The Workflows production build/bundle gate passed again after readiness review fixes: entry 127.43 kB / 127.50 kB, Definitions total 375.87 kB / 384.50 kB, upgrades total 366.89 kB / 375.50 kB.
+- The browser scenarios now use version/node identity and fresh persisted reads instead of display-label selectors or a disabled save action. Scoped browser lint and four-scenario collection passed; actual host execution remains pending.
+- A dedicated correctness job in the existing CI runs the unchanged normal-host command against Studio's tested head and immutable paired Foundation revision `e780a86a151e816a04136ae0ac8fd4eee99c0ce0`. It builds both applications from source and preserves fresh SQLite, real authentication, provider/editor removal controls, owned teardown, and trace-free failure reporting. It does not replace the existing synthetic browser or static/unit gates; hosted execution is not yet a pass. This proves only that paired revision, not arbitrary Foundation main; advance the pin to Foundation #2373's merged SHA and rerun before claiming compatibility with main.
 
-These are partial local checks, not T029 acceptance. No current-head normal-host browser case or current-head manual assistive-technology run has passed yet. The coordinated Foundation persisted-draft case timed out in Workbench readiness before its expression assertions under shared-machine load above 700; its negative missing-Liquid host case passed on the earlier compiled fixture. All milestone checkboxes remain open.
+These are partial local checks, not T029 acceptance. No current-head normal-host browser case or current-head manual assistive-technology run has passed yet. Foundation's hosted run reached the test body but exposed an outdated ReadLine output-name assertion, now corrected; request-envelope execution is pending. Local host readiness timed out under shared-machine load above 700; the negative missing-Liquid host case passed on the earlier compiled fixture. All milestone checkboxes remain open.
 
 ### Historical baseline, 2026-07-28
 

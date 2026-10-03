@@ -5,6 +5,7 @@ import {
   authSessionEndedEvent,
   authSessionStartedEvent,
   expressionEditorSessionEndedEvent,
+  expressionToolingAuthorizationRevokedEvent,
   expressionToolingAuthorizationRestoredEvent
 } from "@elsa-workflows/studio-sdk";
 import type {
@@ -142,7 +143,8 @@ export function ActivityPropertiesPanel({
     return wrapped ? [wrapped.expression.type] : [];
   }) ?? [], [activity, descriptor]);
   const providerReadiness = useExpressionProviderReadiness(expressionTooling, expressionDescriptors,
-    authoredExpressionTypes, toolingAuthorization.available, toolingAuthorization.epoch);
+    authoredExpressionTypes, toolingAuthorization.available && !toolingAuthorization.confirmationRequired,
+    toolingAuthorization.epoch);
   const activateToolingProperty = useCallback((property: string) => setActiveToolingProperty(property), []);
 
   useEffect(() => () => clearDictionaryEditorSessionScope(effectiveDictionarySessionScope), [effectiveDictionarySessionScope]);
@@ -231,9 +233,10 @@ function useExpressionProviderReadiness(
   authorizationAvailable: boolean,
   authorizationEpoch: number
 ): ExpressionProviderReadinessByType {
-  const textTypes = useMemo(() => [...new Set([...descriptors
+  const typesKey = JSON.stringify([...new Set([...descriptors
     .filter(descriptor => descriptor.editingMode === "text")
-    .map(descriptor => descriptor.type), ...authoredExpressionTypes])], [descriptors, authoredExpressionTypes]);
+    .map(descriptor => descriptor.type), ...authoredExpressionTypes])].sort());
+  const textTypes = useMemo<string[]>(() => JSON.parse(typesKey), [typesKey]);
   const [snapshot, setSnapshot] = useState<{
     tooling: StudioExpressionToolingClient | undefined;
     types: string;
@@ -241,12 +244,11 @@ function useExpressionProviderReadiness(
     result?: StudioExpressionToolingResult<StudioExpressionToolingDescriptor[]>;
     failed?: boolean;
   }>();
-  const typesKey = textTypes.join("\u001f");
 
   useEffect(() => {
     if (textTypes.length === 0 || !tooling || !authorizationAvailable) return;
     const controller = new AbortController();
-    void tooling.describe(controller.signal).then(result => {
+    void Promise.resolve().then(() => tooling.describe(controller.signal)).then(result => {
       if (!controller.signal.aborted) setSnapshot({ tooling, types: typesKey, authorizationEpoch, result });
     }).catch(() => {
       if (!controller.signal.aborted) setSnapshot({ tooling, types: typesKey, authorizationEpoch, failed: true });
@@ -447,13 +449,21 @@ function useExpressionToolingAuthorization(scope: string) {
       confirmationRequired: true,
       epoch: current.epoch + 1
     }));
+    const revokeScope = (event: Event) => {
+      const revokedScope = (event as CustomEvent<{ scope?: string }>).detail?.scope;
+      if (revokedScope && revokedScope !== scope) return;
+      // Keep fresh-context confirmation available, but discard cached readiness.
+      setState(current => ({ ...current, confirmationRequired: true, epoch: current.epoch + 1 }));
+    };
     window.addEventListener(authSessionEndedEvent, revoke);
     window.addEventListener(authSessionStartedEvent, restore);
+    window.addEventListener(expressionToolingAuthorizationRevokedEvent, revokeScope);
     return () => {
       window.removeEventListener(authSessionEndedEvent, revoke);
       window.removeEventListener(authSessionStartedEvent, restore);
+      window.removeEventListener(expressionToolingAuthorizationRevokedEvent, revokeScope);
     };
-  }, []);
+  }, [scope]);
   const confirm = useCallback(() => {
     setState(current => ({ ...current, confirmationRequired: false }));
     window.dispatchEvent(new CustomEvent(expressionToolingAuthorizationRestoredEvent, {
