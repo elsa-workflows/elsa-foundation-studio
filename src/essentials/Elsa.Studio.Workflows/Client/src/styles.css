@@ -146,6 +146,8 @@
   display: grid;
   height: 100%;
   min-height: 0;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto minmax(0, 1fr);
   border: 0;
   border-radius: 0;
@@ -869,6 +871,7 @@
   display: grid;
   height: 100%;
   min-height: 0;
+  min-width: 0;
   grid-template-columns:
     minmax(0, 1fr)
     10px
@@ -6160,6 +6163,10 @@ button.wf-reference-select {
 }
 
 @media (max-width: 560px) {
+  .wf-page--run-workbench > .wf-toolbar {
+    flex-wrap: wrap;
+  }
+
   .wf-instance-grid .wf-grid-head,
   .wf-instance-grid .wf-grid-row {
     grid-template-columns: minmax(0, 1fr) 72px minmax(0, 1fr);

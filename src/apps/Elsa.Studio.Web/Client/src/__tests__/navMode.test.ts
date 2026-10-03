@@ -8,6 +8,7 @@ import { read, ruleBody } from "./themeTestUtils";
 
 const stylesCss = read("../app/styles.css");
 const mobileShellCss = stylesCss.match(/@media \(max-width: 1024px\) \{([\s\S]*?)^\}/m)?.[1] ?? "";
+const phoneShellCss = stylesCss.match(/@media \(max-width: 640px\) \{([\s\S]*?)^\}/m)?.[1] ?? "";
 const layoutsCss = read("../app/themes/layouts.css").replace(/\/\*[\s\S]*?\*\//g, "");
 // The desktop media block closes at the first column-zero brace; the status bar rules follow it.
 const desktopEnd = layoutsCss.indexOf("\n}\n");
@@ -84,10 +85,13 @@ describe("navigation mode stylesheet", () => {
   it("keeps narrow-screen navigation in a compact, horizontally reachable strip", () => {
     expect(ruleBody(mobileShellCss, ".sidebar")).toMatch(/flex-direction:\s*row;/);
     expect(ruleBody(mobileShellCss, ".sidebar")).toMatch(/overflow-x:\s*auto;/);
-    expect(ruleBody(mobileShellCss, ".sidebar-collapse-toggle")).toMatch(/display:\s*inline-grid;/);
+    expect(ruleBody(mobileShellCss, ".sidebar-collapse-toggle")).toMatch(/display:\s*none;/);
+    expect(ruleBody(mobileShellCss, 'html[data-nav-mode="top"] .sidebar-footer')).toMatch(/display:\s*none;/);
     expect(ruleBody(mobileShellCss, ".nav-section")).toMatch(/display:\s*flex;/);
     expect(ruleBody(mobileShellCss, ".nav-item-group")).toMatch(/display:\s*flex;/);
     expect(ruleBody(mobileShellCss, ".nav-children")).toMatch(/display:\s*flex;/);
     expect(ruleBody(mobileShellCss, ".nav-heading")).toMatch(/display:\s*none;/);
+    expect(ruleBody(phoneShellCss, ".sidebar")).toMatch(/flex-direction:\s*row;/);
+    expect(ruleBody(stylesCss, ".sidebar-collapsed .sidebar-search")).toMatch(/display:\s*none;/);
   });
 });

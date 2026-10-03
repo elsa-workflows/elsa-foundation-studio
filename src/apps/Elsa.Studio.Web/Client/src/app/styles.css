@@ -780,6 +780,10 @@ textarea:focus {
     display: none;
   }
 
+  .sidebar-collapsed .sidebar-search {
+    display: none;
+  }
+
   .sidebar-collapsed .nav-section {
     gap: var(--spacing-sm);
   }
@@ -908,6 +912,7 @@ textarea:focus {
 
 .content > .wf-page--run-workbench {
   min-height: 0;
+  min-width: 0;
   flex: 1;
 }
 
@@ -2928,7 +2933,7 @@ textarea:focus {
   }
 
   .sidebar-collapse-toggle {
-    display: inline-grid;
+    display: none;
   }
 
   .nav-section {
@@ -2969,6 +2974,10 @@ textarea:focus {
     border-top: 0;
     border-left: 1px solid var(--border);
     padding: 0 10px;
+  }
+
+  html[data-nav-mode="top"] .sidebar-footer {
+    display: none;
   }
 
   .bottom-panel {
@@ -3034,9 +3043,9 @@ textarea:focus {
   }
 
   .sidebar {
-    flex-direction: column;
-    gap: 12px;
-    padding: 12px;
+    flex-direction: row;
+    gap: 10px;
+    padding: 8px 12px;
   }
 
   .brand {
