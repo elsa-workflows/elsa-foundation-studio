@@ -2,6 +2,7 @@ import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
+import type { ReactFlowInstance } from "@xyflow/react";
 import type { StudioAiContributionApi, StudioEndpointContext } from "@elsa-workflows/studio-sdk";
 import { WorkflowInstanceDetailsWorkbench } from "../workflow-editor/WorkflowInstances";
 import type {
@@ -26,6 +27,7 @@ const api = vi.hoisted(() => ({
   supportsWorkflowInstanceHealthFilter: vi.fn(),
   listActivities: vi.fn()
 }));
+const mockFlowInstance = vi.hoisted(() => ({ fitView: vi.fn() }));
 
 vi.mock("../api/runtime", () => ({
   ...api,
@@ -36,15 +38,34 @@ vi.mock("@xyflow/react", async importOriginal => {
   const actual = await importOriginal<typeof import("@xyflow/react")>();
   return {
     ...actual,
-    ReactFlow: ({ nodes }: { nodes: Array<{ id: string; selected?: boolean; data: Record<string, unknown> }> }) => (
-      <div className="wf-mock-react-flow">
-        {nodes.map(node => (
-          <span key={node.id} data-flow-node-id={node.data.runtimeNodeId ?? node.id} data-selected={String(!!node.selected)}>
-            {String(node.data.label ?? "")}
-          </span>
-        ))}
-      </div>
-    ),
+    ReactFlow: ({ nodes, onInit }: {
+      nodes: Array<{ id: string; selected?: boolean; data: Record<string, unknown> }>;
+      onInit?: (instance: ReactFlowInstance) => void;
+    }) => {
+      React.useEffect(() => {
+        onInit?.(mockFlowInstance as unknown as ReactFlowInstance);
+      }, [onInit]);
+      return (
+        <div className="wf-mock-react-flow">
+          {nodes.map(node => {
+            const runtimeNodeId = String(node.data.runtimeNodeId ?? node.id);
+            return (
+              <button
+                type="button"
+                key={node.id}
+                tabIndex={-1}
+                data-id={node.id}
+                data-runtime-node-id={runtimeNodeId}
+                data-flow-node-id={runtimeNodeId}
+                data-selected={String(!!node.selected)}
+              >
+                {String(node.data.label ?? "")}
+              </button>
+            );
+          })}
+        </div>
+      );
+    },
     Background: () => null,
     Controls: () => null,
     MiniMap: () => null
@@ -108,6 +129,33 @@ describe("workflow run workbench incident navigation", () => {
     click(buttonByText(container, "View input evidence"));
     await vi.waitFor(() => expect(container.querySelector("[data-tab-id='activity']")?.getAttribute("aria-selected")).toBe("true"));
     await vi.waitFor(() => expect(container.querySelector<HTMLDetailsElement>(".wf-input-inspection-row details")?.open).toBe(true));
+  });
+
+  it("reframes and refocuses the same affected activity on each explicit activation", async () => {
+    renderWorkbench();
+
+    await vi.waitFor(() => expect(container.querySelector(".wf-instance-detail-workbench.inspector-maximized")).toBeTruthy());
+    click(buttonByText(container, "Show affected activity"));
+    await vi.waitFor(() => expect(mockFlowInstance.fitView).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(container.querySelector("[data-flow-node-id='target-node']")).toBeTruthy());
+    const targetNode = container.querySelector<HTMLButtonElement>("[data-flow-node-id='target-node']")!;
+    await vi.waitFor(() => expect(document.activeElement).toBe(targetNode));
+    const focus = vi.spyOn(targetNode, "focus");
+
+    targetNode.blur();
+    expect(document.activeElement).not.toBe(targetNode);
+    click(container.querySelector<HTMLButtonElement>("[data-tab-id='issues']"));
+    const showAffectedActivityAgain = buttonByText(container, "Show affected activity");
+    expect(showAffectedActivityAgain).toBeTruthy();
+    click(showAffectedActivityAgain);
+    await vi.waitFor(() => expect(mockFlowInstance.fitView).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(focus).toHaveBeenCalledTimes(1));
+    expect(document.activeElement).toBe(targetNode);
+    expect(mockFlowInstance.fitView).toHaveBeenLastCalledWith({
+      nodes: [{ id: "target-node" }],
+      duration: 220,
+      padding: 0.35
+    });
   });
 
   it("opens a direct Issues tab query after the workbench measures at phone width", async () => {

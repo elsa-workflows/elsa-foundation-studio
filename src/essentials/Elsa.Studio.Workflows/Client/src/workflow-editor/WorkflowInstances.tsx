@@ -453,6 +453,7 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
   const [selectedEvidenceId, setSelectedEvidenceId] = useState<string | null>(null);
   const [activeInspectorTab, setActiveInspectorTab] = useState<InstanceInspectorTab>(initialInspectorTab);
   const [focusedRuntimeNodeId, setFocusedRuntimeNodeId] = useState<string | null>(null);
+  const [canvasFocusRequestId, setCanvasFocusRequestId] = useState(0);
   const [focusInputKey, setFocusInputKey] = useState<string | null>(null);
   const [incidentAssociationMessage, setIncidentAssociationMessage] = useState<string | null>(null);
   const [frames, setFrames] = useState<ScopeFrame[]>([]);
@@ -710,6 +711,11 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
     return requestId;
   };
 
+  const requestCanvasFocus = (nodeId: string | null) => {
+    setFocusedRuntimeNodeId(nodeId);
+    if (nodeId) setCanvasFocusRequestId(current => current + 1);
+  };
+
   const selectEvidence = (evidenceId: string | null) => {
     beginEvidenceNavigation();
     setSelectedEvidenceId(evidenceId);
@@ -740,14 +746,14 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
     const targetNodeId = nodeId ?? existingAssociation?.nodeId ?? null;
     setSelectedEvidenceId(incidentId ?? null);
     setActiveInspectorTab("issues");
-    setFocusedRuntimeNodeId(targetNodeId);
+    requestCanvasFocus(targetNodeId);
     focusNodePath(targetNodeId);
     openInspector();
 
     if (incident) {
       void ensureIncidentActivityAssociation(incident, isCurrent).then(association => {
         if (!isCurrent() || !association?.nodeId || association.nodeId === targetNodeId) return;
-        setFocusedRuntimeNodeId(association.nodeId);
+        requestCanvasFocus(association.nodeId);
         focusNodePath(association.nodeId);
       });
     }
@@ -760,7 +766,7 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
     setSelectedEvidenceId(incident.incidentId);
     setActiveInspectorTab(existingAssociation?.activityExecution ? "activity" : "issues");
     setFocusInputKey(showInput && existingAssociation?.activityExecution ? readIncidentInputKey(incident) : null);
-    setFocusedRuntimeNodeId(existingAssociation?.nodeId ?? null);
+    requestCanvasFocus(existingAssociation?.nodeId ?? null);
     focusNodePath(existingAssociation?.nodeId ?? null);
     if (showInput) openInspector();
     else showCanvasForSelection();
@@ -773,7 +779,7 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
       setActiveInspectorTab(association?.activityExecution ? "activity" : "issues");
       setFocusInputKey(showInput && association?.activityExecution ? readIncidentInputKey(incident) : null);
       if (association?.nodeId !== existingAssociation?.nodeId) {
-        setFocusedRuntimeNodeId(association?.nodeId ?? null);
+        requestCanvasFocus(association?.nodeId ?? null);
         focusNodePath(association?.nodeId ?? null);
       }
       if (showInput) openInspector();
@@ -794,7 +800,7 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
     const nodeId = findExecutableGraphNodeId(data?.executableGraph, activity) ?? (activity.authoredActivityId || activity.executableNodeId);
     setSelectedEvidenceId(activityExecutionId);
     setActiveInspectorTab("activity");
-    setFocusedRuntimeNodeId(nodeId);
+    requestCanvasFocus(nodeId);
     focusNodePath(nodeId);
     openInspector();
   };
@@ -810,7 +816,7 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
     beginEvidenceNavigation();
     setSelectedEvidenceId(nodeId);
     setActiveInspectorTab("activity");
-    setFocusedRuntimeNodeId(nodeId);
+    requestCanvasFocus(nodeId);
     openInspector();
   };
 
@@ -859,6 +865,7 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
             onOpenIncident={openIncidentInIssues}
             onSelectActivity={selectGraphActivity}
             focusNodeId={focusedRuntimeNodeId}
+            focusRequestId={canvasFocusRequestId}
             frames={frames}
             onNavigateToScope={navigateToScope}
             inactive={mode === "medium" && mediumDrawerOpen}
@@ -1149,6 +1156,7 @@ function WorkflowInstanceCanvas({
   onOpenIncident,
   onSelectActivity,
   focusNodeId,
+  focusRequestId,
   frames,
   onNavigateToScope,
   inactive = false
@@ -1164,6 +1172,7 @@ function WorkflowInstanceCanvas({
   onOpenIncident(incidentId: string, nodeId?: string | null): void;
   onSelectActivity(nodeId: string): void;
   focusNodeId: string | null;
+  focusRequestId: number;
   frames: ScopeFrame[];
   onNavigateToScope(frames: ScopeFrame[]): void;
   inactive?: boolean;
@@ -1185,7 +1194,7 @@ function WorkflowInstanceCanvas({
       focusSelectedCanvasActivity(focusNodeId);
     });
     return () => cancelAnimationFrame(frame);
-  }, [flowInstance, focusCanvasNodeId, focusNodeId, scopeKey]);
+  }, [flowInstance, focusCanvasNodeId, focusNodeId, focusRequestId, scopeKey]);
 
   return (
     <section className="wf-instance-canvas-shell" aria-label="Workflow run canvas" aria-hidden={inactive || undefined} inert={inactive || undefined}>
