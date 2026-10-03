@@ -80,6 +80,7 @@ describe("JavaScript expression editor module", () => {
     );
 
     expect(inline.props.profile).toBe("compact");
+    expect(inline.props.languageAdapter?.grammarProfile).toBe("expression");
     expect(inline.props.document.value).toBe("return 1;");
     expect(inline.props.document.version).toBe(7);
     expect(inline.props.sessionKey).toBe("workflow-editor-1\u001fdocument-1");
@@ -91,6 +92,7 @@ describe("JavaScript expression editor module", () => {
       version: 7
     });
     expect(expandedEditor.props.profile).toBe("expanded");
+    expect(expandedEditor.props.languageAdapter?.grammarProfile).toBe("expression");
     expect(expandedEditor.props.sessionKey).toBe(inline.props.sessionKey);
     expect(expandedEditor.props.readOnly).toBeUndefined();
     expect(expandedEditor.props.theme).toBe("studio");
@@ -180,6 +182,7 @@ interface StudioCodeEditorElementProps {
   readOnly?: boolean;
   theme?: string;
   profile?: string;
+  languageAdapter?: { language: string; grammarProfile?: string };
   sessionKey?: string;
   onChange(document: { value: string }): void;
 }

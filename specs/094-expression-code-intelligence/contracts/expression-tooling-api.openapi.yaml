@@ -107,8 +107,27 @@ components:
         major: { type: integer, const: 1 }
         minor: { type: integer, minimum: 0 }
     ToolingState:
-      type: string
-      enum: [success, supportedEmpty, unavailable, unauthorized, incompatible, stale, canceled]
+      description: >
+        Foundation v1 normal hosts emit ordinals 0..6 in the named order below.
+        Studio also accepts the camelCase equivalents from string-enum hosts.
+      oneOf:
+        - { type: integer, enum: [0, 1, 2, 3, 4, 5, 6] }
+        - { type: string, enum: [success, supportedEmpty, unavailable, unauthorized, incompatible, stale, canceled] }
+    SymbolKind:
+      description: Foundation v1 ordinal mapping follows the named order below.
+      oneOf:
+        - { type: integer, enum: [0, 1, 2, 3, 4, 5, 6, 7, 8] }
+        - { type: string, enum: [variable, workflowInput, activityResult, function, filter, tag, namespace, member, extension] }
+    ValueKind:
+      description: Foundation v1 ordinal mapping follows the named order below.
+      oneOf:
+        - { type: integer, enum: [0, 1, 2, 3, 4, 5, 6] }
+        - { type: string, enum: [unknown, scalar, object, array, map, function, reference] }
+    DiagnosticSeverity:
+      description: Foundation v1 ordinal mapping follows the named order below.
+      oneOf:
+        - { type: integer, enum: [0, 1, 2, 3] }
+        - { type: string, enum: [error, warning, information, hint] }
     ContextRequest:
       type: object
       additionalProperties: false
@@ -268,7 +287,7 @@ components:
       properties:
         symbolId: { type: string }
         name: { type: string }
-        kind: { type: string }
+        kind: { $ref: "#/components/schemas/SymbolKind" }
         documentation: { type: string }
         valueShape: { $ref: "#/components/schemas/ValueShape" }
         signatures:
@@ -285,9 +304,7 @@ components:
       type: object
       properties:
         displayName: { type: string }
-        kind:
-          type: string
-          enum: [unknown, scalar, object, array, map, function, reference]
+        kind: { $ref: "#/components/schemas/ValueKind" }
         isNullable: { type: boolean, default: true }
         hasLazyChildren:
           type: boolean
@@ -362,13 +379,13 @@ components:
         detail: { type: string }
         documentation: { type: string }
         insertText: { type: string }
-        kind: { type: string }
+        kind: { $ref: "#/components/schemas/SymbolKind" }
     Diagnostic:
       type: object
       required: [code, severity, message, documentRevision]
       properties:
         code: { type: string }
-        severity: { type: string, enum: [error, warning, information, hint] }
+        severity: { $ref: "#/components/schemas/DiagnosticSeverity" }
         message: { type: string }
         documentRevision: { type: string }
         range: { $ref: "#/components/schemas/Range" }
