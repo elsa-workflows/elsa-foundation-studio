@@ -2,7 +2,7 @@
 
 Baseline implementation tasks are complete. File names below reflect the landed design rather than provisional planning names.
 
-The baseline tasks T001-T025 are historical. Program #2310 reopens this feature for dependency-ordered tasks T026-T038. T026-T029 have exact-head normal-host evidence. T030-T031 are implemented with reviewed local conformance evidence; their committed-head CI/review gate is pending. T032-T038 remain open.
+The baseline tasks T001-T025 are historical. Program #2310 reopens this feature for dependency-ordered tasks T026-T038. T026-T029 have exact-head normal-host evidence. T030-T031 pass the exact M2 automated gate under the documented unavailable-review fallback. T035 / Studio #553 settles the technical decision: reject the current service candidate and retain the baseline path. T032-T034 and T036-T038 remain open; no deeper-service dependency is adopted.
 
 ## Contracts and transport
 
@@ -56,9 +56,9 @@ The baseline tasks T001-T025 are historical. Program #2310 reopens this feature 
 ## Program #2310 continuation: User Story 6 — Receive precise, readable language help
 
 - [ ] T032 [US6] Merge local JavaScript completion/snippet sources with authorized workflow assistance in `src/essentials/Elsa.Studio.CodeEditor/Client/src/engines/codeMirrorCodeIntelligence.ts` and its tests after T031 passes.
-- [ ] T033 [P] [US6] Project parser-position-aware Liquid values, filters, tags, snippets and signatures in `src/extensions/Elsa.Studio.ExpressionEditors.Liquid/Client/src/` with focused tests, consuming the runtime-profile evidence delivered by Foundation spec 143 T028-T029.
+- [ ] T033 [P] [US6] Project parser-position-aware Liquid values, filters, tags, snippets and signatures in `src/extensions/Elsa.Studio.ExpressionEditors.Liquid/Client/src/` with focused tests, consuming the runtime-profile and cursor-context evidence delivered by Foundation spec 143 T029-T030 through the existing rich context relation.
 - [ ] T034 [P] [US6] Deepen JavaScript local/member/signature projection without DOM or Node globals in `src/extensions/Elsa.Studio.ExpressionEditors.JavaScript/Client/src/` with focused tests and Foundation spec 143 T028 parity evidence.
-- [ ] T035 [US6] Complete the two-engineer-day deeper-JavaScript-language-service spike defined by Decision 16 in `specs/094-expression-code-intelligence/research.md`; adopt a dependency only if every binary runtime-declaration, worker/cancellation, stale-result, existing-bundle, accessibility and fallback gate passes.
+- [x] T035 [US6] Complete the two-engineer-day deeper-JavaScript-language-service spike defined by Decision 16 in `specs/094-expression-code-intelligence/research.md`; reject the current TypeScript 5.9.3 candidate after independent root reproduction because the actual worker exceeds the unchanged chunk ceiling and synchronous-interruption/accessibility gates remain unproved. Keep the baseline path; this checkbox records the technical decision, not a shipping or human-acceptance gate.
 - [ ] T036 [US6] Add Studio-token themes, lightweight highlighted previews, readable help/diagnostics and light/dark/dim coverage in `src/essentials/Elsa.Studio.CodeEditor/Client/src/` and its styles/tests after T033-T035 settle language behavior.
 - [ ] T037 [P] [US6] Add active-parameter and overload navigation plus explicit behavior-preserving JavaScript/Liquid format actions in the shared editor and language modules with undo/whitespace tests.
 - [ ] T038 [US6] Run and document the current-head real-browser theme, narrow inspector, multiline paste, source/cursor/undo, keyboard exit/help/completion and screen-reader acceptance matrix in `specs/094-expression-code-intelligence/verification.md`.
@@ -67,5 +67,5 @@ The baseline tasks T001-T025 are historical. Program #2310 reopens this feature 
 
 - T026 is the first executable implementation leaf; T027-T028 may follow on the same integration head, and T029 closes milestone 1 only after all three pass.
 - T029 passes at Studio `c9479fba` with paired Foundation `f81be4be`; see `verification.md`. T030-T031 are unblocked.
-- T032-T035 remain Not Ready until the committed-head T030-T031 and linked Foundation M2 gates pass; local implementation checkboxes are not delivery acceptance.
-- T036-T038 remain Not Ready until T032-T035 settle the language behavior they present.
+- The committed-head T030-T031 and linked Foundation M2 automated gates pass at Studio `00677684` / Foundation `7457b7a4`; see `verification.md`. T035 settles the baseline technical path. Refine/assign T032-T034 only through their current Definition of Ready, with Foundation metadata dependencies explicit. Local implementation checkboxes are not human acceptance or delivery.
+- T036-T038 remain Not Ready until T032-T034 settle the language behavior they present. The spike's technical exit decision does not close M3.
