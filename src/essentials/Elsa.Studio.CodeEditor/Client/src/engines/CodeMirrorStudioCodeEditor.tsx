@@ -8,11 +8,12 @@ import {
   temporarilySetTabFocusMode,
   toggleTabFocusMode
 } from "@codemirror/commands";
-import { bracketMatching, defaultHighlightStyle, foldGutter, indentOnInput, syntaxHighlighting, syntaxTree } from "@codemirror/language";
+import { bracketMatching, defaultHighlightStyle, foldGutter, indentOnInput, syntaxHighlighting } from "@codemirror/language";
 import { Compartment, EditorState, Prec, Transaction } from "@codemirror/state";
 import { EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type KeyBinding } from "@codemirror/view";
 import { useEffect, useRef } from "react";
 import { applyCodeMirrorDiagnostics } from "./codeMirrorDiagnostics";
+import { collectCodeMirrorSyntaxDiagnostics } from "./codeMirrorSyntaxDiagnostics";
 import {
   cancelCodeMirrorIntelligence,
   createCodeMirrorCodeIntelligenceExtensions,
@@ -39,6 +40,7 @@ interface CodeMirrorRuntime {
   props: StudioCodeEditorEngineProps;
   lastEmittedValue?: string;
   tabEscapeArmed?: boolean;
+  languageLoadGeneration: number;
 }
 
 // Compact fields are mutually exclusive. Parking the outgoing view until React mounts the incoming
@@ -79,11 +81,12 @@ export function CodeMirrorStudioCodeEditor(props: StudioCodeEditorEngineProps) {
       effects: entry.presentation.reconfigure(presentationExtensions(props.profile))
     });
     if (props.autoFocus) view.focus();
-    applyDiagnostics(view, entry.runtime.props.diagnostics);
-    void loadLanguageSupport(view, props.document.language, entry);
+    applyDiagnostics(view, entry.runtime.props.diagnostics, entry.runtime.props.grammarProfile);
+    void loadLanguageSupport(view, props.document.language, props.grammarProfile, entry);
 
     return () => {
       entry.runtime.tabEscapeArmed = false;
+      entry.runtime.languageLoadGeneration++;
       entry.state = view.state;
       setStudioCodeEditorSessionEntry(props.session, props.document.uri, entry);
       if (activeCodeMirrorViews.delete(view)) {
@@ -96,7 +99,7 @@ export function CodeMirrorStudioCodeEditor(props: StudioCodeEditorEngineProps) {
       viewRef.current = undefined;
     };
   // A session survives profile remounts. A changed URI/session intentionally mounts a new view.
-  }, [entry, props.autoFocus, props.document.language, props.document.uri, props.profile, props.session]);
+  }, [entry, props.autoFocus, props.document.language, props.document.uri, props.grammarProfile, props.profile, props.session]);
 
   useEffect(() => {
     const view = viewRef.current;
@@ -109,8 +112,8 @@ export function CodeMirrorStudioCodeEditor(props: StudioCodeEditorEngineProps) {
         annotations: Transaction.addToHistory.of(false)
       });
     }
-    applyDiagnostics(view, props.diagnostics);
-  }, [props.document.value, props.document.version, props.diagnostics]);
+    applyDiagnostics(view, props.diagnostics, props.grammarProfile);
+  }, [props.document.value, props.document.version, props.diagnostics, props.grammarProfile]);
 
   useEffect(() => {
     const view = viewRef.current;
@@ -199,7 +202,7 @@ function resolveEntry(props: StudioCodeEditorEngineProps): CodeMirrorSessionEntr
     return existing;
   }
 
-  const runtime: CodeMirrorRuntime = { props };
+  const runtime: CodeMirrorRuntime = { props, languageLoadGeneration: 0 };
   const presentation = new Compartment();
   const editability = new Compartment();
   const language = new Compartment();
@@ -339,36 +342,26 @@ function requestExpansion(runtime: CodeMirrorRuntime) {
   return true;
 }
 
-async function loadLanguageSupport(view: EditorView, language: string, entry: CodeMirrorSessionEntry) {
-  const extensions = await loadCodeMirrorLanguageExtensions(language);
+async function loadLanguageSupport(
+  view: EditorView,
+  language: string,
+  grammarProfile: StudioCodeEditorEngineProps["grammarProfile"],
+  entry: CodeMirrorSessionEntry
+) {
+  const generation = ++entry.runtime.languageLoadGeneration;
+  const extensions = await loadCodeMirrorLanguageExtensions(language, grammarProfile);
+  if (generation !== entry.runtime.languageLoadGeneration) return;
   try {
     view.dispatch({ effects: entry.language.reconfigure(extensions) });
-    applyDiagnostics(view, entry.runtime.props.diagnostics);
+    applyDiagnostics(view, entry.runtime.props.diagnostics, entry.runtime.props.grammarProfile);
   } catch {
     // The component was unmounted while the optional language chunk was loading.
   }
 }
 
-function applyDiagnostics(view: EditorView, supplied: StudioCodeDiagnostic[]) {
-  applyCodeMirrorDiagnostics(view, [...supplied, ...localSyntaxDiagnostics(view)]);
-}
-
-function localSyntaxDiagnostics(view: EditorView): StudioCodeDiagnostic[] {
-  const diagnostics: StudioCodeDiagnostic[] = [];
-  syntaxTree(view.state).iterate({
-    enter(node) {
-      if (!node.type.isError) return;
-      const line = view.state.doc.lineAt(node.from);
-      diagnostics.push({
-        severity: "error",
-        code: "STUDIO-SYNTAX",
-        message: "Syntax error.",
-        startLineNumber: line.number,
-        startColumn: node.from - line.from + 1,
-        endLineNumber: line.number,
-        endColumn: Math.max(node.from - line.from + 2, node.to - line.from + 1)
-      });
-    }
-  });
-  return diagnostics;
+function applyDiagnostics(view: EditorView, diagnostics: StudioCodeDiagnostic[], grammarProfile: StudioCodeEditorEngineProps["grammarProfile"]) {
+  applyCodeMirrorDiagnostics(view, [
+    ...diagnostics,
+    ...collectCodeMirrorSyntaxDiagnostics(view.state, grammarProfile)
+  ]);
 }

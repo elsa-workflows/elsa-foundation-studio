@@ -11,6 +11,10 @@ import { javaScriptToolingProjection } from "./javaScriptToolingProjection";
 import "./styles.css";
 
 const javaScriptSyntax = "JavaScript";
+const javaScriptExpressionLanguageAdapter = {
+  ...javaScriptLanguageAdapter,
+  grammarProfile: "expression" as const
+};
 
 export function register(api: ElsaStudioModuleApi) {
   api.expressionEditors.add({
@@ -94,7 +98,7 @@ function JavaScriptCodeEditor({
         diagnostics={diagnostics}
         document={document}
         hoverProvider={tooling.hoverProvider}
-        languageAdapter={javaScriptLanguageAdapter}
+        languageAdapter={javaScriptExpressionLanguageAdapter}
         minHeight={profile === "compact" ? "2.25rem" : "260px"}
         profile={profile}
         readOnly={disabled}

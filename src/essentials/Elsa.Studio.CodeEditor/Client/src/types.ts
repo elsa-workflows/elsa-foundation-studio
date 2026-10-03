@@ -10,6 +10,8 @@ export interface StudioCodeDocument {
 }
 
 export type StudioCodeEditorProfile = "compact" | "expanded";
+/** Internal parser/completion mode selected by a language adapter, not source metadata. */
+export type StudioCodeGrammarProfile = "program" | "expression";
 export type StudioCodeDiagnosticSeverity = "info" | "warning" | "error";
 
 export interface StudioCodeDiagnostic {
@@ -93,6 +95,7 @@ export interface StudioCodeEditorEngineProps {
   ariaLabel: string;
   autoFocus?: boolean;
   diagnostics: StudioCodeDiagnostic[];
+  grammarProfile?: StudioCodeGrammarProfile;
   completions?: StudioCodeCompletion[];
   completionProvider?: StudioCodeCompletionProvider;
   hoverProvider?: StudioCodeHoverProvider;
@@ -109,6 +112,7 @@ export type StudioCodeEditorLoader = () => Promise<{ default: ComponentType<Stud
 export interface StudioCodeLanguageAdapter {
   language: string;
   displayName: string;
+  grammarProfile?: StudioCodeGrammarProfile;
   loadSupport?(): Promise<StudioCodeLanguageSupport>;
   loadEditor?: StudioCodeEditorLoader;
 }

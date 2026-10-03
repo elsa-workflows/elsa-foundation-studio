@@ -18,6 +18,11 @@ completeTest("persisted workflow drafts use live JavaScript and Liquid assistanc
   await expect(compactJavaScript).toBeVisible();
 
   await exerciseWorkflowAssistance(page, hostPair, compactJavaScript, draft, traffic, "JavaScript");
+  await exerciseJavaScriptConformance(page, hostPair, compactJavaScript, draft, traffic, [
+    { source: "(value: number) => value", code: "JavaScript/Syntax" },
+    { source: "<span />", code: "JavaScript/Syntax" },
+    { source: "const value = 1; value", code: "JavaScript/Syntax" }
+  ]);
 
   await replaceEditorSource(page, compactJavaScript, `args.customerName + args.predecessor.${draft.outputName}`);
   const expandedButton = page.getByRole("button", { name: `Open expanded ${draft.inputName} editor` });
@@ -25,6 +30,9 @@ completeTest("persisted workflow drafts use live JavaScript and Liquid assistanc
   const expandedJavaScript = page.getByRole("dialog").locator(".studio-code-editor-rich-expanded .cm-content");
   await expect(expandedJavaScript).toContainText("args.customerName");
   await exerciseWorkflowAssistance(page, hostPair, expandedJavaScript, draft, traffic, "JavaScript");
+  await exerciseJavaScriptConformance(page, hostPair, expandedJavaScript, draft, traffic, [
+    { source: "Math.random()", code: "JavaScript/AmbientCapability" }
+  ]);
   await replaceEditorSource(page, expandedJavaScript, `args.customerName + args.predecessor.${draft.outputName} + '!'`);
   await page.getByRole("dialog").getByRole("button", { name: `Close ${draft.inputName} editor` }).click();
   await expect(page.getByRole("button", { name: "JavaScript expression. Activate to edit." })).toContainText("args.customerName");
@@ -315,6 +323,32 @@ async function replacePersistedWorkflowSource(page: Page, pair: NormalHostPair, 
       "/expression-tooling/validate", phase.previousRevision, { allowSupportedEmpty: true });
   }, { timeout: 30_000 }).toBe(true);
   return phase;
+}
+
+async function exerciseJavaScriptConformance(page: Page, pair: NormalHostPair, editor: Locator,
+  draft: PersistedExpressionDraft, traffic: SafeBackendTraffic[], cases: { source: string; code: string }[]) {
+  const diagnostics = editor.locator("xpath=ancestor::section[@data-studio-code-editor='true'][1]")
+    .locator(".studio-code-editor-diagnostics");
+  for (const { source, code } of cases) {
+    const phase = await replacePersistedWorkflowSource(page, pair, editor, draft, traffic, "JavaScript", source);
+    await expect.poll(() => hasFreshAssistance(traffic.slice(phase.start), draft, "JavaScript",
+      "/expression-tooling/validate", phase.previousRevision, { diagnosticCode: code }),
+    { timeout: 15_000 }).toBe(true);
+    await expect(diagnostics).toContainText(code);
+    // Known errors are advisory while authoring: the exact source is still persisted.
+    await expect(editor).toContainText(source);
+  }
+
+  // Runtime expression grammar still permits a function body containing return.
+  // These deterministic globals are tested against the real Foundation profile.
+  const source = "(() => { return JSON.stringify({ total: Math.abs(-2) }); })()";
+  const phase = await replacePersistedWorkflowSource(page, pair, editor, draft, traffic, "JavaScript", source);
+  await expect.poll(() => hasFreshAssistance(traffic.slice(phase.start), draft, "JavaScript",
+    "/expression-tooling/validate", phase.previousRevision, { allowSupportedEmpty: true }),
+  { timeout: 15_000 }).toBe(true);
+  await expect(diagnostics.filter({ hasText: "JavaScript/Syntax" })).toHaveCount(0);
+  await expect(diagnostics.filter({ hasText: "JavaScript/AmbientCapability" })).toHaveCount(0);
+  await expect(editor).toContainText(source);
 }
 
 function matchesDraftLocation(request: SafeBackendTraffic, draft: PersistedExpressionDraft, syntax: string) {

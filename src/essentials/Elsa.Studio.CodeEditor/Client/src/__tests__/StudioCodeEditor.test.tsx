@@ -1,9 +1,17 @@
 import { flushSync } from "react-dom";
+import { undo } from "@codemirror/commands";
 import { createRoot } from "react-dom/client";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { EditorView } from "@codemirror/view";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { StudioCodeEditor } from "../StudioCodeEditor";
 import { javaScriptLanguageAdapter } from "../languages/javascript";
 import type { StudioCodeCompletion, StudioCodeDocument, StudioCodeEditorProps } from "../types";
+
+const mountedEditors = new Set<() => void>();
+afterEach(() => {
+  for (const unmount of mountedEditors) unmount();
+  window.dispatchEvent(new Event("elsa:auth-session-ended"));
+});
 
 beforeEach(() => {
   window.dispatchEvent(new Event("elsa:auth-session-started"));
@@ -365,6 +373,50 @@ describe("StudioCodeEditor", () => {
     unmount();
   }, 20000);
 
+  it("reconfigures an existing JavaScript session when its adapter grammar profile changes", async () => {
+    const expressionAdapter = { ...javaScriptLanguageAdapter, grammarProfile: "expression" as const };
+    const document = codeDocument({ value: "(total: number) => total" });
+    const editor = renderEditor({ document, languageAdapter: expressionAdapter });
+
+    await waitFor(() => !!editor.container.querySelector(".cm-lintRange-error"));
+    expect(editor.container.querySelector(".cm-content")?.textContent).toBe(document.value);
+
+    editor.rerender({ document, languageAdapter: javaScriptLanguageAdapter });
+    await waitFor(() => !editor.container.querySelector(".cm-lintRange-error"));
+    expect(editor.container.querySelector(".cm-content")?.textContent).toBe(document.value);
+
+    editor.rerender({ document, languageAdapter: expressionAdapter });
+    await waitFor(() => !!editor.container.querySelector(".cm-lintRange-error"));
+    expect(editor.container.querySelector(".cm-content")?.textContent).toBe(document.value);
+    editor.unmount();
+  }, 20000);
+
+  it("preserves authored source and undo history across JavaScript grammar-profile switches", async () => {
+    const expressionAdapter = { ...javaScriptLanguageAdapter, grammarProfile: "expression" as const };
+    const document = codeDocument({ value: "input" });
+    const onChange = vi.fn();
+    const editor = renderEditor({ document, languageAdapter: expressionAdapter, onChange });
+    await waitFor(() => !!editor.container.querySelector(".cm-content"));
+
+    let content = editor.container.querySelector<HTMLElement>(".cm-content")!;
+    let view = EditorView.findFromDOM(content)!;
+    view.dispatch({ changes: { from: view.state.doc.length, insert: ".total" } });
+    expect(onChange).toHaveBeenLastCalledWith({ ...document, value: "input.total" });
+
+    const editedDocument = { ...document, value: "input.total" };
+    editor.rerender({ document: editedDocument, languageAdapter: javaScriptLanguageAdapter, onChange });
+    await waitFor(() => !editor.container.querySelector(".cm-lintRange-error"));
+    editor.rerender({ document: editedDocument, languageAdapter: expressionAdapter, onChange });
+    await waitFor(() => editor.container.querySelector(".cm-content")?.textContent === "input.total");
+    content = editor.container.querySelector<HTMLElement>(".cm-content")!;
+    view = EditorView.findFromDOM(content)!;
+
+    expect(undo(view)).toBe(true);
+    expect(view.state.doc.toString()).toBe("input");
+    expect(onChange).toHaveBeenLastCalledWith({ ...document, value: "input" });
+    editor.unmount();
+  }, 20000);
+
   it("shows keyboard-accessible signature help in the rich editor", async () => {
     const { container, unmount } = renderEditor({
       document: codeDocument({ value: "formatTotal(" }),
@@ -673,13 +725,17 @@ function renderEditor(props: Partial<StudioCodeEditorProps> = {}) {
   };
   render(props);
 
+  const unmount = () => {
+    if (!mountedEditors.delete(unmount)) return;
+    flushSync(() => root.unmount());
+    host.remove();
+  };
+  mountedEditors.add(unmount);
+
   return {
     container: host,
     rerender: render,
-    unmount: () => {
-      root.unmount();
-      host.remove();
-    }
+    unmount
   };
 }
 
