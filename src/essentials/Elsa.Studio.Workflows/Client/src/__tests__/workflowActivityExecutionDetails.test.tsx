@@ -24,11 +24,12 @@ import type {
   ActivityExecutionStateSummary,
   IncidentStateSummary,
   WorkflowDefinitionVersionDetails,
-  WorkflowInstanceDetails
+  WorkflowInstanceDetails,
+  WorkflowExecutableNode
 } from "../workflowTypes";
 import { bpmnStructureKind } from "../bpmn/bpmnTypes";
-import type { ExecutableGraphNodeFacts } from "../executableGraph";
-import { flowchartActivity, flowchartNode, forEachActivity, forEachNode, leafNode, writeLine } from "./fixtures";
+import { buildExecutableActivityGraph, type ExecutableGraphNodeFacts } from "../executableGraph";
+import { bpmnActivity, flowchartActivity, flowchartNode, forEachActivity, forEachNode, leafNode, writeLine } from "./fixtures";
 
 vi.mock("../api/runtime", async importOriginal => ({
   ...(await importOriginal<typeof import("../api/runtime")>()),
@@ -1075,6 +1076,67 @@ describe("buildInstanceCanvas", () => {
 
     const descended = buildInstanceCanvas(definitionVersion, instanceCatalog, instanceDetails([]), null, frames, () => {});
     expect(descended.nodes.map(node => node.id).sort()).toEqual(["wl-1", "wl-2"]);
+  });
+
+  it("renders the compact executable BPMN projection with exact incident navigation", () => {
+    const child: WorkflowExecutableNode = {
+      executableNodeId: "compiled-writer",
+      authoredActivityId: "authored-writer",
+      activityType: writeLine.activityTypeKey,
+      activityTypeVersion: "1.0.0",
+      structureKind: null,
+      inputBindings: [],
+      childSlots: []
+    };
+    const executable: WorkflowExecutableNode = {
+      ...child,
+      executableNodeId: "compiled-bpmn",
+      authoredActivityId: "authored-bpmn",
+      activityType: bpmnActivity.activityTypeKey,
+      structureKind: bpmnStructureKind,
+      childSlots: [{ name: "Bpmn.Activities", activities: [child] }],
+      bpmnStructure: {
+        elements: [
+          { elementId: "start", elementType: "startEvent" },
+          { elementId: "task", elementType: "task", childNodeId: "compiled-writer" },
+          { elementId: "end", elementType: "endEvent" }
+        ],
+        sequenceFlows: [{ flowId: "start-task", sourceRef: "start", targetRef: "task" }]
+      }
+    };
+    const catalog = [...instanceCatalog, bpmnActivity];
+    const graph = buildExecutableActivityGraph(executable, catalog);
+    const failedActivity = {
+      ...activity,
+      executableNodeId: child.executableNodeId,
+      authoredActivityId: child.authoredActivityId,
+      status: "Scheduled",
+      startedAt: null,
+      completedAt: null,
+      incidentIds: [incident.incidentId]
+    };
+    const details = {
+      ...instanceDetails([failedActivity]),
+      incidents: [{ ...incident, executableNodeId: child.executableNodeId }]
+    };
+    const opened: Array<{ incidentId: string; nodeId?: string | null }> = [];
+    const canvas = buildInstanceCanvas(
+      { ...definitionVersion, state: { rootActivity: graph.root } }, catalog, details,
+      failedActivity.activityExecutionId, [], () => {},
+      (incidentId, nodeId) => opened.push({ incidentId, nodeId }), details.activities, graph
+    );
+
+    expect(canvas.nodes.map(node => node.id)).toEqual(["start", "task", "end"]);
+    const task = canvas.nodes.find(node => node.id === "task")!;
+    expect(task.data.runtimeNodeId).toBe("authored-writer");
+    expect(task.data.runtime).toMatchObject({
+      status: "Scheduled", activityExecutionId: activity.activityExecutionId,
+      incidentCount: 1, hasBlockingIncident: true, selected: true
+    });
+    task.data.onIncidentClick!(incident.incidentId);
+    expect(opened).toEqual([{ incidentId: incident.incidentId, nodeId: "authored-writer" }]);
+    expect(canvas.nodes.find(node => node.id === "start")?.data.runtime).toBeUndefined();
+    expect(canvas.nodes.find(node => node.id === "end")?.data.runtime).toBeUndefined();
   });
 
   it("uses frozen BPMN activity labels in the historical run canvas", () => {

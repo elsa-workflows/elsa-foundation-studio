@@ -653,7 +653,7 @@ export interface WorkflowExecutableConnection {
 
 // A node in the Execution Material tree served by GET /executables/{artifactId}. Input bindings are
 // compact summaries (secrets stay references, never literals); only the structure kind and compact
-// flowchart connections are projected, never the authored structure or descriptor payload.
+// routing topology is projected, never the authored structure or descriptor payload.
 export interface WorkflowExecutableNode {
   executableNodeId: string;
   authoredActivityId: string;
@@ -664,6 +664,24 @@ export interface WorkflowExecutableNode {
   childSlots: WorkflowExecutableChildSlot[];
   connections?: WorkflowExecutableConnection[];
   outputCaptures?: WorkflowExecutableOutputCapture[] | null;
+  bpmnStructure?: WorkflowExecutableBpmnStructure | null;
+}
+
+export interface WorkflowExecutableBpmnStructure {
+  elements: {
+    elementId: string;
+    elementType: string;
+    childNodeId?: string | null;
+    name?: string | null;
+  }[];
+  sequenceFlows: {
+    flowId: string;
+    sourceRef: string;
+    targetRef: string;
+    name?: string | null;
+    conditionOutcome?: string | null;
+    isDefault?: boolean;
+  }[];
 }
 
 // A compiled output capture on an executable node; `conversionPlan` is the pinned ValueConversionPlan

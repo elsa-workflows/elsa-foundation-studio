@@ -19,3 +19,5 @@ When an affected activity is nested inside a visible container, the container sh
 An input can have a recorded evaluation failure, a recorded successful evaluation, or no evaluation evidence. When no snapshot was recorded, Studio says so and does not imply that the input was evaluated. Technical failure details are available in the incident's expandable details.
 
 Runtime summaries are paged. Studio loads a bounded batch of exact activity associations for active incidents and offers **Load more affected activities** when additional associations remain. Until those are loaded, the canvas shows that affected activities are still being resolved. Hosts that do not expose exact activity inspection show an unavailable-evidence state. Selecting an older incident can request its exact activity inspection separately.
+
+The BPMN run canvas uses the pinned executable’s compact element/flow topology and exact child bindings. Layout and activity labels stay separate from execution evidence. Older hosts that omit BPMN topology cannot supply a complete BPMN canvas; Studio does not invent activity associations from names or identifiers.
