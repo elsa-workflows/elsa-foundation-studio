@@ -2871,7 +2871,7 @@ describe("workflows module", () => {
     expect(container.querySelector("[data-tab-id='activity']")?.getAttribute("aria-selected")).toBe("true");
     expect(container.textContent).toContain("Activity Execution ID");
     expect(container.textContent).toContain("activity-execution-1");
-    expect(container.textContent).toContain("Bookmarks0");
+    expect(container.textContent).toContain("BookmarksUnavailable");
     expect(container.textContent).toContain("IncidentsUnavailable");
     await click(buttonByLabel(container, "Maximize run details panel"));
     expect(buttonByLabel(container, "Restore run details panel")).toBeTruthy();

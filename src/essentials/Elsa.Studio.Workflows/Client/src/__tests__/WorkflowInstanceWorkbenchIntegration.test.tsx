@@ -624,6 +624,69 @@ describe("workflow run workbench incident navigation", () => {
     }));
     await vi.waitFor(() => expect(container.querySelector(".wf-instance-incident[data-selected='true']")?.textContent).toContain("SecondFailure"));
   });
+
+  it("keeps the newest exact summary when two incidents share one activity execution", async () => {
+    const olderIncident = incident({
+      incidentId: "incident-older",
+      activityExecutionId: "execution-shared",
+      executableNodeId: "compiled-target",
+      failureType: "OlderFailure",
+      message: "The earlier attempt failed."
+    });
+    const newerIncident = incident({
+      incidentId: "incident-newer",
+      activityExecutionId: "execution-shared",
+      executableNodeId: "compiled-target",
+      failureType: "NewerFailure",
+      message: "The current attempt failed."
+    });
+    api.getWorkflowInstance.mockResolvedValue(workflowDetails({ activities: [], incidents: [olderIncident, newerIncident] }));
+    api.supportsActivityExecutionInspection.mockReset().mockResolvedValueOnce(false).mockResolvedValue(true);
+    const olderLookup = deferred<ActivityExecutionInspection>();
+    const newerLookup = deferred<ActivityExecutionInspection>();
+    let lookupCount = 0;
+    api.getActivityExecutionInspection.mockImplementation(() =>
+      ++lookupCount === 1 ? olderLookup.promise : newerLookup.promise);
+
+    renderWorkbench();
+    await vi.waitFor(() => expect(container.querySelectorAll(".wf-instance-incident")).toHaveLength(2));
+    const incidentRow = (message: string) => [...container.querySelectorAll<HTMLElement>(".wf-instance-incident")]
+      .find(row => row.textContent?.includes(message));
+    const olderAction = buttonByText(incidentRow("The earlier attempt failed.")!, "View input evidence");
+    expect(olderAction).toBeTruthy();
+    click(olderAction);
+    await vi.waitFor(() => expect(api.getActivityExecutionInspection).toHaveBeenCalledTimes(1));
+    const newerAction = buttonByText(incidentRow("The current attempt failed.")!, "View input evidence");
+    expect(newerAction).toBeTruthy();
+    click(newerAction);
+    await vi.waitFor(() => expect(api.getActivityExecutionInspection).toHaveBeenCalledTimes(2));
+
+    newerLookup.resolve(activityInspection({
+      activityExecutionId: "execution-shared",
+      status: "Completed",
+      incidents: [newerIncident],
+      bookmarks: [bookmarkSummary("current-1"), bookmarkSummary("current-2")]
+    }));
+    await vi.waitFor(() => expect(container.querySelector(".wf-activity-overview-status")?.textContent).toContain("Completed"));
+    const metadataValue = (label: string) => [...container.querySelectorAll<HTMLElement>(".wf-activity-meta-item")]
+      .find(item => item.querySelector("dt")?.textContent === label)
+      ?.querySelector(".wf-activity-meta-value")?.textContent;
+    expect(metadataValue("Incidents")).toBe("1");
+    expect(metadataValue("Bookmarks")).toBe("2");
+
+    olderLookup.resolve(activityInspection({
+      activityExecutionId: "execution-shared",
+      status: "Faulted",
+      incidents: [olderIncident, incident({ incidentId: "incident-older-extra", activityExecutionId: "execution-shared" })],
+      bookmarks: [bookmarkSummary("stale-bookmark")]
+    }));
+    await olderLookup.promise;
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(container.querySelector(".wf-activity-overview-status")?.textContent).toContain("Completed");
+    expect(metadataValue("Incidents")).toBe("1");
+    expect(metadataValue("Bookmarks")).toBe("2");
+  });
 });
 
 function buttonByText(scope: ParentNode, text: string) {
@@ -772,5 +835,16 @@ function activityInspection(overrides: Partial<ActivityExecutionInspection> = {}
     valueSnapshots: [],
     metadata: {},
     ...overrides
+  };
+}
+
+function bookmarkSummary(bookmarkId: string): ActivityExecutionInspection["bookmarks"][number] {
+  return {
+    bookmarkId,
+    resumeTargetId: "target",
+    stimulusType: "timer",
+    stimulusHash: "sha256:timer",
+    createdAt: "2026-10-01T12:00:00Z",
+    metadata: {}
   };
 }

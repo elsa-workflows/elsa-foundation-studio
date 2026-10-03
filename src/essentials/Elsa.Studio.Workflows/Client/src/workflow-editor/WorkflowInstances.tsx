@@ -459,6 +459,8 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
   const appliedInitialInspectorTab = useRef<InstanceInspectorTab | null>(null);
   const incidentNavigationRequest = useRef(0);
   const loadGeneration = useRef(0);
+  const incidentActivityLookupSequence = useRef(0);
+  const latestIncidentActivityLookupById = useRef(new Map<string, number>());
   const associationActivities = combineActivityExecutions(data?.details.activities ?? [], data?.incidentActivityExecutions ?? []);
   const selectedActivity = findSelectedActivityExecution(associationActivities, selectedEvidenceId, data?.details.incidents ?? []);
   const {
@@ -492,6 +494,7 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
 
   const load = useCallback(async () => {
     const generation = ++loadGeneration.current;
+    latestIncidentActivityLookupById.current.clear();
     incidentNavigationRequest.current += 1;
     setIncidentAssociationMessage(null);
     setFocusedRuntimeNodeId(null);
@@ -617,15 +620,24 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
     }
     const activityExecutionId = readIncidentActivityExecutionId(incident);
     if (!activityExecutionId || !data) return existing;
+    const lookupRequest = ++incidentActivityLookupSequence.current;
+    latestIncidentActivityLookupById.current.set(activityExecutionId, lookupRequest);
+    const isLatestLookup = () => latestIncidentActivityLookupById.current.get(activityExecutionId) === lookupRequest;
+    const finishLookup = () => {
+      if (isLatestLookup()) latestIncidentActivityLookupById.current.delete(activityExecutionId);
+    };
     let supported: boolean;
     try {
       supported = await supportsActivityExecutionInspection(context);
     } catch {
-      if (isCurrent()) setIncidentAssociationMessage(incidentActivityLookupFailureMessage("unavailable"));
+      if (isLatestLookup() && isCurrent()) setIncidentAssociationMessage(incidentActivityLookupFailureMessage("unavailable"));
+      finishLookup();
       return existing;
     }
+    if (!isLatestLookup()) return existing;
     if (!supported) {
       if (isCurrent()) setIncidentAssociationMessage(incidentActivityLookupFailureMessage("unsupported"));
+      finishLookup();
       return existing;
     }
     const workflowExecutionId = data.details.instance.workflowExecutionId;
@@ -633,8 +645,10 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
       workflowExecutionId,
       activityExecutionId,
       id => getActivityExecutionInspection(context, workflowExecutionId, id));
+    if (!isLatestLookup()) return existing;
     if (result.status === "failed") {
       if (isCurrent()) setIncidentAssociationMessage(incidentActivityLookupFailureMessage(result.reason));
+      finishLookup();
       return existing;
     }
     const exact = result.summary;
@@ -654,6 +668,7 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
           .filter(failure => failure.activityExecutionId !== activityExecutionId)
       };
     });
+    finishLookup();
     return resolveIncidentActivityAssociation(incident, combineActivityExecutions(activities, [exact]), data?.executableGraph);
   }, [context, data]);
 
@@ -985,6 +1000,7 @@ export function activityExecutionSummaryFromInspection(inspection: IncidentActiv
     scheduledAt: inspection.scheduledAt,
     startedAt: inspection.startedAt,
     completedAt: inspection.completedAt,
+    bookmarkCount: inspection.bookmarks.length,
     bookmarkIds: inspection.bookmarks.map(bookmark => bookmark.bookmarkId),
     incidentCount: inspection.incidents.length,
     incidentIds: inspection.incidents.map(incident => incident.incidentId),
@@ -1690,6 +1706,10 @@ type ActivityExecutionInspectionState = {
   error: string;
 };
 
+function resolveReportedCount(count: number | null | undefined, legacyIds: readonly unknown[] | null | undefined) {
+  return count !== undefined ? count : Array.isArray(legacyIds) ? legacyIds.length : null;
+}
+
 export function WorkflowActivityExecutionDetails({
   context,
   activity,
@@ -1786,10 +1806,8 @@ export function WorkflowActivityExecutionDetails({
   const startedLabel = formatDate(activity.startedAt);
   const completedLabel = formatDate(activity.completedAt);
   const durationLabel = formatDuration(activity.startedAt, activity.completedAt) || "Unknown";
-  const bookmarkCount = activity.bookmarkIds?.length ?? 0;
-  const incidentCount = activity.incidentCount !== undefined
-    ? activity.incidentCount
-    : Array.isArray(activity.incidentIds) ? activity.incidentIds.length : null;
+  const bookmarkCount = resolveReportedCount(activity.bookmarkCount, activity.bookmarkIds);
+  const incidentCount = resolveReportedCount(activity.incidentCount, activity.incidentIds);
   const markCopied = (label: string) => setCopyStatus(`Copied ${label}.`);
   const markCopyFailed = (label: string) => setCopyStatus(`Could not copy ${label}.`);
 
@@ -1878,7 +1896,7 @@ export function WorkflowActivityExecutionDetails({
             <ActivityMetadataValue label="Activity Execution ID" value={activity.activityExecutionId} copiedLabel="activity execution ID" code onCopied={markCopied} onCopyFailed={markCopyFailed} />
             <ActivityMetadataValue label="Authored Activity ID" value={activity.authoredActivityId} copiedLabel="authored activity ID" code onCopied={markCopied} onCopyFailed={markCopyFailed} />
             <ActivityMetadataValue label="Completed" value={completedLabel} copiedLabel="completion time" onCopied={markCopied} onCopyFailed={markCopyFailed} />
-            <ActivityMetadataValue label="Bookmarks" value={String(bookmarkCount)} copiedLabel="bookmark count" onCopied={markCopied} onCopyFailed={markCopyFailed} />
+            <ActivityMetadataValue label="Bookmarks" value={bookmarkCount == null ? "Unavailable" : String(bookmarkCount)} copiedLabel="bookmark count" onCopied={markCopied} onCopyFailed={markCopyFailed} />
           </dl>
         </details>
       </section>

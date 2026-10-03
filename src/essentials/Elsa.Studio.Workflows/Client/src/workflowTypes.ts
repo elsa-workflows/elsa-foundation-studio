@@ -1120,7 +1120,10 @@ export interface ActivityExecutionStateSummary {
   branchId?: string | null;
   iterationId?: string | null;
   callStackDepth?: number | null;
-  bookmarkIds: string[];
+  /** Runtime's projected bookmark total; null means the count is unavailable. */
+  bookmarkCount?: number | null;
+  /** Legacy bookmark identities, used only when the projected count is absent. */
+  bookmarkIds?: string[] | null;
   incidentCount?: number | null;
   incidentIds?: string[] | null;
   faultCount?: number;

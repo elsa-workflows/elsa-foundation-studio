@@ -10,6 +10,7 @@ import {
   WorkflowIncidentList,
   buildInstanceCanvas,
   combineActivityExecutions,
+  activityExecutionSummaryFromInspection,
   formatSnapshotPayload,
   getIncidentStackTrace,
   loadActiveIncidentActivitySummaries
@@ -98,6 +99,12 @@ async function waitFor(assertion: () => void) {
   }
 
   throw lastError;
+}
+
+function metadataValue(container: ParentNode, label: string) {
+  return [...container.querySelectorAll<HTMLElement>(".wf-activity-meta-item")]
+    .find(item => item.querySelector("dt")?.textContent === label)
+    ?.querySelector(".wf-activity-meta-value")?.textContent;
 }
 
 function installClipboard(writeText: (value: string) => Promise<void>) {
@@ -226,9 +233,6 @@ describe("WorkflowActivityExecutionDetails", () => {
   it("uses projected incident counts and falls back only to available legacy IDs", () => {
     vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([]));
     const container = render(<WorkflowActivityExecutionDetails context={context} activity={activity} activityCatalog={catalog} />);
-    const incidentCount = () => [...container.querySelectorAll<HTMLElement>(".wf-activity-meta-item")]
-      .find(item => item.querySelector("dt")?.textContent === "Incidents")
-      ?.querySelector(".wf-activity-meta-value")?.textContent;
     const cases: Array<[Partial<ActivityExecutionStateSummary>, string]> = [
       [{ incidentCount: 1, incidentIds: undefined }, "1"],
       [{ incidentCount: 0, incidentIds: ["stale-id"] }, "0"],
@@ -239,7 +243,24 @@ describe("WorkflowActivityExecutionDetails", () => {
 
     for (const [summary, expected] of cases) {
       rerender(<WorkflowActivityExecutionDetails context={context} activity={{ ...activity, ...summary }} activityCatalog={catalog} />);
-      expect(incidentCount()).toBe(expected);
+      expect(metadataValue(container, "Incidents")).toBe(expected);
+    }
+  });
+
+  it("prefers projected bookmark counts and uses legacy IDs only when the count is absent", () => {
+    vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([]));
+    const container = render(<WorkflowActivityExecutionDetails context={context} activity={activity} activityCatalog={catalog} />);
+    const cases: Array<[Partial<ActivityExecutionStateSummary>, string]> = [
+      [{ bookmarkCount: 3, bookmarkIds: undefined }, "3"],
+      [{ bookmarkCount: 0, bookmarkIds: ["stale-id"] }, "0"],
+      [{ bookmarkCount: null, bookmarkIds: ["legacy-id"] }, "Unavailable"],
+      [{ bookmarkCount: undefined, bookmarkIds: ["legacy-1", "legacy-2"] }, "2"],
+      [{ bookmarkCount: undefined, bookmarkIds: undefined }, "Unavailable"]
+    ];
+
+    for (const [summary, expected] of cases) {
+      rerender(<WorkflowActivityExecutionDetails context={context} activity={{ ...activity, ...summary }} activityCatalog={catalog} />);
+      expect(metadataValue(container, "Bookmarks")).toBe(expected);
     }
   });
 
@@ -1131,8 +1152,20 @@ describe("buildInstanceCanvas", () => {
       workflowExecutionId: "wf-1",
       executableNodeId: "compiled-wl-1",
       authoredActivityId: "wl-1",
-      incidents: [{ ...incident, incidentId: targetIncident.incidentId }]
+      incidents: [{ ...incident, incidentId: targetIncident.incidentId }],
+      bookmarks: ["bookmark-1", "bookmark-2"].map(bookmarkId => ({
+        bookmarkId,
+        resumeTargetId: "target",
+        stimulusType: "timer",
+        stimulusHash: "sha256:timer",
+        createdAt: "2026-07-09T10:00:01Z",
+        metadata: {}
+      }))
     };
+    expect(activityExecutionSummaryFromInspection(exactInspection)).toMatchObject({
+      bookmarkCount: 2,
+      bookmarkIds: ["bookmark-1", "bookmark-2"]
+    });
     const loaded = await loadActiveIncidentActivitySummaries(details, async () => exactInspection);
     const frames = enterForEachBody()!;
     const descended = buildInstanceCanvas(
@@ -1147,7 +1180,12 @@ describe("buildInstanceCanvas", () => {
     );
 
     expect(loaded.incomplete).toBe(false);
-    expect(loaded.activities[0]).toMatchObject({ incidentCount: 1, incidentIds: [targetIncident.incidentId] });
+    expect(loaded.activities[0]).toMatchObject({
+      bookmarkCount: 2,
+      bookmarkIds: ["bookmark-1", "bookmark-2"],
+      incidentCount: 1,
+      incidentIds: [targetIncident.incidentId]
+    });
     expect(combineActivityExecutions([
       { ...activity, activityExecutionId: "older-execution", incidentCount: 0, incidentIds: ["stale-id"] }
     ], loaded.activities)[0]).toMatchObject({
