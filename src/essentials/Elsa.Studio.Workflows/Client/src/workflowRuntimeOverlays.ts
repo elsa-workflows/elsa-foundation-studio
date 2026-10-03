@@ -1,6 +1,7 @@
 import type { Node } from "@xyflow/react";
 import type { ActivityCatalogItem, ActivityExecutionStateSummary, ActivityNode, IncidentStateSummary } from "./workflowTypes";
 import { getChildSlots, latestActivityExecution, type ChildSlot, type WorkflowRuntimeNodeOverlay } from "./workflowAdapter";
+import type { ExecutableActivityGraph } from "./executableGraph";
 
 export function isActiveIncident(incident: Pick<IncidentStateSummary, "status">) {
   const status = incident.status.trim().toLowerCase();
@@ -12,7 +13,8 @@ export function applyRuntimeOverlays<TNodeData extends Record<string, unknown>>(
   activities: ActivityExecutionStateSummary[],
   incidents: IncidentStateSummary[],
   selectedEvidenceId: string | null = null,
-  activityCatalog: ActivityCatalogItem[] = []
+  activityCatalog: ActivityCatalogItem[] = [],
+  executableGraph?: ExecutableActivityGraph | null
 ): Node<TNodeData & { runtime?: WorkflowRuntimeNodeOverlay }>[] {
   type NodeWithRuntime = Node<TNodeData & { runtime?: WorkflowRuntimeNodeOverlay }>;
   const catalogByVersion = new Map(activityCatalog.map(activity => [activity.activityVersionId, activity]));
@@ -31,6 +33,9 @@ export function applyRuntimeOverlays<TNodeData extends Record<string, unknown>>(
   const activitiesByNodeId = new Map<string, ActivityExecutionStateSummary[]>();
   const activitiesByAuthoredId = new Map<string, ActivityExecutionStateSummary[]>();
   const activitiesByExecutableNodeId = new Map<string, ActivityExecutionStateSummary[]>();
+  const canvasNodeIdByExecutableId = new Map(
+    [...(executableGraph?.factsByNodeId ?? [])].map(([canvasNodeId, facts]) => [facts.executableNodeId, canvasNodeId] as const)
+  );
   for (const activity of activities) {
     const authoredId = activity.authoredActivityId?.trim();
     const executableId = activity.executableNodeId?.trim();
@@ -70,7 +75,9 @@ export function applyRuntimeOverlays<TNodeData extends Record<string, unknown>>(
     const authoredPlacements = activitiesByAuthoredId.get(executableNodeId) ?? [];
     if (new Set(authoredPlacements.map(activity => activity.executableNodeId)).size > 1) return "";
     const byNodeId = activitiesByNodeId.get(executableNodeId)?.find(activity => activity.authoredActivityId === executableNodeId);
-    return byNodeId ? canvasNodeIdForActivity(byNodeId) : executableNodeId;
+    return byNodeId
+      ? canvasNodeIdForActivity(byNodeId)
+      : canvasNodeIdByExecutableId.get(executableNodeId) ?? executableNodeId;
   });
 
   return nodes.map(node => {

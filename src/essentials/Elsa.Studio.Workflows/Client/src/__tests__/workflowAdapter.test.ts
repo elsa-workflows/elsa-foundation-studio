@@ -797,6 +797,37 @@ describe("workflow adapter", () => {
     });
   });
 
+  it("maps node-only incident cues through the pinned executable graph when activity inspection is missing", () => {
+    const graph = buildExecutableActivityGraph({
+      executableNodeId: "root-executable",
+      authoredActivityId: "root-authored",
+      activityType: sequenceActivity.activityTypeKey,
+      activityTypeVersion: sequenceActivity.version,
+      structureKind: sequenceStructureKind,
+      inputBindings: [],
+      childSlots: [{ name: "Sequence.Activities", activities: [{
+        executableNodeId: "compiled-write-line",
+        authoredActivityId: "authored-write-line",
+        activityType: writeLine.activityTypeKey,
+        activityTypeVersion: writeLine.version,
+        inputBindings: [],
+        childSlots: []
+      }] }]
+    }, [sequenceActivity, writeLine]);
+    const canvas = buildCanvas(firstScope(graph.root), [sequenceActivity, writeLine], []);
+    const nodeOnlyIncident = incident({
+      activityExecutionId: null,
+      executableNodeId: "compiled-write-line"
+    });
+
+    const nodes = applyRuntimeOverlays(canvas.nodes, [], [nodeOnlyIncident], null, [sequenceActivity, writeLine], graph);
+
+    expect(nodes[0]).toMatchObject({
+      id: "authored-write-line",
+      data: { runtime: { primaryIncidentId: nodeOnlyIncident.incidentId, incidentCount: 1 } }
+    });
+  });
+
   it("translates BPMN element identity to its bound runtime activity identity", () => {
     const canvas = buildCanvas(firstScope(sequenceRoot([node("write-line-1")])), [writeLine], []);
     const bpmnNode = {

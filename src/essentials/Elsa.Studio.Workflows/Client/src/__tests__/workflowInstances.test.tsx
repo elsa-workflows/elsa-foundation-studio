@@ -264,23 +264,27 @@ describe("Runtime-pinned workflow instance rendering", () => {
       activities: [],
       incidents
     };
-    const fetchInspection = vi.fn(async (activityExecutionId: string) => ({
-      activityExecutionId,
-      workflowExecutionId: "workflow-execution-1",
-      executableNodeId: `compiled-${activityExecutionId}`,
-      authoredActivityId: `authored-${activityExecutionId}`,
-      activityType: "Example.Activity",
-      activityTypeVersion: "1.0.0",
-      status: "Faulted",
-      scheduledAt: "2026-10-01T12:00:00Z",
-      bookmarks: [],
-      incidents: [],
-      metadata: {}
-    }));
+    const fetchInspection = vi.fn(async (activityExecutionId: string) => {
+      if (activityExecutionId !== "execution-51") throw new Error("Earlier activity inspection is unavailable");
+      return {
+        activityExecutionId,
+        workflowExecutionId: "workflow-execution-1",
+        executableNodeId: `compiled-${activityExecutionId}`,
+        authoredActivityId: `authored-${activityExecutionId}`,
+        activityType: "Example.Activity",
+        activityTypeVersion: "1.0.0",
+        status: "Faulted",
+        scheduledAt: "2026-10-01T12:00:00Z",
+        bookmarks: [],
+        incidents: [],
+        metadata: {}
+      };
+    });
 
     const firstBatch = await loadActiveIncidentActivitySummaries(details, fetchInspection);
-    expect(firstBatch.activities).toHaveLength(50);
-    expect(firstBatch.pendingActivityExecutionIds).toEqual(["execution-51"]);
+    expect(firstBatch.activities).toHaveLength(0);
+    expect(firstBatch.pendingActivityExecutionIds).toHaveLength(51);
+    expect(firstBatch.pendingActivityExecutionIds[0]).toBe("execution-51");
     expect(firstBatch.incomplete).toBe(true);
 
     const nextBatch = await loadActiveIncidentActivitySummaries(
@@ -289,8 +293,9 @@ describe("Runtime-pinned workflow instance rendering", () => {
       firstBatch.pendingActivityExecutionIds);
     expect(nextBatch.activities).toHaveLength(1);
     expect(nextBatch.activities[0]?.activityExecutionId).toBe("execution-51");
-    expect(nextBatch.pendingActivityExecutionIds).toEqual([]);
-    expect(nextBatch.incomplete).toBe(false);
+    expect(nextBatch.pendingActivityExecutionIds).toHaveLength(50);
+    expect(nextBatch.pendingActivityExecutionIds).not.toContain("execution-51");
+    expect(nextBatch.incomplete).toBe(true);
   });
 
   it("loads selected execution 51 on demand for exact input navigation", async () => {
