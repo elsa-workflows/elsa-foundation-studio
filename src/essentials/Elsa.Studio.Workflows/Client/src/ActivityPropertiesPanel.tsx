@@ -225,6 +225,7 @@ export function ActivityPropertiesPanel({
 
 type ExpressionProviderReadiness = "checking" | "ready" | "missing" | "unavailable" | "unauthorized" | "incompatible" | "stale";
 type ExpressionProviderReadinessByType = ReadonlyMap<string, ExpressionProviderReadiness>;
+const studioExpressionToolingContractVersion = 1;
 
 function useExpressionProviderReadiness(
   tooling: StudioExpressionToolingClient | undefined,
@@ -277,11 +278,18 @@ function useExpressionProviderReadiness(
         readiness.set(type, "unavailable");
         continue;
       }
-      const state = currentSnapshot.result?.state;
-      if (state === "ready") {
-        readiness.set(type, currentSnapshot.result?.data?.some(item => item.expressionType === type) ? "ready" : "missing");
-      } else if (state === "supported-empty" || state === "canceled") {
-        readiness.set(type, state === "canceled" ? "checking" : "missing");
+      const result = currentSnapshot.result;
+      const state = result?.state;
+      if (state === "ready" && result) {
+        const descriptor = result.data?.find(item => item.expressionType === type);
+        readiness.set(type, !descriptor
+          ? "missing"
+          : supportsExpressionToolingContractVersion(descriptor) ? "ready" : "incompatible");
+      } else if (state === "supported-empty") {
+        readiness.set(type, "missing");
+      } else if (state === "canceled") {
+        // A settled cancellation with a live request signal is terminal, not still pending.
+        readiness.set(type, "unavailable");
       } else if (state === "unauthorized" || state === "incompatible" || state === "unavailable" || state === "stale") {
         readiness.set(type, state);
       } else {
@@ -290,6 +298,13 @@ function useExpressionProviderReadiness(
     }
     return readiness;
   }, [snapshot, textTypes, tooling, typesKey, authorizationAvailable, authorizationEpoch]);
+}
+
+function supportsExpressionToolingContractVersion(descriptor: StudioExpressionToolingDescriptor) {
+  const { contractMinVersion, contractMaxVersion } = descriptor;
+  return Number.isSafeInteger(contractMinVersion) && Number.isSafeInteger(contractMaxVersion) &&
+    contractMinVersion <= studioExpressionToolingContractVersion &&
+    studioExpressionToolingContractVersion <= contractMaxVersion;
 }
 
 function ExpressionReadinessStatus({

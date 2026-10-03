@@ -129,11 +129,49 @@ function propertyLabels(container: HTMLElement) {
   return [...container.querySelectorAll(".wf-property-row-header label")].map(label => label.textContent);
 }
 
-function readinessTooling(expressionTypes: string[] = [], state = "ready") {
+function readinessTooling(
+  expressionTypes: string[] = [],
+  state: StudioExpressionToolingResult<StudioExpressionToolingDescriptor[]>["state"] = "ready",
+  contractRanges: Record<string, { contractMinVersion: number; contractMaxVersion: number }> = {},
+  onDescribe?: (signal?: AbortSignal) => void
+): StudioExpressionToolingClient {
+  const unsupportedOperation = async () => {
+    throw new Error("This test fixture only implements descriptor discovery.");
+  };
   return {
-    describe: vi.fn(async () => ({ state, contractVersion: 1, expressionType: "",
-      data: expressionTypes.map(expressionType => ({ expressionType })) }))
-  } as unknown as StudioExpressionToolingClient;
+    describe: vi.fn(async (signal?: AbortSignal) => {
+      onDescribe?.(signal);
+      return {
+        state,
+        contractVersion: 1,
+        expressionType: "",
+        data: expressionTypes.map(expressionType => ({
+          expressionType,
+          moduleId: `test.${expressionType.toLowerCase()}`,
+          moduleVersion: "1.0.0",
+          contractMinVersion: contractRanges[expressionType]?.contractMinVersion ?? 1,
+          contractMaxVersion: contractRanges[expressionType]?.contractMaxVersion ?? 1,
+          capabilities: {
+            highlighting: true,
+            completion: true,
+            hover: true,
+            signatures: true,
+            formatting: false,
+            localDiagnostics: true,
+            semanticValidation: true
+          }
+        }))
+      };
+    }),
+    getCatalog: unsupportedOperation,
+    getValueShape: unsupportedOperation,
+    getAuthoringContext: unsupportedOperation,
+    getCompletions: unsupportedOperation,
+    getHover: unsupportedOperation,
+    validate: unsupportedOperation,
+    invalidateAuthorization: () => {},
+    dispose: () => {}
+  };
 }
 
 function authoringContext(): StudioExpressionToolingResult<StudioExpressionAuthoringContext> {
@@ -242,6 +280,80 @@ describe("activity property organization", () => {
     expect(container.querySelector("[data-property-name='JavaScriptMessage'] [data-provider-readiness='missing']")).not.toBeNull();
     expect(container.querySelector("[data-property-name='LiquidMessage'] [data-editor-readiness='missing']")).not.toBeNull();
     expect(container.querySelector("[data-property-name='LiquidMessage'] [data-provider-readiness='ready']")).not.toBeNull();
+  });
+
+  it.each([
+    { label: "at the lower supported boundary", minimum: 0, maximum: 1, readiness: "ready" },
+    { label: "at the exact client v1.0 contract", minimum: 1, maximum: 1, readiness: "ready" },
+    { label: "at the upper supported boundary", minimum: 1, maximum: 2, readiness: "ready" },
+    { label: "with reversed bounds", minimum: 2, maximum: 1, readiness: "incompatible" },
+    { label: "with a fractional lower bound", minimum: 0.5, maximum: 1, readiness: "incompatible" },
+    { label: "with a fractional upper bound", minimum: 1, maximum: 1.5, readiness: "incompatible" },
+    { label: "when the provider supports only v2", minimum: 2, maximum: 2, readiness: "incompatible" },
+    { label: "when the provider supports only v0", minimum: 0, maximum: 0, readiness: "incompatible" }
+  ])("checks provider contract ranges against client v1 $label", async ({ minimum, maximum, readiness }) => {
+    const tooling = readinessTooling(["JavaScript"], "ready", {
+      JavaScript: { contractMinVersion: minimum, contractMaxVersion: maximum }
+    });
+    const container = renderPanel([
+      input("Message", { isWrapped: true, defaultSyntax: "JavaScript" })
+    ], {
+      expressionTooling: tooling,
+      activity: activity({ message: { typeName: "System.String", expression: { type: "JavaScript", value: "args.customerName" } } })
+    });
+
+    await vi.waitFor(() => expect(container.querySelector(`[data-provider-readiness='${readiness}']`)).not.toBeNull());
+    expect(container.querySelector<HTMLInputElement>("input[aria-label='Message expression']")?.value).toBe("args.customerName");
+  });
+
+  it("keeps a v2-only provider incompatible without degrading the compatible language or its editor", async () => {
+    const changed = vi.fn();
+    const tooling = readinessTooling(["JavaScript", "Liquid"], "ready", {
+      JavaScript: { contractMinVersion: 2, contractMaxVersion: 2 }
+    });
+    const container = renderPanel([
+      input("JavaScriptMessage", { isWrapped: true, defaultSyntax: "JavaScript" }),
+      input("LiquidMessage", { isWrapped: true, defaultSyntax: "Liquid" })
+    ], {
+      expressionTooling: tooling,
+      expressionEditors: [editableJavaScriptEditor()],
+      onChange: changed,
+      activity: activity({
+        javaScriptMessage: { typeName: "System.String", expression: { type: "JavaScript", value: "args.customerName" } },
+        liquidMessage: { typeName: "System.String", expression: { type: "Liquid", value: "{{ customerName }}" } }
+      })
+    });
+
+    await vi.waitFor(() => expect(container.querySelector("[data-property-name='JavaScriptMessage'] [data-provider-readiness='incompatible']")).not.toBeNull());
+    expect(container.querySelector("[data-property-name='JavaScriptMessage'] [data-editor-readiness='ready']")).not.toBeNull();
+    expect(container.querySelector("[data-property-name='LiquidMessage'] [data-provider-readiness='ready']")).not.toBeNull();
+    expect(container.querySelector("[data-property-name='LiquidMessage'] [data-editor-readiness='missing']")).not.toBeNull();
+
+    const javascriptSource = container.querySelector<HTMLInputElement>("input[aria-label='JavaScriptMessage rich source']")!;
+    expect(javascriptSource.value).toBe("args.customerName");
+    changeTextField(javascriptSource, "args.customerName.toUpperCase()");
+    expect(changed.mock.calls.at(-1)?.[0].javaScriptMessage.expression).toEqual({
+      type: "JavaScript",
+      value: "args.customerName.toUpperCase()"
+    });
+  });
+
+  it("reports a settled canceled provider description as unavailable while keeping source editable", async () => {
+    let describeSignal: AbortSignal | undefined;
+    const tooling = readinessTooling(["JavaScript"], "canceled", {}, signal => { describeSignal = signal; });
+    const container = renderPanel([
+      input("Message", { isWrapped: true, defaultSyntax: "JavaScript" })
+    ], {
+      expressionTooling: tooling,
+      activity: activity({ message: { typeName: "System.String", expression: { type: "JavaScript", value: "args.customerName" } } })
+    });
+
+    await vi.waitFor(() => expect(container.querySelector("[data-provider-readiness='unavailable']")).not.toBeNull());
+    expect(describeSignal?.aborted).toBe(false);
+    expect(container.querySelector("[data-provider-readiness='checking']")).toBeNull();
+    const field = container.querySelector<HTMLInputElement>("input[aria-label='Message expression']")!;
+    expect(field.value).toBe("args.customerName");
+    expect(field.disabled).toBe(false);
   });
 
   it("preserves rich inline and expanded text editing when its runtime descriptor is absent", async () => {
