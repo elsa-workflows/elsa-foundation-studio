@@ -29,7 +29,6 @@ import {
   getExpressionAuthoringContext,
   getExpressionCompletions,
   getExpressionHover,
-  searchExpressionSymbols,
   validateExpression
 } from "../api/expressionTooling";
 
@@ -68,6 +67,8 @@ export function createExpressionToolingClient(
 class ExpressionToolingClient implements StudioExpressionToolingClient {
   private readonly metadataCache = new Map<string, StudioExpressionToolingResult<StudioExpressionSymbolCatalogPage>>();
   private readonly contextRevisions = new Map<string, string>();
+  private readonly contextRequests = new Map<string, number>();
+  private readonly valueShapeContexts = new Map<string, Map<string, StudioExpressionValueShape>>();
   private authorizationRevoked = false;
   private authorizationPendingRestore = false;
   private authorizationGeneration = 0;
@@ -101,11 +102,16 @@ class ExpressionToolingClient implements StudioExpressionToolingClient {
     this.ensureActive();
     const expressionType = document.expressionType;
     if (this.authorizationRevoked || this.authorizationPendingRestore) return result("unauthorized", expressionType);
+    if (signal?.aborted) return result("canceled", expressionType);
     const generation = this.authorizationGeneration;
+    const revisionIdentity = this.shapeContextKey(document, authoringContext);
+    const currentRevision = this.contextRevisions.get(document.id);
+    if (currentRevision !== undefined && currentRevision !== revisionIdentity) return result("stale", expressionType);
     const skip = parseCursor(cursor);
     const key = this.cacheKey(
       "symbols",
       document.id,
+      document.expressionType,
       String(document.sourceVersion),
       authoringContext.version,
       authoringContext.catalogVersion ?? "",
@@ -119,23 +125,30 @@ class ExpressionToolingClient implements StudioExpressionToolingClient {
 
     const response = await mapToolingRequest(
       expressionType,
-      () => searchExpressionSymbols(this.context, {
+      () => getExpressionAuthoringContext(this.context, {
         ...locationRequest(document, authoringContext.version),
         search: query || undefined,
         skip,
         take: 100
       }, signal),
-      value => parseItemsOutcome(value, expressionType, document, authoringContext.version)
+      value => parseContextOutcome(value, document, authoringContext.version)
     );
-    const catalog = response.data
+    if (signal?.aborted) return result("canceled", expressionType);
+    const current = this.observeAuthorization(response, generation);
+    if (current.data && (!contextMatches(authoringContext, current.data) ||
+        (this.contextRevisions.has(document.id) && this.contextRevisions.get(document.id) !== revisionIdentity)))
+      return result("stale", expressionType);
+    if (current.data) this.retainValueShapes(document, authoringContext, current.data);
+    const catalog = current.data
       ? {
-          ...withoutData(response),
+          ...withoutData(current),
+          state: current.data.rootSymbols?.length ? current.state : "supported-empty" as const,
           data: {
-            symbols: response.data.items.map(completionItemToSymbol),
-            nextCursor: response.data.items.length === 100 ? String(skip + 100) : undefined
+            symbols: current.data.rootSymbols ?? [],
+            nextCursor: current.data.rootSymbols?.length === 100 ? String(skip + 100) : undefined
           }
         }
-      : withoutData(response);
+      : withoutData(current);
     const observed = this.observeAuthorization(catalog, generation);
     if (observed.state === "ready" || observed.state === "supported-empty") this.metadataCache.set(key, observed);
     return observed;
@@ -150,7 +163,10 @@ class ExpressionToolingClient implements StudioExpressionToolingClient {
     this.ensureActive();
     if (this.authorizationRevoked || this.authorizationPendingRestore) return result("unauthorized", document.expressionType);
     signal?.throwIfAborted();
-    const shape = (authoringContext as AuthoringContextWithShapes)[valueShapesKey]?.get(shapeId);
+    const currentRevision = this.contextRevisions.get(document.id);
+    if (currentRevision !== undefined && currentRevision !== this.shapeContextKey(document, authoringContext))
+      return result("stale", document.expressionType);
+    const shape = this.valueShapeContexts.get(this.shapeContextKey(document, authoringContext))?.get(shapeId);
     return shape
       ? result("ready", document.expressionType, {
           contextVersion: authoringContext.version,
@@ -166,23 +182,28 @@ class ExpressionToolingClient implements StudioExpressionToolingClient {
   ): Promise<StudioExpressionToolingResult<StudioExpressionAuthoringContext>> {
     this.ensureActive();
     if (this.authorizationRevoked) return result("unauthorized", document.expressionType);
+    if (signal?.aborted) return result("canceled", document.expressionType);
     const generation = this.authorizationGeneration;
+    const requestGeneration = (this.contextRequests.get(document.id) ?? 0) + 1;
+    this.contextRequests.set(document.id, requestGeneration);
     const response = await mapToolingRequest(
       document.expressionType,
       () => getExpressionAuthoringContext(this.context, locationRequest(document), signal),
       value => parseContextOutcome(value, document)
     );
+    if (signal?.aborted) return result("canceled", document.expressionType);
     const observed = this.observeAuthorization(response, generation, true);
+    if (observed.data && this.contextRequests.get(document.id) !== requestGeneration)
+      return result("stale", document.expressionType);
     if (observed.data) {
-      const revisionIdentity = [
-        observed.data.version,
-        observed.data.catalogVersion ?? "",
-        observed.data.permissionRevision ?? "",
-        observed.data.hostPolicyRevision ?? ""
-      ].join("\u001f");
+      const revisionIdentity = this.shapeContextKey(document, observed.data);
       const previous = this.contextRevisions.get(document.id);
-      if (previous !== undefined && previous !== revisionIdentity) this.metadataCache.clear();
+      if (previous !== undefined && previous !== revisionIdentity) {
+        this.metadataCache.clear();
+        this.valueShapeContexts.clear();
+      }
       this.contextRevisions.set(document.id, revisionIdentity);
+      this.retainValueShapes(document, observed.data, observed.data);
     }
     return observed;
   }
@@ -241,15 +262,17 @@ class ExpressionToolingClient implements StudioExpressionToolingClient {
   }
 
   invalidateAuthorization(): void {
+    this.authorizationGeneration++;
     this.metadataCache.clear();
     this.contextRevisions.clear();
+    this.contextRequests.clear();
+    this.valueShapeContexts.clear();
   }
 
   revokeAuthorization(): void {
     if (this.authorizationRevoked) return;
     this.authorizationRevoked = true;
     this.authorizationPendingRestore = false;
-    this.authorizationGeneration++;
     this.invalidateAuthorization();
     this.dispatchAuthorizationEvent(expressionToolingAuthorizationRevokedEvent);
   }
@@ -258,7 +281,6 @@ class ExpressionToolingClient implements StudioExpressionToolingClient {
     this.ensureActive();
     this.authorizationRevoked = false;
     this.authorizationPendingRestore = true;
-    this.authorizationGeneration++;
     this.invalidateAuthorization();
     this.dispatchAuthorizationEvent(expressionToolingAuthorizationRevokedEvent);
   }
@@ -278,6 +300,21 @@ class ExpressionToolingClient implements StudioExpressionToolingClient {
     ].join("\u001f");
   }
 
+  private shapeContextKey(document: StudioExpressionDocument, context: StudioExpressionAuthoringContext) {
+    return this.cacheKey("shapes", document.id, document.expressionType, String(document.sourceVersion), contextRevisionIdentity(context));
+  }
+
+  private retainValueShapes(
+    document: StudioExpressionDocument,
+    context: StudioExpressionAuthoringContext,
+    response: StudioExpressionAuthoringContext
+  ) {
+    const key = this.shapeContextKey(document, context);
+    const shapes = this.valueShapeContexts.get(key) ?? new Map<string, StudioExpressionValueShape>();
+    for (const [id, shape] of (response as AuthoringContextWithShapes)[valueShapesKey] ?? []) shapes.set(id, shape);
+    this.valueShapeContexts.set(key, shapes);
+  }
+
   private ensureActive() {
     if (this.disposed) throw new Error("Expression tooling client has been disposed.");
   }
@@ -287,6 +324,7 @@ class ExpressionToolingClient implements StudioExpressionToolingClient {
     generation: number,
     confirmsAuthorization = false
   ) {
+    if (this.disposed) return result<T>("canceled", response.expressionType);
     if (generation !== this.authorizationGeneration)
       return result<T>("unauthorized", response.expressionType);
     if (this.authorizationRevoked) return result<T>("unauthorized", response.expressionType);
@@ -397,14 +435,16 @@ function mapToolingError<T>(error: unknown, expressionType: string): StudioExpre
 
 function parseContextOutcome(
   value: unknown,
-  document: StudioExpressionDocument
+  document: StudioExpressionDocument,
+  expectedContextRevision?: string
 ): StudioExpressionToolingResult<StudioExpressionAuthoringContext> {
   const expressionType = document.expressionType;
-  const outcome = parseOutcome(value, expressionType, String(document.sourceVersion));
+  const outcome = parseOutcome(value, expressionType, String(document.sourceVersion), expectedContextRevision);
   if (!outcome.ok) return outcome.result;
   const payload = asRecord(outcome.payload);
   const version = readString(payload, "contextRevision") ?? outcome.contextVersion;
-  if (!payload || !version) return result("incompatible", expressionType);
+  if (!payload || !version || !Array.isArray(payload.rootSymbols)) return result("incompatible", expressionType);
+  if (version !== outcome.contextVersion) return result("stale", expressionType);
   const shapes = new Map<string, StudioExpressionValueShape>();
   const rootSymbols = readSymbols(payload.rootSymbols, shapes);
   const expectedResultShape = parseValueShape(payload.expectedResultShape, "expected-result", shapes);
@@ -532,7 +572,7 @@ function parseSymbol(
     documentation: readString(record, "documentation"),
     shapeId,
     signatures: Array.isArray(record.signatures)
-      ? record.signatures.map(parseSignature).filter(isDefined)
+      ? record.signatures.map((signature, index) => parseSignature(signature, `${id}:signature:${index}`, shapes)).filter(isDefined)
       : undefined
   };
 }
@@ -591,12 +631,15 @@ function parseCapabilities(value: unknown): StudioExpressionAuthoringContext["ca
   };
 }
 
-function parseSignature(value: unknown): StudioExpressionSignature | undefined {
+function parseSignature(value: unknown, id: string, shapes?: Map<string, StudioExpressionValueShape>): StudioExpressionSignature | undefined {
   const record = asRecord(value);
   const label = readString(record, "display");
   if (!record || !label) return undefined;
+  const returnShapeId = asRecord(record.returnShape) ? `${id}:return` : undefined;
+  if (returnShapeId) parseValueShape(record.returnShape, returnShapeId, shapes);
   return {
     label,
+    returnShapeId,
     parameters: Array.isArray(record.parameters)
       ? record.parameters.filter((item): item is string => typeof item === "string").map(name => ({ name }))
       : []
@@ -616,13 +659,15 @@ function parseCompletionItem(value: unknown): StudioExpressionCompletionItem | u
   };
 }
 
-function completionItemToSymbol(item: StudioExpressionCompletionItem): StudioExpressionSymbol {
-  return {
-    id: `${item.kind ?? "value"}:${item.label}`,
-    name: item.label,
-    kind: item.kind ?? "value",
-    documentation: item.documentation
-  };
+function contextRevisionIdentity(context: StudioExpressionAuthoringContext) {
+  return [context.version, context.catalogVersion ?? "", context.permissionRevision ?? "", context.hostPolicyRevision ?? ""].join("\u001f");
+}
+
+function contextMatches(expected: StudioExpressionAuthoringContext, actual: StudioExpressionAuthoringContext) {
+  return expected.version === actual.version &&
+    (expected.catalogVersion === undefined || expected.catalogVersion === actual.catalogVersion) &&
+    (expected.permissionRevision === undefined || expected.permissionRevision === actual.permissionRevision) &&
+    (expected.hostPolicyRevision === undefined || expected.hostPolicyRevision === actual.hostPolicyRevision);
 }
 
 function parseDiagnostic(

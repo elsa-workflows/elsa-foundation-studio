@@ -2,7 +2,7 @@
 
 Baseline implementation tasks are complete. File names below reflect the landed design rather than provisional planning names.
 
-The baseline tasks T001-T025 are historical. Program #2310 reopens this feature for dependency-ordered tasks T026-T038. T026-T029 have exact-head normal-host evidence. T030-T031 pass the exact M2 automated gate under the documented unavailable-review fallback. T035 / Studio #553 settles the technical decision: reject the current service candidate and retain the baseline path. T032-T034 and T036-T038 remain open; no deeper-service dependency is adopted.
+The baseline tasks T001-T025 are historical. Program #2310 reopens this feature for dependency-ordered tasks T026-T038. T026-T029 have exact-head normal-host evidence. T030-T031 pass the exact M2 automated gate under the documented unavailable-review fallback. T035 / Studio #553 settles the technical decision: reject the current service candidate and retain the baseline path. Studio #560 implements T032/T034 against Foundation #2379's frozen rich catalog contract; final integrated producer-consumer proof is pending. T032-T034 and T036-T038 remain open; no deeper-service dependency is adopted.
 
 ## Contracts and transport
 

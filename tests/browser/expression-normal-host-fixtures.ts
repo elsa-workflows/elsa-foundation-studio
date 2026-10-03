@@ -39,6 +39,11 @@ export type PersistedExpressionDraft = {
   initialSyntax: "JavaScript" | "Liquid";
 };
 
+// Retain only bounded opaque hex revisions, including the profile-composed SHA-256 revision.
+function isSafeContextRevision(value: unknown): value is string {
+  return typeof value === "string" && /^(?:[a-f0-9]{32}|[a-f0-9]{64})$/i.test(value);
+}
+
 /** Playwright runs this once before starting workers, so all host variants share one reviewed build. */
 export default async function globalSetup() {
   await buildNormalHosts();
@@ -111,7 +116,7 @@ export const test = base.extend<NormalHostFixtures>({
             host: origin === pair.foundationUrl ? "foundation" as const : "studio" as const,
             ...(syntax === "JavaScript" || syntax === "Liquid" ? { expressionType: syntax } : {}),
             ...(typeof documentRevision === "string" || typeof documentRevision === "number" ? { documentRevision: String(documentRevision) } : {}),
-            ...(typeof contextRevision === "string" && /^[a-f0-9]{32}$/.test(contextRevision) ? { contextRevision } : {}),
+            ...(isSafeContextRevision(contextRevision) ? { contextRevision } : {}),
             ...(typeof workflowDraftId === "string" ? { workflowDraftId } : {}),
             ...(typeof nodeId === "string" ? { nodeId } : {}),
             ...(typeof propertyKey === "string" ? { propertyKey } : {})
@@ -138,7 +143,7 @@ export const test = base.extend<NormalHostFixtures>({
               if (typeof outcome?.documentRevision === "string" && /^\d+$/.test(outcome.documentRevision)) {
                 record.responseDocumentRevision = outcome.documentRevision;
               }
-              if (typeof outcome?.contextRevision === "string" && /^[a-f0-9]{32}$/.test(outcome.contextRevision)) {
+              if (isSafeContextRevision(outcome?.contextRevision)) {
                 record.responseContextRevision = outcome.contextRevision;
               }
               const diagnostics = outcome?.payload?.diagnostics;

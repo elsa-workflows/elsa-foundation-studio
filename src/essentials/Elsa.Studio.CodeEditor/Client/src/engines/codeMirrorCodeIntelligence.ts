@@ -1,4 +1,4 @@
-import { autocompletion, closeCompletion, completionStatus, type CompletionSource } from "@codemirror/autocomplete";
+import { autocompletion, closeCompletion, completionStatus, type Completion, type CompletionSource } from "@codemirror/autocomplete";
 import { StateEffect, StateField, type Extension } from "@codemirror/state";
 import { EditorView, hoverTooltip, panels, showPanel, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 import { sanitizeStudioCodeMarkdown } from "../StudioCodeDocumentation";
@@ -258,34 +258,36 @@ function createCompletionSource(
   completionRequests: Set<AbortController>
 ): CompletionSource {
   return context => {
-    const word = context.matchBefore(/[\w$]*/);
+    const word = context.matchBefore(/[\p{L}\p{Nd}_$]*/u);
     if (!word && !context.explicit) return null;
-    if (!options.completionProvider) return toCompletionResult(options.completions, word?.from ?? context.pos);
-
+    const from = word?.from ?? context.pos;
     const controller = new AbortController();
     completionRequests.add(controller);
     context.addEventListener("abort", () => controller.abort(), { onDocChange: true });
     const document = { ...options.document, value: context.state.doc.toString() };
-    return Promise.resolve(options.completionProvider({
+    const supplied = options.completionProvider ? Promise.resolve(options.completionProvider({
       document,
       position: context.pos,
       explicit: context.explicit,
       signal: controller.signal
-    }))
-      .catch(() => options.completions)
-      .then(supplied => controller.signal.aborted || context.aborted
-        ? null
-        : toCompletionResult(supplied, word?.from ?? context.pos))
+    })).catch(() => options.completions) : Promise.resolve(options.completions);
+    // Only explicit expression-profile sources participate, never the program grammar's
+    // generic autocomplete sources (which include snippets and ambient assumptions).
+    const local = context.state.languageDataAt<CompletionSource>("studioExpressionCompletion", context.pos)
+      .map(source => Promise.resolve().then(() => source(context)).catch(() => null));
+    return Promise.all([supplied, Promise.all(local)])
+      .then(([authorized, results]) => {
+        if (controller.signal.aborted || context.aborted) return null;
+        const merged = new Map<string, Completion>();
+        for (const result of results) {
+          if (result?.from !== from) continue;
+          for (const item of result.options) merged.set(item.label, item);
+        }
+        // Authoritative documentation/application wins collisions with syntax-only help.
+        for (const item of authorized ?? []) merged.set(item.label, toCodeMirrorCompletion(item));
+        return merged.size ? { from, options: [...merged.values()], validFor: /^[\p{L}\p{Nd}_$]*$/u } : null;
+      })
       .finally(() => completionRequests.delete(controller));
-  };
-}
-
-function toCompletionResult(supplied: StudioCodeCompletion[] | null | undefined, from: number) {
-  if (!supplied?.length) return null;
-  return {
-    from,
-    options: supplied.map(toCodeMirrorCompletion),
-    validFor: /^[\w$]*$/
   };
 }
 

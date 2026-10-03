@@ -107,9 +107,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: elsa-workflows/elsa-foundation
-          # Program #2310 M2 is stacked across repositories. Pin the reviewed producer source;
-          # neither moving branches nor arbitrary main prove this conformance pair.
-          ref: 7457b7a4564892bab4b28bd0d07fac9709462d56
+          # Program #2310 M3 is stacked across repositories. Pin the reviewed producer source;
+          # neither moving branches nor arbitrary main prove this language-help pair.
+          ref: 58238b8678dce6dc3dc7510d88c630d106892393
           path: .normal-host-foundation
           persist-credentials: false
 

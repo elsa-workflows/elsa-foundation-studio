@@ -173,3 +173,26 @@ Primary API references: [TypeScript Language Service host](https://github.com/mi
 **Rationale**: The current context `RootSymbols` already carries the required symbol/signature/value-shape model and accepts search, skip and take. The existing symbol-item projection discards signatures. Reusing the context response avoids a new wire field, SDK type, endpoint or parallel catalog authority. Its provider-capability lookup and explicit outcome mapping remain consequential and must be tested, not bypassed.
 
 **Consequences**: Runtime catalogs stay Foundation-owned. Local inference remains advisory; unknown or truncated shapes must not be diagnosed as closed schemas. Language modules own cursor/member/call spelling while the shared editor keeps engine-neutral presentation and lifecycle behavior.
+
+### Baseline implementation bounds — Studio #560
+
+The candidate consumes rich context pages (100 symbols per request) and retains value/return shapes
+only under the complete document/source/context/catalog/permission/policy identity and authorization
+generation. This uses existing v1 fields and relations; no Studio SDK or server field is added.
+
+Expression-mode local sources use an internal language-data key, separate from the general program
+grammar's autocomplete sources. The shared engine merges these with authorized results by label;
+authorized application and documentation win collisions. Only explicit completion includes the two
+expression-safe arrow/function-expression templates. Program statement snippets and ambient globals
+are not imported. Authored locals and parameters remain syntax-derived, not runtime data.
+
+Object-member help follows direct `const` object-literal initializers and at most four named path
+segments, 100 members per object and 2,000 scanned declaration/property nodes in a source no larger
+than 100,000 characters. Parameters, aliases, calls, computed/spread properties and unknown shapes
+do not acquire guessed members. Full callable names are language-owned bounded lexical paths;
+unproved template/regex syntax stays quiet. This is advisory help, not full type inference or a
+closed-schema assertion. Structured signature parameters and return-shape references are preserved
+for later M4 presentation without introducing an engine type into the public Studio SDK.
+
+These are implementation-candidate bounds. Final paired-host, review and acceptance evidence is
+recorded separately; this decision does not mark M3 complete or authorize delivery.

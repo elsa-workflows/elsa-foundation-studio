@@ -62,8 +62,17 @@ export type StudioCodeHoverProvider = (
   signal: AbortSignal
 ) => StudioCodeHover | null | Promise<StudioCodeHover | null>;
 
+export interface StudioCodeSignatureParameter {
+  name: string;
+  documentation?: string;
+  shapeId?: string;
+  optional?: boolean;
+}
+
 export interface StudioCodeSignature {
   label: string;
+  parameters?: readonly StudioCodeSignatureParameter[];
+  returnShapeId?: string;
   documentation?: StudioCodeDocumentation;
 }
 
