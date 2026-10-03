@@ -8,6 +8,14 @@ T026-T029 pass at the exact M1 pair below. T030-T031 are implemented with the lo
 
 ## Passing evidence
 
+### M2 browser sequencing correction, 2026-10-03
+
+At Studio `3c37b4869e034548a538830d9160bcfe08c5a2d3`, [CI 37131596196](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37131596196) passes lint/typecheck and the dedicated rebuilt normal-host Chromium job against Foundation `99a28c7ff63b8748550ade79dab0fcff7acf0350`, but its generic browser job fails one of 67 cases at the expression syntax popover keyboard reopening assertion. Root reproduces the same failure in four of 30 focused repetitions across both themes.
+
+Syntax selection intentionally focuses the new editor synchronously and again on the row's requested animation frame. The test starts its next independent trigger-key interaction before that focus handoff finishes. Waiting only for initial textbox focus still fails two of 60 repetitions. The shared test helper now verifies textbox focus, crosses two animation frames, and verifies focus again before proceeding; there is no wall-clock sleep, retry, production change, or weakened keyboard assertion. All 60 focused repetitions and the full 67-case Chromium suite pass, as do scoped ESLint and diff review. Root reviews a bounded read-only worker assessment. This proves the scenario after transition completion, not rapid user input during the transition or a production focus fix.
+
+The upcoming committed head requires fresh full CI. Copilot re-review requests through REST, GraphQL bot review requests and the documented CLI return success but produce no new work-start event or current-head review; this is not external approval. M2 remains open, M3/M4 remain Not Ready, and all PRs remain draft and unmerged.
+
 ### M2 first review correction, 2026-10-03
 
 Studio `54fceb950e29d9f09d667bcb809aae4a73b0a9ac` passes all jobs in [CI 37129335170](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37129335170), including the normal-host job pinned to Foundation `59ef03004cb514520686de00467a425e340b11aa`. Copilot review 5401220606 identifies one valid test gap: the sequential profile-switch test cannot detect an out-of-order language load. This predecessor CI is not acceptance of the corrective commit.
