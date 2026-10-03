@@ -1,4 +1,5 @@
 import { syntaxTree } from "@codemirror/language";
+import { CompletionContext, type CompletionSource } from "@codemirror/autocomplete";
 import { EditorState } from "@codemirror/state";
 import { describe, expect, it } from "vitest";
 import { collectCodeMirrorSyntaxDiagnostics } from "../engines/codeMirrorSyntaxDiagnostics";
@@ -74,7 +75,47 @@ describe("JavaScript CodeMirror grammar profiles", () => {
     expect(createState("", "program").languageDataAt("autocomplete", 0).length).toBeGreaterThan(0);
     expect(createState("", "expression").languageDataAt("autocomplete", 0)).toEqual([]);
   });
+
+  it("offers declared expression locals and parameters without ambient globals or statement snippets", async () => {
+    const labels = await localLabels("(customer) => { const total = 1; return |; }");
+    expect(labels).toEqual(expect.arrayContaining(["customer", "total"]));
+    expect(labels).toEqual(expect.arrayContaining(["arrow function", "function expression"]));
+    expect(labels).not.toEqual(expect.arrayContaining(["Date", "fetch", "window", "for", "import"]));
+  });
+
+  it("offers only syntax-known nested object members", async () => {
+    expect(await localLabels("(() => { const order = { address: { city: 1 }, total: 2 }; return order.address.|; })()"))
+      .toEqual(["city"]);
+    expect(await localLabels("(() => { const order = { total: 2 }; return order.to|; })()"))
+      .toEqual(["total"]);
+  });
+
+  it.each([
+    "(order) => order.|",
+    "(() => { const order = getOrder(); return order.|; })()",
+    "(() => { const order = { city: 1 }; return ((order) => order.|)({}); })()",
+    "(() => { const order = { ...other, city: 1 }; return order.|; })()",
+    "(() => { const order = { city: 1 }; return getOrder().order.|; })()",
+    "(() => { const order = { city: 1 }; return 'order.|'; })()",
+    "(() => { const order = { city: 1 }; /* order.| */ return 1; })()"
+  ])("stays quiet for unknown, shadowed or non-code member paths: %s", async source => {
+    expect(await localLabels(source)).toEqual([]);
+  });
+
+  it("does not leak locals from a sibling nested function", async () => {
+    const labels = await localLabels("(() => { const sibling = () => { const privateValue = 1; }; return |; })()");
+    expect(labels).toContain("sibling");
+    expect(labels).not.toContain("privateValue");
+  });
 });
+
+async function localLabels(markedSource: string) {
+  const position = markedSource.indexOf("|");
+  const state = createState(markedSource.replace("|", ""), "expression");
+  const sources = state.languageDataAt<CompletionSource>("studioExpressionCompletion", position);
+  const results = await Promise.all(sources.map(source => source(new CompletionContext(state, position, true))));
+  return results.flatMap(result => result?.options.map(option => option.label) ?? []);
+}
 
 function expressionDiagnostics(source: string) {
   return collectCodeMirrorSyntaxDiagnostics(createState(source, "expression"), "expression");

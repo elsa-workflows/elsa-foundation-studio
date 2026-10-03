@@ -170,6 +170,36 @@ describe("JavaScript expression editor module", () => {
     }));
     expect(getValueShape).toHaveBeenCalledWith({ source: "" }, authoringContext, "shape:customer", signal);
   });
+
+  it("resolves full authorized callable names and preserves signature metadata", async () => {
+    const signature = { label: "Math.abs(value)", parameters: [{ name: "value" }], returnShapeId: "number" };
+    const getCatalog = vi.fn().mockResolvedValue({ state: "ready", data: { symbols: [
+      { name: "Math.abs", signatures: [signature] },
+      { name: "abs", signatures: [{ label: "unrelated(value)" }] }
+    ] } });
+    const projection = createStudioCodeToolingProjection({
+      document: { source: "" }, authoringContext: {}, tooling: { getCatalog },
+      languageProjection: javaScriptToolingProjection
+    });
+    const source = "Math.abs(1, ";
+    await expect(projection.signatureProvider(
+      { uri: "test://signature", language: "javascript", value: source, version: 1 },
+      source.length, new AbortController().signal
+    )).resolves.toMatchObject(signature);
+    expect(getCatalog).toHaveBeenCalledWith(expect.anything(), expect.anything(), "Math.abs", undefined, expect.anything());
+  });
+
+  it.each(["'Math.abs('", "Math.abs('unfinished", "/* Math.abs(", "`Math.abs(`", "unknown("])(
+    "does not invent a signature for unknown or non-code call paths: %s", async source => {
+      const projection = createStudioCodeToolingProjection({
+        authoringContext: { rootSymbols: [{ name: "abs", signatures: [{ label: "abs(value)" }] }] },
+        languageProjection: javaScriptToolingProjection
+      });
+      await expect(projection.signatureProvider(
+        { uri: "test://unknown", language: "javascript", value: source, version: 1 },
+        source.length, new AbortController().signal
+      )).resolves.toBeNull();
+    });
 });
 
 interface StudioCodeEditorElementProps {

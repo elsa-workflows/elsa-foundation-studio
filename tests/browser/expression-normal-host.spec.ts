@@ -18,6 +18,7 @@ completeTest("persisted workflow drafts use live JavaScript and Liquid assistanc
   await expect(compactJavaScript).toBeVisible();
 
   await exerciseWorkflowAssistance(page, hostPair, compactJavaScript, draft, traffic, "JavaScript");
+  await exerciseJavaScriptDepth(page, hostPair, compactJavaScript, draft, traffic);
   await exerciseJavaScriptConformance(page, hostPair, compactJavaScript, draft, traffic, [
     { source: "(value: number) => value", code: "JavaScript/Syntax" },
     { source: "<span />", code: "JavaScript/Syntax" },
@@ -30,6 +31,7 @@ completeTest("persisted workflow drafts use live JavaScript and Liquid assistanc
   const expandedJavaScript = page.getByRole("dialog").locator(".studio-code-editor-rich-expanded .cm-content");
   await expect(expandedJavaScript).toContainText("args.customerName");
   await exerciseWorkflowAssistance(page, hostPair, expandedJavaScript, draft, traffic, "JavaScript");
+  await exerciseJavaScriptDepth(page, hostPair, expandedJavaScript, draft, traffic);
   await exerciseJavaScriptConformance(page, hostPair, expandedJavaScript, draft, traffic, [
     { source: "Math.random()", code: "JavaScript/AmbientCapability" }
   ]);
@@ -323,6 +325,39 @@ async function replacePersistedWorkflowSource(page: Page, pair: NormalHostPair, 
       "/expression-tooling/validate", phase.previousRevision, { allowSupportedEmpty: true });
   }, { timeout: 30_000 }).toBe(true);
   return phase;
+}
+
+async function exerciseJavaScriptDepth(page: Page, pair: NormalHostPair, editor: Locator,
+  draft: PersistedExpressionDraft, traffic: SafeBackendTraffic[]) {
+  for (const { marked, labels } of [
+    { marked: "(customer) => { const total = 1; return |; }", labels: ["customer", "total", "Math"] },
+    { marked: "(() => { const order = { address: { city: 1 } }; return order.address.|; })()", labels: ["city"] }
+  ]) {
+    const position = marked.indexOf("|");
+    const source = marked.replace("|", "");
+    await replacePersistedWorkflowSource(page, pair, editor, draft, traffic, "JavaScript", source);
+    await expect(async () => {
+      await editor.press("End");
+      for (let step = position; step < source.length; step++) await editor.press("ArrowLeft");
+      await editor.press("Control+Space");
+      const menu = page.locator(".cm-tooltip-autocomplete");
+      for (const label of labels) {
+        await expect(menu.getByRole("option").locator(".cm-completionLabel", { hasText: new RegExp(`^${label}$`) }))
+          .toHaveCount(1, { timeout: 1_000 });
+      }
+      await expect(menu).not.toContainText(/\b(Date|fetch|window|process|import)\b/);
+    }).toPass({ timeout: 15_000 });
+    await editor.press("Escape");
+    await expect(editor).toContainText(source);
+  }
+
+  const source = "Math.abs(-2)";
+  await replacePersistedWorkflowSource(page, pair, editor, draft, traffic, "JavaScript", source);
+  await editor.press("End");
+  for (let step = 0; step < 3; step++) await editor.press("ArrowLeft");
+  await expect(editor.locator("xpath=ancestor::section[@data-studio-code-editor='true'][1]")
+    .locator(".studio-code-editor-signature")).toContainText("abs(x): Number");
+  await expect(editor).toContainText(source);
 }
 
 async function exerciseJavaScriptConformance(page: Page, pair: NormalHostPair, editor: Locator,

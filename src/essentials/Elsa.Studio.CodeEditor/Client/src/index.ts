@@ -46,5 +46,6 @@ export type {
   StudioCodeLanguageAdapter,
   StudioCodeLanguageSupport,
   StudioCodeSignature,
+  StudioCodeSignatureParameter,
   StudioCodeSignatureProvider
 } from "./types";

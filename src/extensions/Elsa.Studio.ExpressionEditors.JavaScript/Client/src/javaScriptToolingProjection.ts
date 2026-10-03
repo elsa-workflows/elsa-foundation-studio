@@ -55,6 +55,7 @@ export const javaScriptToolingProjection: StudioCodeToolingLanguageProjection = 
     const contextualKeys = symbolKeys(contextualSymbols(context));
     return symbols.filter(symbol => !contextualKeys.has(symbol.id) && !contextualKeys.has(symbol.name));
   },
+  callableNameAt,
   memberPathAt: (source, position, includeCurrentWord) => {
     const prefix = source.slice(0, Math.min(Math.max(0, position), source.length));
     const match = prefix.match(memberPathPattern);
@@ -65,6 +66,44 @@ export const javaScriptToolingProjection: StudioCodeToolingLanguageProjection = 
     return segments;
   }
 };
+
+/** Bounded lexical call-path help, not type checking or execution. Unknown syntax stays unknown. */
+function callableNameAt(source: string, position: number) {
+  const end = Math.min(Math.max(0, position), source.length);
+  if (end > 100_000) return undefined;
+  const calls: (string | undefined)[] = [];
+  const callable = new RegExp(`(${identifierPattern}(?:\\s*\\.\\s*${identifierPattern})*)\\s*$`, "u");
+  for (let index = 0; index < end; index++) {
+    const character = source[index];
+    if (character === "`") return undefined; // Template interpolation needs a parser-owned proof.
+    if (character === "'" || character === '"') {
+      const quote = character;
+      let closed = false;
+      while (++index < end) {
+        if (source[index] === "\\") index++;
+        else if (source[index] === quote) { closed = true; break; }
+      }
+      if (!closed) return undefined;
+    } else if (character === "/") {
+      if (source[index + 1] === "/") {
+        const newline = source.indexOf("\n", index + 2);
+        if (newline < 0 || newline >= end) return undefined;
+        index = newline;
+      } else if (source[index + 1] === "*") {
+        const close = source.indexOf("*/", index + 2);
+        if (close < 0 || close + 2 > end) return undefined;
+        index = close + 1;
+      } else return undefined; // Division/regex ambiguity is not a callable-path proof.
+    } else if (character === "(") {
+      if (calls.length >= 100) return undefined;
+      const prefix = source.slice(0, index);
+      const match = callable.exec(prefix);
+      const preceding = match ? prefix[match.index - 1] ?? "" : "";
+      calls.push(match && !/[.\])\p{L}\p{Nd}_$]/u.test(preceding) ? match[1].replace(/\s/g, "") : undefined);
+    } else if (character === ")") calls.pop();
+  }
+  return calls.at(-1);
+}
 
 function contextualSymbols(context?: StudioCodeToolingAuthoringContext) {
   return mergeSymbols(

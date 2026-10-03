@@ -297,6 +297,30 @@ describe("StudioCodeEditor", () => {
     }
   }, 20000);
 
+  it.each(["compact", "expanded"] as const)("merges safe expression locals with authoritative runtime help in %s", async profile => {
+    const source = "(customer) => { const total = 1; return ; }";
+    const { container } = renderEditor({
+      document: codeDocument({ uri: `elsa://expressions/local-merge-${profile}`, value: source }),
+      languageAdapter: { ...javaScriptLanguageAdapter, grammarProfile: "expression" },
+      profile,
+      completionProvider: () => [
+        { label: "total", detail: "authorized metadata", apply: "total" },
+        { label: "Math", kind: "value" }
+      ]
+    });
+    const content = await activateRichEditor(container, profile);
+    const view = EditorView.findFromDOM(content)!;
+    view.dispatch({ selection: { anchor: source.indexOf("return ") + "return ".length } });
+    key(content, " ", { code: "Space", ctrlKey: true });
+    await waitFor(() => !!container.querySelector(".cm-tooltip-autocomplete"));
+    const items = [...container.querySelectorAll(".cm-tooltip-autocomplete li")].map(item => item.textContent ?? "");
+    const labels = [...container.querySelectorAll(".cm-completionLabel")].map(item => item.textContent);
+    expect(items.filter(item => item.startsWith("total"))).toHaveLength(1);
+    expect(items.join(" ")).toContain("authorized metadata");
+    expect(labels).toEqual(expect.arrayContaining(["customer", "total", "Math"]));
+    expect(items.join(" ")).not.toMatch(/\b(Date|fetch|window|import)\b/);
+  }, 20000);
+
   it.each(["compact", "expanded"] as const)("keeps rich %s Enter behavior when no completion is active", async profile => {
     const onChange = vi.fn();
     const onExpand = vi.fn();
