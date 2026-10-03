@@ -8,6 +8,14 @@ T026-T029 pass at the exact M1 pair below. T030-T031 are implemented with the lo
 
 ## Passing evidence
 
+### M2 first review correction, 2026-10-03
+
+Studio `54fceb950e29d9f09d667bcb809aae4a73b0a9ac` passes all jobs in [CI 37129335170](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37129335170), including the normal-host job pinned to Foundation `59ef03004cb514520686de00467a425e340b11aa`. Copilot review 5401220606 identifies one valid test gap: the sequential profile-switch test cannot detect an out-of-order language load. This predecessor CI is not acceptance of the corrective commit.
+
+A controlled loader regression starts expression and program loads without settling the first, confirms the compact editor reuses the same `EditorView`, resolves the program load first and then the stale expression load, and verifies that the active grammar remains `Script`, source is exact and diagnostics remain current. Removing only the generation guard makes the test fail because `SingleExpression` replaces `Script`; the guard is restored. The first expanded-editor variant did not discriminate because cleanup destroyed the old view, so that variant is not used as adverse proof. Root reviews the final test and the complete CodeEditor suite passes 65/65, with package typecheck, scoped lint and diff check passing. No production implementation or dependency changes are needed for this finding.
+
+Foundation's four diagnostic findings are corrected at `99a28c7ff63b8748550ade79dab0fcff7acf0350`, which is now the immutable CI producer pin. Root complete Foundation suites pass Expressions 168/168, Jint 92/92, Design 507/507, Design API 142/142, Publishing API 714/714, scoped Architecture 17/17 and map freshness. At 14:58 UTC the canonical paired command rebuilds both Release hosts and serial clients and passes all four Chromium cases in 2.9 minutes against that producer, retaining exact persisted source, fresh revision correlation, real authentication, fresh SQLite, zero console errors and owned teardown. New exact-head CI/review remains pending after the coordinated corrective commits. M2 remains open and M3/M4 remain Not Ready; no merge or human acceptance is claimed.
+
 ### M2 reviewed local candidate, 2026-10-03
 
 Branch `codex/552-javascript-expression-conformance` is based on reviewed M1 `c9479fba`, paired with Foundation's local `claude/2352-javascript-runtime-conformance` branch. Only the JavaScript ExpressionEditor adapter opts into the internal single-expression grammar profile. General-purpose JavaScript/TypeScript/JSX editors retain the existing program grammar and statement completion sources. No engine-specific type enters the Studio SDK or persisted expression document. Profile changes preserve source and undo while stale asynchronous language loads are rejected.

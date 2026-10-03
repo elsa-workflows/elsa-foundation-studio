@@ -109,7 +109,7 @@ jobs:
           repository: elsa-workflows/elsa-foundation
           # Program #2310 M2 is stacked across repositories. Pin the reviewed producer source;
           # neither moving branches nor arbitrary main prove this conformance pair.
-          ref: 59ef03004cb514520686de00467a425e340b11aa
+          ref: 99a28c7ff63b8748550ade79dab0fcff7acf0350
           path: .normal-host-foundation
           persist-credentials: false
 
