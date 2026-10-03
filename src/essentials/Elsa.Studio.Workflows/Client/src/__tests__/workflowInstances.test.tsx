@@ -221,17 +221,19 @@ describe("Runtime-pinned workflow instance rendering", () => {
     expect(onViewInput).toHaveBeenCalledWith(targetIncident);
   });
 
-  it("leaves failed and wrong-identity exact activity evidence pending", async () => {
+  it("retries transient inspection failures and preserves terminal reasons", async () => {
     const details: WorkflowInstanceDetails = {
       instance: { workflowExecutionId: "workflow-execution-1" } as WorkflowInstanceDetails["instance"],
       activities: [],
       incidents: [
         incident({ incidentId: "wrong-id", activityExecutionId: "requested-wrong" }),
+        incident({ incidentId: "denied", activityExecutionId: "requested-denied" }),
         incident({ incidentId: "failed", activityExecutionId: "requested-failed" })
       ]
     };
     const fetchInspection = vi.fn(async (activityExecutionId: string) => {
       if (activityExecutionId === "requested-failed") throw new Error("Runtime unavailable");
+      if (activityExecutionId === "requested-denied") throw Object.assign(new Error("Forbidden"), { status: 403 });
       return {
         activityExecutionId: "different-execution",
         workflowExecutionId: "workflow-execution-1",
@@ -251,7 +253,11 @@ describe("Runtime-pinned workflow instance rendering", () => {
 
     expect(result.activities).toEqual([]);
     expect(result.incomplete).toBe(true);
-    expect(result.pendingActivityExecutionIds).toEqual(["requested-wrong", "requested-failed"]);
+    expect(result.pendingActivityExecutionIds).toEqual(["requested-failed"]);
+    expect(result.unavailableFailures).toEqual([
+      { activityExecutionId: "requested-wrong", reason: "identity-mismatch" },
+      { activityExecutionId: "requested-denied", reason: "permission-denied" }
+    ]);
   });
 
   it("exposes another bounded association batch for active incidents beyond the first fifty", async () => {

@@ -432,6 +432,7 @@ interface WorkflowInstanceWorkbenchData extends WorkflowInstanceInspectionData {
   incidentAssociationLookupIncomplete: boolean;
   incidentActivityLookupSupported: boolean;
   pendingIncidentActivityExecutionIds: string[];
+  unavailableIncidentActivityFailures: UnavailableIncidentActivityFailure[];
 }
 
 const maxIncidentActivityLookups = 50;
@@ -489,6 +490,10 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
   const instanceAction = findAiAction(ai, "weaver.workflows.explain-instance");
 
   const load = useCallback(async () => {
+    incidentNavigationRequest.current += 1;
+    setIncidentAssociationMessage(null);
+    setFocusedRuntimeNodeId(null);
+    setFocusInputKey(null);
     if (!workflowExecutionId) {
       setError("No workflow execution id was provided.");
       setState("failed");
@@ -540,7 +545,8 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
         incidentActivityExecutions: incidentActivityResult.activities,
         incidentAssociationLookupIncomplete: incidentActivityResult.incomplete,
         incidentActivityLookupSupported: incidentActivityResult.supported,
-        pendingIncidentActivityExecutionIds: incidentActivityResult.pendingActivityExecutionIds
+        pendingIncidentActivityExecutionIds: incidentActivityResult.pendingActivityExecutionIds,
+        unavailableIncidentActivityFailures: incidentActivityResult.unavailableFailures
       });
       const initialEvidence = resolveInitialActivityEvidenceId(
         combineActivityExecutions(details.activities, incidentActivityResult.activities),
@@ -647,7 +653,10 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
           ...current,
           incidentActivityExecutions: combineActivityExecutions(current.incidentActivityExecutions, result.activities),
           pendingIncidentActivityExecutionIds: result.pendingActivityExecutionIds,
-          incidentAssociationLookupIncomplete: result.incomplete
+          incidentAssociationLookupIncomplete: result.incomplete,
+          unavailableIncidentActivityFailures: combineUnavailableIncidentActivityFailures(
+            current.unavailableIncidentActivityFailures,
+            result.unavailableFailures)
         }
       : current);
   };
@@ -836,6 +845,7 @@ export function WorkflowInstanceDetailsWorkbench({ context, ai, expressionEditor
             associationLookupSupported={data.incidentActivityLookupSupported}
             associationLookupMessage={incidentAssociationMessage}
             pendingIncidentActivityCount={data.pendingIncidentActivityExecutionIds.length}
+            unavailableActivityFailures={data.unavailableIncidentActivityFailures}
             state="ready"
             error=""
             selectedEvidenceId={selectedEvidenceId}
@@ -956,6 +966,10 @@ export function activityExecutionSummaryFromInspection(inspection: IncidentActiv
 export type IncidentActivityInspectionFetcher = (activityExecutionId: string) => Promise<IncidentActivityInspection>;
 
 export type IncidentActivityLookupFailureReason = "identity-mismatch" | "permission-denied" | "unavailable" | "unsupported";
+type UnavailableIncidentActivityFailure = {
+  activityExecutionId: string;
+  reason: "identity-mismatch" | "permission-denied";
+};
 
 export function incidentActivityLookupFailureMessage(reason: IncidentActivityLookupFailureReason) {
   switch (reason) {
@@ -1016,11 +1030,26 @@ export async function loadActiveIncidentActivitySummaries(
   const requestedIds = requestedActivityExecutionIds
     ? [...new Set(requestedActivityExecutionIds.filter(id => activeIds.includes(id)))]
     : activeIds.filter(id => !activitiesById.get(id)?.authoredActivityId);
-  if (requestedIds.length === 0) return { activities: [] as ActivityExecutionStateSummary[], incomplete: false, pendingActivityExecutionIds: [] as string[] };
-  if (!fetchInspection) return { activities: [] as ActivityExecutionStateSummary[], incomplete: true, pendingActivityExecutionIds: requestedIds };
+  if (requestedIds.length === 0) {
+    return {
+      activities: [] as ActivityExecutionStateSummary[],
+      incomplete: false,
+      pendingActivityExecutionIds: [] as string[],
+      unavailableFailures: [] as UnavailableIncidentActivityFailure[]
+    };
+  }
+  if (!fetchInspection) {
+    return {
+      activities: [] as ActivityExecutionStateSummary[],
+      incomplete: true,
+      pendingActivityExecutionIds: requestedIds,
+      unavailableFailures: [] as UnavailableIncidentActivityFailure[]
+    };
+  }
 
   const fetched: ActivityExecutionStateSummary[] = [];
   const failedIds: string[] = [];
+  const unavailableFailures: UnavailableIncidentActivityFailure[] = [];
   const selectedIds = requestedIds.slice(0, maxIncidentActivityLookups);
   for (let index = 0; index < selectedIds.length; index += incidentActivityLookupBatchSize) {
     const batch = selectedIds.slice(index, index + incidentActivityLookupBatchSize);
@@ -1030,7 +1059,8 @@ export async function loadActiveIncidentActivitySummaries(
     }));
     for (const result of results) {
       if (result.result.status === "found") fetched.push(result.result.summary);
-      else failedIds.push(result.activityExecutionId);
+      else if (result.result.reason === "unavailable") failedIds.push(result.activityExecutionId);
+      else unavailableFailures.push({ activityExecutionId: result.activityExecutionId, reason: result.result.reason });
     }
   }
 
@@ -1038,8 +1068,18 @@ export async function loadActiveIncidentActivitySummaries(
   return {
     activities: fetched,
     incomplete: pendingActivityExecutionIds.length > 0,
-    pendingActivityExecutionIds
+    pendingActivityExecutionIds,
+    unavailableFailures
   };
+}
+
+function combineUnavailableIncidentActivityFailures(
+  existing: UnavailableIncidentActivityFailure[],
+  next: UnavailableIncidentActivityFailure[]
+) {
+  const byActivityExecutionId = new Map(existing.map(failure => [failure.activityExecutionId, failure]));
+  for (const failure of next) byActivityExecutionId.set(failure.activityExecutionId, failure);
+  return [...byActivityExecutionId.values()];
 }
 
 function sourceAccessFromError(error: unknown) {
@@ -1281,6 +1321,7 @@ function WorkflowInstanceInspector({
   associationLookupSupported = false,
   associationLookupMessage = null,
   pendingIncidentActivityCount = 0,
+  unavailableActivityFailures = [],
   onSelectEvidence,
   activeTab,
   onActiveTabChange,
@@ -1311,6 +1352,7 @@ function WorkflowInstanceInspector({
   associationLookupSupported?: boolean;
   associationLookupMessage?: string | null;
   pendingIncidentActivityCount?: number;
+  unavailableActivityFailures?: UnavailableIncidentActivityFailure[];
   state: "idle" | "loading" | "ready" | "failed";
   error: string;
   selectedEvidenceId?: string | null;
@@ -1454,6 +1496,7 @@ function WorkflowInstanceInspector({
                     associationLookupSupported={associationLookupSupported}
                     associationLookupMessage={associationLookupMessage}
                     pendingIncidentActivityCount={pendingIncidentActivityCount}
+                    unavailableActivityFailures={unavailableActivityFailures}
                     activityCatalog={activityCatalog}
                     selectedEvidenceId={selectedEvidenceId}
                     onSelectEvidence={onSelectEvidence}
@@ -2261,6 +2304,7 @@ export function WorkflowIncidentList({
   associationLookupSupported = false,
   associationLookupMessage = null,
   pendingIncidentActivityCount = 0,
+  unavailableActivityFailures = [],
   selectedEvidenceId = null,
   onSelectEvidence,
   onShowAffectedActivity,
@@ -2275,6 +2319,7 @@ export function WorkflowIncidentList({
   associationLookupSupported?: boolean;
   associationLookupMessage?: string | null;
   pendingIncidentActivityCount?: number;
+  unavailableActivityFailures?: UnavailableIncidentActivityFailure[];
   selectedEvidenceId?: string | null;
   onSelectEvidence?(evidenceId: string): void;
   onShowAffectedActivity?(incident: IncidentStateSummary): void;
@@ -2285,6 +2330,8 @@ export function WorkflowIncidentList({
   const [loadingAssociations, setLoadingAssociations] = useState(false);
   const incidentEvidenceAvailable = Array.isArray(incidents);
   const incidentRows = incidents ?? [];
+  const permissionDeniedCount = unavailableActivityFailures.filter(failure => failure.reason === "permission-denied").length;
+  const identityMismatchCount = unavailableActivityFailures.filter(failure => failure.reason === "identity-mismatch").length;
 
   return (
     <section className="wf-instance-section">
@@ -2311,6 +2358,16 @@ export function WorkflowIncidentList({
           ) : null}
         </div>
       ) : null}
+      {unavailableActivityFailures.length > 0 ? (
+        <div className="wf-run-association-status" role="status">
+          {permissionDeniedCount > 0 ? (
+            <p>You do not have permission to inspect {permissionDeniedCount} exact activity execution{permissionDeniedCount === 1 ? "" : "s"}. The incident{permissionDeniedCount === 1 ? " remains" : "s remain"} available here.</p>
+          ) : null}
+          {identityMismatchCount > 0 ? (
+            <p>Runtime returned a different run or activity execution for {identityMismatchCount} association{identityMismatchCount === 1 ? "" : "s"}. Studio kept those incidents open and did not open the returned execution.</p>
+          ) : null}
+        </div>
+      ) : null}
       {associationLookupMessage ? <p className="wf-run-association-status" role="status">{associationLookupMessage}</p> : null}
       {incidentEvidenceAvailable && incidentRows.length === 0 ? <p>No incidents recorded.</p> : null}
       {incidentRows.map(incident => (
@@ -2321,9 +2378,11 @@ export function WorkflowIncidentList({
           const expressionLanguage = incident.metadata?.["runtime.expressionLanguage"];
           const inputPhase = incident.metadata?.["runtime.inputEvaluationPhase"];
           const innerType = incident.metadata?.["runtime.faultInnerType"];
-          const activityFacts = findExecutableNodeFacts(executableGraph, association?.activityExecution);
-          const activityLabel = getIncidentActivityLabel(association?.activityExecution, activityCatalog, activityFacts?.presentation);
-          const inputLabel = getIncidentInputLabel(association?.activityExecution, activityCatalog, inputKey);
+          const activityFacts = findExecutableNodeFacts(executableGraph, association?.activityExecution) ??
+            (association?.nodeId ? executableGraph?.factsByNodeId.get(association.nodeId) : undefined);
+          const labelActivity = association?.activityExecution ?? activityFacts;
+          const activityLabel = getIncidentActivityLabel(labelActivity, activityCatalog, activityFacts?.presentation);
+          const inputLabel = getIncidentInputLabel(association?.activityExecution, activityCatalog, inputKey, activityFacts);
           const incidentHealthLabel = !isActiveIncident(incident)
             ? "Historical"
             : incident.isBlocking ? "Needs intervention" : "Non-blocking";
@@ -2383,7 +2442,7 @@ export function WorkflowIncidentList({
 }
 
 function getIncidentActivityLabel(
-  activity: ActivityExecutionStateSummary | null | undefined,
+  activity: Pick<ActivityExecutionStateSummary, "activityType" | "activityTypeVersion"> | null | undefined,
   catalog: ActivityCatalogItem[],
   presentation?: ExecutableGraphNodeFacts["presentation"]
 ) {
@@ -2396,7 +2455,12 @@ function hasIncidentActivityExecutionId(incident: IncidentStateSummary) {
   return Boolean(readIncidentActivityExecutionId(incident));
 }
 
-export function getIncidentInputLabel(activity: ActivityExecutionStateSummary | null | undefined, catalog: ActivityCatalogItem[], inputKey: string | null) {
+export function getIncidentInputLabel(
+  activity: Pick<ActivityExecutionStateSummary, "activityType" | "activityTypeVersion"> | null | undefined,
+  catalog: ActivityCatalogItem[],
+  inputKey: string | null,
+  activityFacts?: Pick<ExecutableGraphNodeFacts, "inputBindings">
+) {
   if (!inputKey) return null;
   const exactActivityVersion = activity
     ? catalog.find(item => item.activityTypeKey === activity.activityType && item.version === activity.activityTypeVersion)
@@ -2409,7 +2473,12 @@ export function getIncidentInputLabel(activity: ActivityExecutionStateSummary | 
       return referenceKey ? referenceKey === inputKey : record.name === inputKey;
     }) as StudioActivityInputDescriptor | undefined;
   const displayName = descriptor?.displayName?.trim();
-  const inputLabel = displayName && displayName !== inputKey ? `${displayName} input` : `${inputKey} input`;
+  const frozenInputName = activityFacts?.inputBindings.find(binding => (binding.inputKey?.trim() || binding.inputName) === inputKey)?.inputName.trim();
+  const inputLabel = displayName && displayName !== inputKey
+    ? `${displayName} input`
+    : frozenInputName && frozenInputName !== inputKey
+      ? `${frozenInputName} input`
+      : `${inputKey} input`;
   return inputLabel;
 }
 

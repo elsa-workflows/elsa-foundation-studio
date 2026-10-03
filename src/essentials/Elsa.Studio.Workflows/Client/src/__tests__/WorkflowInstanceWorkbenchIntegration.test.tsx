@@ -139,6 +139,109 @@ describe("workflow run workbench incident navigation", () => {
     expect(container.querySelector(".wf-instance-detail-workbench.inspector-drawer-open")).toBeNull();
   });
 
+  it("clears stale incident state on refresh and ignores an exact lookup that completes afterward", async () => {
+    api.getWorkflowInstance.mockResolvedValue(workflowDetails({ activities: [] }));
+    api.supportsActivityExecutionInspection.mockReset()
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+    const lateLookup = deferred<ActivityExecutionInspection>();
+    let lookupCount = 0;
+    api.getActivityExecutionInspection.mockImplementation(() => {
+      lookupCount++;
+      if (lookupCount === 1) return Promise.reject(Object.assign(new Error("Forbidden"), { status: 403 }));
+      return lateLookup.promise;
+    });
+
+    renderWorkbench();
+    await vi.waitFor(() => expect(container.querySelector(".wf-instance-detail-workbench")).toBeTruthy());
+    click(buttonByText(container, "View input evidence"));
+    await vi.waitFor(() => expect(container.textContent).toContain("You do not have permission to inspect this activity execution"));
+    expect(container.querySelector(".wf-instance-incident[data-selected='true']")).toBeTruthy();
+
+    click(buttonByText(container, "Refresh"));
+    await vi.waitFor(() => expect(api.getWorkflowInstance).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(container.textContent).not.toContain("You do not have permission to inspect this activity execution"));
+    await vi.waitFor(() => expect(container.querySelector(".wf-instance-incident-summary")).toBeTruthy());
+    expect(container.querySelector(".wf-instance-incident[data-selected='true']")).toBeNull();
+
+    click(buttonByText(container, "View input evidence"));
+    await vi.waitFor(() => expect(api.supportsActivityExecutionInspection).toHaveBeenCalledTimes(4));
+    await vi.waitFor(() => expect(api.getActivityExecutionInspection).toHaveBeenCalledTimes(2));
+    click(buttonByText(container, "Refresh"));
+    await vi.waitFor(() => expect(api.getWorkflowInstance).toHaveBeenCalledTimes(3));
+    await vi.waitFor(() => expect(container.querySelector(".wf-instance-incident-summary")).toBeTruthy());
+    expect(container.querySelector(".wf-instance-incident[data-selected='true']")).toBeNull();
+
+    lateLookup.resolve(activityInspection());
+    await lateLookup.promise;
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(container.querySelector(".wf-instance-incident[data-selected='true']")).toBeNull();
+    expect(container.querySelector("[data-tab-id='issues']")?.getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("keeps denied and mismatched activity evidence unavailable while retrying only transient failures", async () => {
+    const incidents = [
+      incident({ incidentId: "denied-incident", activityExecutionId: "denied-execution" }),
+      incident({ incidentId: "mismatch-incident", activityExecutionId: "mismatch-execution" }),
+      incident({ incidentId: "transient-incident", activityExecutionId: "transient-execution" })
+    ];
+    api.getWorkflowInstance.mockResolvedValue(workflowDetails({ activities: [], incidents }));
+    api.supportsActivityExecutionInspection.mockResolvedValue(true);
+    let transientAttempt = 0;
+    api.getActivityExecutionInspection.mockImplementation(async (_context, workflowExecutionId: string, activityExecutionId: string) => {
+      if (activityExecutionId === "denied-execution") throw Object.assign(new Error("Forbidden"), { status: 403 });
+      if (activityExecutionId === "mismatch-execution") return activityInspection({ activityExecutionId: "different-execution", workflowExecutionId });
+      transientAttempt++;
+      if (transientAttempt === 1) throw new Error("Runtime unavailable");
+      return activityInspection({ activityExecutionId, workflowExecutionId });
+    });
+
+    renderWorkbench();
+    await vi.waitFor(() => expect(container.textContent).toContain("You do not have permission to inspect 1 exact activity execution"));
+    expect(container.textContent).toContain("Runtime returned a different run or activity execution for 1 association");
+    expect(container.textContent).toContain("Some affected activities are not shown yet (1 remaining)");
+    click(buttonByText(container, "Load more affected activities (1)"));
+
+    await vi.waitFor(() => expect(transientAttempt).toBe(2));
+    await vi.waitFor(() => expect(container.textContent).not.toContain("Loading affected activities..."));
+    expect(api.getActivityExecutionInspection.mock.calls.map(([, , activityExecutionId]) => activityExecutionId)).toEqual([
+      "denied-execution",
+      "mismatch-execution",
+      "transient-execution",
+      "transient-execution"
+    ]);
+    expect(buttonByText(container, "Load more affected activities (1)")).toBeUndefined();
+    expect(container.textContent).toContain("You do not have permission to inspect 1 exact activity execution");
+    expect(container.textContent).toContain("Runtime returned a different run or activity execution for 1 association");
+    expect(container.textContent).not.toContain("Some affected activities are not shown yet");
+  });
+
+  it("uses the pinned graph to label node-only incidents when exact execution inspection is absent", async () => {
+    const nodeOnlyIncident = incident({
+      activityExecutionId: null,
+      executableNodeId: "compiled-target",
+      metadata: { "runtime.inputKey": "text" }
+    });
+    api.getWorkflowInstance.mockResolvedValue(workflowDetails({ activities: [], incidents: [nodeOnlyIncident] }));
+    const pinnedExecutable = executable();
+    const nestedActivity = pinnedExecutable.rootActivity.childSlots[0]!.activities[0]!.childSlots[0]!.activities[0]!;
+    nestedActivity.activityTypeVersion = "0.9.0";
+    pinnedExecutable.chosenReference = {
+      ...pinnedExecutable.chosenReference!,
+      activityPresentation: [{ executableNodeId: "compiled-target", displayName: "Frozen Write Line" }]
+    };
+    api.getExecutable.mockResolvedValue(pinnedExecutable);
+
+    renderWorkbench();
+
+    await vi.waitFor(() => expect(container.querySelector(".wf-instance-incident-summary strong")?.textContent)
+      .toBe("Frozen Write Line · Text input"));
+    expect(api.getActivityExecutionInspection).not.toHaveBeenCalled();
+  });
+
   it("keeps the newest incident selected when exact activity lookups finish out of order", async () => {
     const firstIncident = incident({ incidentId: "incident-first", activityExecutionId: "execution-first", executableNodeId: "compiled-first", failureType: "FirstFailure", metadata: {} });
     const secondIncident = incident({ incidentId: "incident-second", activityExecutionId: "execution-second", executableNodeId: "compiled-second", failureType: "SecondFailure", metadata: {} });
