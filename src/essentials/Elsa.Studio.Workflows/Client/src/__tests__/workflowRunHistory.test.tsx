@@ -126,7 +126,10 @@ describe("workflow run history", () => {
     });
     const container = render(context(getJson), vi.fn());
 
-    await waitFor(() => expect(container.textContent).toContain("Current incident health filtering is not available on this server"));
+    await waitFor(() => expect(container.textContent).toContain("This host cannot filter by current incident health."));
+    expect(container.textContent).toContain("No workflow runs were loaded.");
+    expect(container.textContent).toContain("Clear the incident-health filter");
+    expect(container.textContent).not.toContain("these results are not filtered");
     expect(container.textContent).not.toContain("No workflow runs match these filters");
     expect(container.querySelector<HTMLSelectElement>("select[aria-label='Workflow run incident health']")?.disabled).toBe(true);
     expect(getJson).toHaveBeenCalledTimes(1);

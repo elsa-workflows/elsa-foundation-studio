@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  applyRuntimeOverlays,
   buildUnsupportedActivityCanvas,
   buildCanvas,
   createActivityNode,
@@ -9,7 +8,6 @@ import {
   getActivityDesignerSupport,
   getActivityDisplay,
   getChildSlots,
-  isActiveIncident,
   normalizeActivityStructures,
   readStructureDesignFacet,
   replaceSlotActivities,
@@ -22,6 +20,7 @@ import {
   type CanvasScope,
   type ScopeFrame
 } from "../workflowAdapter";
+import { applyRuntimeOverlays, isActiveIncident } from "../workflowRuntimeOverlays";
 import type { ActivityCatalogItem, ActivityNode } from "../workflowTypes";
 import { decorateWorkflowCanvasElements } from "../workflow-editor/workflowAccessibility";
 import { writeLine } from "./fixtures";

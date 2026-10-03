@@ -195,7 +195,7 @@ export interface ListWorkflowInstancesRequest {
 
 export class WorkflowInstanceHealthFilterUnavailableError extends Error {
   constructor() {
-    super("Current incident health filtering is not available on this server.");
+    super("This host cannot filter by current incident health.");
     this.name = "WorkflowInstanceHealthFilterUnavailableError";
   }
 }

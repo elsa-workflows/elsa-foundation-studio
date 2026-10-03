@@ -7,6 +7,8 @@ import {
   combineActivityExecutions,
   loadExactIncidentActivitySummary,
   loadActiveIncidentActivitySummaries,
+  incidentActivityLookupFailureMessage,
+  focusSelectedCanvasActivity,
   projectPinnedExecutable,
   resolveIncidentActivityAssociation,
   resolveInitialActivityEvidenceId,
@@ -260,17 +262,77 @@ describe("Runtime-pinned workflow instance rendering", () => {
       metadata: {}
     }));
 
-    const exact = await loadExactIncidentActivitySummary("workflow-execution-1", "execution-51", fetchInspection);
+    const exactResult = await loadExactIncidentActivitySummary("workflow-execution-1", "execution-51", fetchInspection);
     expect(fetchInspection).toHaveBeenCalledTimes(1);
     expect(fetchInspection).toHaveBeenCalledWith("execution-51");
-    expect(exact).toMatchObject({ activityExecutionId: "execution-51", authoredActivityId: "authored-51" });
-    const activities = combineActivityExecutions([], exact ? [exact] : []);
+    expect(exactResult).toMatchObject({ status: "found", summary: { activityExecutionId: "execution-51", authoredActivityId: "authored-51" } });
+    const activities = combineActivityExecutions([], exactResult.status === "found" ? [exactResult.summary] : []);
     expect(resolveIncidentActivityAssociation(targetIncident, activities)?.activityExecution?.activityExecutionId).toBe("execution-51");
 
     const onViewInput = vi.fn();
     renderIncidentList([targetIncident], activities, vi.fn(), onViewInput);
     click(buttonByText(mounted!.container, "View input evidence"));
     expect(onViewInput).toHaveBeenCalledWith(targetIncident);
+  });
+
+  it("keeps exact inspection failures distinct for truthful operator feedback", async () => {
+    const forbidden = await loadExactIncidentActivitySummary("workflow-execution-1", "execution-51", async () => {
+      throw Object.assign(new Error("Forbidden"), { status: 403 });
+    });
+    const wrongIdentity = await loadExactIncidentActivitySummary("workflow-execution-1", "execution-51", async () => ({
+      activityExecutionId: "different-execution",
+      workflowExecutionId: "workflow-execution-1",
+      executableNodeId: "compiled-51",
+      authoredActivityId: "authored-51",
+      activityType: "Example.Activity",
+      activityTypeVersion: "1.0.0",
+      status: "Faulted",
+      scheduledAt: "2026-10-01T12:00:00Z",
+      bookmarks: [],
+      incidents: [],
+      metadata: {}
+    }));
+    const unavailable = await loadExactIncidentActivitySummary("workflow-execution-1", "execution-51", async () => {
+      throw new Error("Connection timed out");
+    });
+    const serverErrorWithPermissionWord = await loadExactIncidentActivitySummary("workflow-execution-1", "execution-51", async () => {
+      throw Object.assign(new Error("Permission lookup unavailable"), { status: 500 });
+    });
+
+    expect(forbidden).toEqual({ status: "failed", reason: "permission-denied" });
+    expect(wrongIdentity).toEqual({ status: "failed", reason: "identity-mismatch" });
+    expect(unavailable).toEqual({ status: "failed", reason: "unavailable" });
+    expect(serverErrorWithPermissionWord).toEqual({ status: "failed", reason: "unavailable" });
+    expect(incidentActivityLookupFailureMessage("permission-denied")).toContain("do not have permission");
+    expect(incidentActivityLookupFailureMessage("identity-mismatch")).toContain("different run or activity execution");
+    expect(incidentActivityLookupFailureMessage("unavailable")).toContain("Use Show affected activity to try again");
+  });
+
+  it("shows an exact-activity inspection failure while keeping the incident available", () => {
+    const targetIncident = incident({ activityExecutionId: "execution-51" });
+    const message = incidentActivityLookupFailureMessage("permission-denied");
+    renderIncidentList([targetIncident], [], vi.fn(), vi.fn(), [], message);
+
+    expect(mounted?.container.querySelector('[role="status"]')?.textContent).toContain("do not have permission");
+    expect(buttonByText(mounted!.container, "Show affected activity")).toBeDefined();
+  });
+
+  it("returns keyboard focus to a BPMN wrapper when the selected identity is its bound activity", () => {
+    const canvas = document.createElement("div");
+    canvas.className = "wf-instance-canvas";
+    const wrapper = document.createElement("div");
+    wrapper.dataset.id = "bpmn-element-1";
+    wrapper.tabIndex = 0;
+    const node = document.createElement("div");
+    node.dataset.runtimeNodeId = "authored-activity-1";
+    wrapper.appendChild(node);
+    canvas.appendChild(wrapper);
+    document.body.appendChild(canvas);
+
+    focusSelectedCanvasActivity("authored-activity-1");
+
+    expect(document.activeElement).toBe(wrapper);
+    canvas.remove();
   });
 
   it("keeps an unattributed incident run-level and prefers structured root-cause metadata", () => {
@@ -289,7 +351,7 @@ describe("Runtime-pinned workflow instance rendering", () => {
     const activity = activityExecution();
     const affectedIncident = incident({
       metadata: {
-        "runtime.inputKey": "greeting",
+        "runtime.inputKey": "text",
         "runtime.inputFailureCode": "ExpressionEvaluationFailed",
         "runtime.expressionLanguage": "JavaScript",
         "runtime.inputEvaluationPhase": "Start",
@@ -305,10 +367,16 @@ describe("Runtime-pinned workflow instance rendering", () => {
       category: "Tests",
       displayName: "Write Line",
       executionType: "Activity",
-      inputs: [{ name: "greeting", typeName: "string", displayName: "Text" }],
+      inputs: [{ referenceKey: "text", name: "Text", typeName: "string", displayName: "Text" }],
       outputs: []
     } satisfies ActivityCatalogItem;
-    renderIncidentList([affectedIncident], [activity], onShowAffectedActivity, onViewInput, [catalogItem]);
+    const newerCatalogItem = {
+      ...catalogItem,
+      activityVersionId: "example-activity@2",
+      version: "2.0.0",
+      inputs: [{ referenceKey: "text", name: "Text", typeName: "string", displayName: "Newer Text" }]
+    } satisfies ActivityCatalogItem;
+    renderIncidentList([affectedIncident], [activity], onShowAffectedActivity, onViewInput, [newerCatalogItem, catalogItem]);
 
     const summary = mounted?.container.querySelector(".wf-instance-incident-summary");
     expect(summary?.querySelector("strong")?.textContent).toBe("Write Line · Text input");
@@ -323,6 +391,12 @@ describe("Runtime-pinned workflow instance rendering", () => {
     expect(onShowAffectedActivity).toHaveBeenCalledWith(affectedIncident);
     expect(onViewInput).toHaveBeenCalledWith(affectedIncident);
 
+    renderIncidentList([incident({ metadata: { "runtime.inputKey": "legacyText" } })], [activity], vi.fn(), vi.fn(), [{
+      ...catalogItem,
+      inputs: [{ name: "legacyText", typeName: "string", displayName: "Legacy Text" }]
+    }]);
+    expect(mounted?.container.querySelector(".wf-instance-incident-summary strong")?.textContent).toBe("Write Line · Legacy Text input");
+
     renderIncidentList([incident({ activityExecutionId: null, executableNodeId: null })], [], vi.fn(), vi.fn());
     expect(mounted?.container.textContent).toContain("Run-level issue · no activity association was recorded.");
     expect(buttonByText(mounted!.container, "Show affected activity")).toBeUndefined();
@@ -334,7 +408,8 @@ function renderIncidentList(
   activities: ActivityExecutionStateSummary[],
   onShowAffectedActivity: (incident: IncidentStateSummary) => void,
   onViewInput: (incident: IncidentStateSummary) => void,
-  activityCatalog: ActivityCatalogItem[] = []
+  activityCatalog: ActivityCatalogItem[] = [],
+  associationLookupMessage: string | null = null
 ) {
   if (mounted) {
     flushSync(() => mounted!.root.unmount());
@@ -345,7 +420,7 @@ function renderIncidentList(
   const root = createRoot(container);
   mounted = { root, container };
   flushSync(() => root.render(
-    <WorkflowIncidentList incidents={incidents} activities={activities} activityCatalog={activityCatalog} onShowAffectedActivity={onShowAffectedActivity} onViewInput={onViewInput} />
+    <WorkflowIncidentList incidents={incidents} activities={activities} activityCatalog={activityCatalog} associationLookupMessage={associationLookupMessage} onShowAffectedActivity={onShowAffectedActivity} onViewInput={onViewInput} />
   ));
 }
 
