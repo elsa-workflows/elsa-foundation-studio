@@ -8,6 +8,14 @@ T026-T029 pass at the exact M1 pair below. T030-T031 are implemented with the lo
 
 ## Passing evidence
 
+### M2 final immutable producer correction, 2026-10-03
+
+Predecessor Studio `d2d4f4cd00c6e7ca93fc86e159841097292d902c` passes every job in [CI 37133114873](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37133114873), including generic Chromium 67/67 and paired normal-host 4/4 against Foundation `99a28c7ff63b8748550ade79dab0fcff7acf0350`. The browser focus synchronization is test-only; all original assertions remain intact and no production focus fix is claimed.
+
+The immutable producer pin now advances to Foundation `7457b7a4564892bab4b28bd0d07fac9709462d56`. Independent and root reviews close absent-root optional-typeof, literal/coalescing, composed-fact retention, primitive-member and mutable-intrinsic identity findings. Root producer checks pass Expressions 218/218, Jint 126/126, Design 507/507, Design API 142/142, Publishing API 714/714, scoped Architecture 17/17, map freshness, rebuilt authenticated Workbench 3/3 and fresh Debug JavaScript REST 10/10. Runtime grants and actual evaluation are unchanged; the classifier preserves native errors when intrinsic identity is uncertain.
+
+This Studio delta changes only the producer pin and verification record, not editor production code, SDK, persisted contracts or dependencies. Its rebuilt paired browser and exact-head full CI remain pending at this checkpoint. Predecessor results are not acceptance of the new pair. Copilot re-review requests have not produced a new work-start event/current-head review after a reasonable window; independent/root review is not Copilot approval. M2 remains open until the corrected pair passes; M3/M4 remain Not Ready here. No current-head manual assistive-technology pass, human acceptance or merge is claimed.
+
 ### M2 browser sequencing correction, 2026-10-03
 
 At Studio `3c37b4869e034548a538830d9160bcfe08c5a2d3`, [CI 37131596196](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37131596196) passes lint/typecheck and the dedicated rebuilt normal-host Chromium job against Foundation `99a28c7ff63b8748550ade79dab0fcff7acf0350`, but its generic browser job fails one of 67 cases at the expression syntax popover keyboard reopening assertion. Root reproduces the same failure in four of 30 focused repetitions across both themes.
