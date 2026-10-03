@@ -25,6 +25,7 @@ function createApi(
   } = {}
 ) {
   let expressionAttempt = 0;
+  let activityResults = options.activities ?? [];
   const getJson = vi.fn(async (path: string) => {
     if (path === "/capabilities") {
       return {
@@ -44,7 +45,7 @@ function createApi(
         versions: []
       };
     }
-    if (path.includes("/design/activities/catalog")) return { activities: options.activities ?? [] };
+    if (path.includes("/design/activities/catalog")) return { activities: activityResults };
     if (path.includes("/design/activities/definitions/picker")) return { items: options.recommended ?? [], nextOffset: null };
     if (path.endsWith("/expressions/descriptors")) {
       const response = expressionResponses[Math.min(expressionAttempt++, expressionResponses.length - 1)];
@@ -53,7 +54,11 @@ function createApi(
     }
     throw new Error(`Unexpected GET ${path}`);
   });
-  return { context: { baseUrl: "", http: { getJson } } as unknown as StudioEndpointContext, getJson };
+  return {
+    context: { baseUrl: "", http: { getJson } } as unknown as StudioEndpointContext,
+    getJson,
+    setActivities(activities: unknown[]) { activityResults = activities; }
+  };
 }
 
 const callbacks = {
@@ -75,6 +80,7 @@ function Probe({ context }: { context: StudioEndpointContext }) {
         {data.catalog.map(activity => `${activity.activityVersionId}:${activity.activityDefinitionVersion ?? "-"}`).join(",")}
       </output>
       <button type="button" onClick={() => void data.reload()}>Reload definition</button>
+      <button type="button" onClick={() => void data.reloadCatalog()}>Refresh catalog</button>
       <button type="button" onClick={() => void data.reloadExpressionDescriptors()}>Retry descriptors</button>
     </div>
   );
@@ -144,6 +150,39 @@ describe("useWorkflowEditorData expression descriptor contract", () => {
       .find(button => button.textContent === "Retry descriptors")!.click());
     await waitFor(() => expect(output.dataset.status).toBe("failed"));
 
+    expect(callbacks.resetHistory).not.toHaveBeenCalled();
+    expect(callbacks.loadDraft).not.toHaveBeenCalled();
+    expect(callbacks.markSaved).not.toHaveBeenCalled();
+  });
+
+  it("refreshes catalog versions without replacing the unsaved workflow draft", async () => {
+    const oldActivity = {
+      activityVersionId: "renewal-v1",
+      activityTypeKey: "Elsa.RegisterRenewal",
+      version: "1.0.0",
+      displayName: "Register renewal",
+      category: "Renewals",
+      executionType: "Action",
+      available: true,
+      inputs: [],
+      outputs: [],
+      ports: []
+    };
+    const newActivity = { ...oldActivity, activityVersionId: "renewal-v2", version: "1.1.0" };
+    const api = createApi([[]], { activities: [oldActivity] });
+    const container = render(api.context);
+    const catalog = container.querySelector<HTMLOutputElement>("[data-testid='catalog']")!;
+    await waitFor(() => expect(catalog.textContent).toContain("renewal-v1"));
+    callbacks.resetHistory.mockClear();
+    callbacks.loadDraft.mockClear();
+    callbacks.markSaved.mockClear();
+
+    api.setActivities([oldActivity, newActivity]);
+    flushSync(() => [...container.querySelectorAll<HTMLButtonElement>("button")]
+      .find(button => button.textContent === "Refresh catalog")!.click());
+    await waitFor(() => expect(catalog.textContent).toContain("renewal-v2"));
+
+    expect(catalog.textContent).toContain("renewal-v1");
     expect(callbacks.resetHistory).not.toHaveBeenCalled();
     expect(callbacks.loadDraft).not.toHaveBeenCalled();
     expect(callbacks.markSaved).not.toHaveBeenCalled();

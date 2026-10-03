@@ -33,6 +33,7 @@ export function useWorkflowEditorData({ context, definitionId, resetHistory, loa
   const [recommendedDefinitions, setRecommendedDefinitions] = useState<RecommendedActivityDefinition[]>([]);
   const [activityDescriptors, setActivityDescriptors] = useState<StudioActivityDescriptor[]>([]);
   const [availabilityDiagnostics, setAvailabilityDiagnostics] = useState<ActivityAvailabilityDiagnostics | null>(null);
+  const [catalogRefreshing, setCatalogRefreshing] = useState(false);
   const [expressionDescriptorState, setExpressionDescriptorState] = useState<{
     context: StudioEndpointContext;
     definitionId: string;
@@ -68,23 +69,23 @@ export function useWorkflowEditorData({ context, definitionId, resetHistory, loa
     }
   }, [context, definitionId]);
 
+  const applyActivityCatalog = useCallback((result: LoadedActivityCatalog) => {
+    setCatalog(result.activities);
+    setRecommendedDefinitions(result.recommendedDefinitions ?? []);
+    setPaletteCatalog(result.paletteCatalog);
+    setActivityDescriptors(result.activities.map(toActivityDescriptor));
+    observeReusableActivity({
+      event: "picker-load",
+      surface: "workflow-designer",
+      outcome: result.paletteCatalog.length > 0 ? "ready" : "empty"
+    });
+  }, []);
+
   const reload = useCallback(async () => {
     setError("");
-    const [nextDetails, nextCatalog, nextRecommendedDefinitions] = await Promise.all([
+    const [nextDetails, nextActivityCatalog] = await Promise.all([
       getDefinition(context, definitionId),
-      listActivities(context),
-      listRecommendedActivityDefinitions(context).catch(error => {
-        // A backend that doesn't advertise the relation has no recommendation concept at all
-        // (null, versus a supported listing that returned nothing): the palette then degrades to
-        // the full activity catalog instead of blocking the editor or rendering empty.
-        if (error instanceof ApiCapabilityUnavailableError) return null;
-        observeReusableActivity({
-          event: "picker-load",
-          surface: "workflow-designer",
-          outcome: "failed"
-        });
-        throw error;
-      }),
+      loadActivityCatalog(context),
       reloadExpressionDescriptors()
     ]);
     const nextDraft = nextDetails.draft ?? null;
@@ -92,23 +93,21 @@ export function useWorkflowEditorData({ context, definitionId, resetHistory, loa
     markSaved(nextDraft);
     resetHistory(nextDraft);
     loadDraft(nextDraft);
-    const recommendedDefinitions = nextRecommendedDefinitions ?? [];
-    const activities = decorateReusableCatalog(nextCatalog.activities ?? [], recommendedDefinitions);
-    setCatalog(activities);
-    setRecommendedDefinitions(recommendedDefinitions);
-    const nextPaletteCatalog = nextRecommendedDefinitions == null
-      ? activities
-      : projectRecommendedPalette(activities, recommendedDefinitions);
-    setPaletteCatalog(nextPaletteCatalog);
-    observeReusableActivity({
-      event: "picker-load",
-      surface: "workflow-designer",
-      outcome: nextPaletteCatalog.length > 0 ? "ready" : "empty"
-    });
-    setActivityDescriptors(activities.map(toActivityDescriptor));
+    applyActivityCatalog(nextActivityCatalog);
     setAvailabilityDiagnostics(null);
     setDescriptorStatus("ready");
-  }, [context, definitionId, resetHistory, loadDraft, markSaved, reloadExpressionDescriptors, setError]);
+  }, [context, definitionId, resetHistory, loadDraft, markSaved, reloadExpressionDescriptors, setError, applyActivityCatalog]);
+
+  const reloadCatalog = useCallback(async () => {
+    setCatalogRefreshing(true);
+    try {
+      // This path deliberately refreshes catalog metadata only. `reload()` also fetches and installs
+      // the server draft, which would discard unsaved local edits when used from the designer toolbar.
+      applyActivityCatalog(await loadActivityCatalog(context));
+    } finally {
+      setCatalogRefreshing(false);
+    }
+  }, [applyActivityCatalog, context]);
 
   useEffect(() => {
     void reload().catch(e => setError(describeWorkflowError(e, "Could not load the workflow editor.")));
@@ -128,8 +127,43 @@ export function useWorkflowEditorData({ context, definitionId, resetHistory, loa
     expressionDescriptors: expressionStateMatchesAuthority ? expressionDescriptorState.descriptors : [],
     expressionDescriptorStatus: expressionStateMatchesAuthority ? expressionDescriptorState.status : "loading",
     descriptorStatus,
+    catalogRefreshing,
+    reloadCatalog,
     reload,
     reloadExpressionDescriptors
+  };
+}
+
+interface LoadedActivityCatalog {
+  activities: ActivityCatalogItem[];
+  recommendedDefinitions: RecommendedActivityDefinition[] | null;
+  paletteCatalog: ActivityCatalogItem[];
+}
+
+async function loadActivityCatalog(context: StudioEndpointContext): Promise<LoadedActivityCatalog> {
+  const [nextCatalog, nextRecommendedDefinitions] = await Promise.all([
+    listActivities(context),
+    listRecommendedActivityDefinitions(context).catch(error => {
+      // A backend that doesn't advertise the relation has no recommendation concept at all
+      // (null, versus a supported listing that returned nothing): the palette then degrades to
+      // the full activity catalog instead of blocking the editor or rendering empty.
+      if (error instanceof ApiCapabilityUnavailableError) return null;
+      observeReusableActivity({
+        event: "picker-load",
+        surface: "workflow-designer",
+        outcome: "failed"
+      });
+      throw error;
+    })
+  ]);
+  const recommendedDefinitions = nextRecommendedDefinitions ?? [];
+  const activities = decorateReusableCatalog(nextCatalog.activities ?? [], recommendedDefinitions);
+  return {
+    activities,
+    recommendedDefinitions: nextRecommendedDefinitions,
+    paletteCatalog: nextRecommendedDefinitions == null
+      ? activities
+      : projectRecommendedPalette(activities, recommendedDefinitions)
   };
 }
 

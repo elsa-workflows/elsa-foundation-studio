@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { Boxes, Check, ChevronRight, Code2, Download, GitBranch, ListTree, Network, Package, PackageOpen, Play, Plus, Redo2, Save, SlidersHorizontal, Sparkles, Undo2, Upload, Workflow as WorkflowIcon } from "lucide-react";
+import { Boxes, Check, ChevronRight, Code2, Download, GitBranch, ListTree, Network, Package, PackageOpen, Play, Plus, Redo2, RefreshCw, Save, SlidersHorizontal, Sparkles, Undo2, Upload, Workflow as WorkflowIcon } from "lucide-react";
 import { authSessionEndedEvent, authSessionStartedEvent, expressionEditorSessionEndedEvent, useStudioThemeLayout, type StudioActivityPropertyEditorContribution, type StudioAiContributionApi, type StudioEndpointContext, type StudioExpressionEditorContribution, type StudioExpressionToolingClient, type StudioWorkflowDesignerPanelContribution, type StudioWorkflowRunInputEditorContribution } from "@elsa-workflows/studio-sdk";
 import type { ActivityCatalogItem, ActivityNode, WorkflowDraft } from "../workflowTypes";
 import {
@@ -32,6 +32,7 @@ import type { WorkflowSlotNavigation } from "./contexts";
 import {
   createNodeId,
   dispatchAiAction,
+  describeWorkflowError,
   findAiAction,
   getDraftSignature,
   groupActivityPalette,
@@ -227,6 +228,8 @@ export function WorkflowEditor({
     expressionDescriptors,
     expressionDescriptorStatus,
     descriptorStatus,
+    catalogRefreshing,
+    reloadCatalog,
     reload,
     reloadExpressionDescriptors
   } = useWorkflowEditorData({ context, definitionId, resetHistory, loadDraft, markSaved, setError });
@@ -760,6 +763,18 @@ export function WorkflowEditor({
     setAutosavePaused(false);
   }, [draft, loadDraft, saveDraft, setAutosavePaused]);
 
+  const refreshActivityCatalog = useCallback(async () => {
+    setError("");
+    setStatus("Refreshing activity catalog…");
+    try {
+      await reloadCatalog();
+      setStatus("Activity catalog refreshed. The workflow draft was preserved.");
+    } catch (e) {
+      setStatus("");
+      setError(describeWorkflowError(e, "Could not refresh the activity catalog."));
+    }
+  }, [reloadCatalog, setError]);
+
   // Navigates the designer to the activity that owns an invalid scoped variable reference so the
   // author can deliberately re-pick a variable in its scope. We never auto-retarget (ADR-0027). The
   // path follows planSlotNavigation's breadcrumb conventions, so landing here reads exactly like
@@ -1067,6 +1082,14 @@ export function WorkflowEditor({
               <PackageOpen size={15} /> {operation === "exportingArtifact" ? "Exporting…" : "Export artifact"}
             </button>
           ) : null}
+          <button
+            type="button"
+            disabled={busy || catalogRefreshing}
+            title="Refresh available activity versions without replacing the local workflow draft"
+            onClick={() => void refreshActivityCatalog()}
+          >
+            <RefreshCw size={15} /> {catalogRefreshing ? "Refreshing…" : "Refresh catalog"}
+          </button>
           <button type="button" disabled={busy} onClick={() => void save()}><Save size={15} /> Save</button>
           <button
             type="button"
