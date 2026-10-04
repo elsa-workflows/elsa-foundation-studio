@@ -626,6 +626,18 @@ describe("WorkflowActivityExecutionDetails", () => {
     expect(container.querySelector(".wf-input-inspection-value")?.textContent).toContain("Runtime value evidence is metadata-only.");
   });
 
+  it("reports absent input evidence without claiming a completed execution did not evaluate it", async () => {
+    vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([]));
+    const declaredCatalog: ActivityCatalogItem[] = [{
+      ...catalog[0]!, inputs: [{ referenceKey: "message-key", name: "Message", typeName: "System.String" }]
+    }];
+    const container = render(<WorkflowActivityExecutionDetails context={context} activity={activity} activityCatalog={declaredCatalog} />);
+
+    await waitFor(() => expect(container.querySelector(".wf-input-inspection-value")?.textContent)
+      .toContain("No evaluation evidence recorded"));
+    expect(container.querySelector(".wf-input-inspection-value")?.textContent).not.toContain("Not evaluated");
+  });
+
   it("retains native input disclosures with distinct controlled regions for punctuation-containing keys", async () => {
     vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([]));
     const pairedCatalog: ActivityCatalogItem[] = [{

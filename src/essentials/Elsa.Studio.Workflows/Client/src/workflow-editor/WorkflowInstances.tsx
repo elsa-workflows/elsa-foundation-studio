@@ -2142,7 +2142,7 @@ function InputInspectionRowCard({
         <div className="wf-input-inspection-value" aria-label={`${row.name} runtime value`}>
           {runtimeSnapshot ? <RuntimeValueEvidenceContent snapshot={runtimeSnapshot} presentation="input" /> : (
             <p className="wf-input-inspection-unavailable">
-              {inspectionStatus === "loading" ? "Loading captured value…" : inspectionStatus === "failed" ? "Runtime evidence unavailable" : "Not evaluated"}
+              {inspectionStatus === "loading" ? "Loading captured value…" : inspectionStatus === "failed" ? "Runtime evidence unavailable" : "No evaluation evidence recorded"}
             </p>
           )}
         </div>
