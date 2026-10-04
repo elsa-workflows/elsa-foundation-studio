@@ -29,6 +29,9 @@ describe("dialog focus management", () => {
     dialog.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true }));
     expect(document.activeElement).toBe(buttons[1]);
 
+    buttons[1].dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+    expect(document.activeElement).toBe(buttons[0]);
+
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     expect(onEscape).toHaveBeenCalledTimes(1);
 
@@ -66,5 +69,8 @@ describe("dialog focus management", () => {
 function Dialog({ onEscape }: { onEscape(): void }) {
   const ref = useRef<HTMLElement>(null);
   useDialogFocus(ref, onEscape);
-  return <section ref={ref} role="dialog" tabIndex={-1}><button type="button">Publish</button><button type="button">Cancel</button></section>;
+  return <section ref={ref} role="dialog" tabIndex={-1}>
+    <link rel="stylesheet" href="/dialog.css" />
+    <button type="button">Publish</button><button type="button">Cancel</button>
+  </section>;
 }

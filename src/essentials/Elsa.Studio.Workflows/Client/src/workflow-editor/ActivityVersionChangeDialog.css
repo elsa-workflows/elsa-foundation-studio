@@ -122,41 +122,6 @@
   gap: 4px;
 }
 
-.wf-version-disclosure {
-  border-top: 1px solid var(--studio-border);
-}
-
-.wf-version-disclosure > button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 12px 0;
-  border: 0;
-  color: var(--studio-text);
-  background: none;
-  font: inherit;
-  font-size: 13px;
-  text-align: left;
-  cursor: pointer;
-}
-
-.wf-version-disclosure > button strong {
-  font-weight: 500;
-}
-
-.wf-version-disclosure > button .wf-muted {
-  margin-left: auto;
-  font-size: 12px;
-  text-align: right;
-}
-
-.wf-version-disclosure > div:not([hidden]) {
-  display: grid;
-  gap: 12px;
-  padding-bottom: 12px;
-}
-
 .wf-version-change-facts,
 .wf-version-change-section,
 .wf-version-change-section dl {

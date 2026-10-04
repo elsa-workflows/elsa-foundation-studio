@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { StudioEndpointContext } from "@elsa-workflows/studio-sdk";
 import type {
   ActivityDefinitionVersionManagementView,
@@ -18,6 +18,7 @@ import {
   type ActivityVersionChangePrecondition,
   type ActivityVersionChangeScope
 } from "./activityVersionChangeModel";
+import { DialogDisclosure } from "./DialogDisclosure";
 import { useDialogFocus } from "./useDialogFocus";
 import versionChangeStylesUrl from "./ActivityVersionChangeDialog.css?url&no-inline";
 
@@ -181,17 +182,17 @@ export function ActivityVersionChangeDialog({
             ) : null}
 
             {matchingCount > 1 ? (
-              <Disclosure title="Apply scope" hint={scopeLabel}>
+              <DialogDisclosure className="wf-version-disclosure" title="Apply scope" hint={scopeLabel}>
                 <fieldset disabled={busy}>
                   <legend>Apply to</legend>
                   <p className="wf-muted">Nodes using the same exact version in this draft.</p>
                   <label><input type="radio" name="version-change-scope" checked={scope === "occurrence"} onChange={() => setScope("occurrence")} /> This node only</label>
                   <label><input type="radio" name="version-change-scope" checked={scope === "matching"} onChange={() => setScope("matching")} /> All matching nodes ({matchingCount})</label>
                 </fieldset>
-              </Disclosure>
+              </DialogDisclosure>
             ) : null}
 
-            <Disclosure title="Change details">
+            <DialogDisclosure className="wf-version-disclosure" title="Change details">
               {diff.data && impact ? (
                 <>
                   <section className="wf-version-change-section" aria-labelledby="version-compatibility-title">
@@ -216,7 +217,7 @@ export function ActivityVersionChangeDialog({
                 <div><dt>Current version ID</dt><dd>{current.versionId}</dd></div>
                 <div><dt>Target version ID</dt><dd>{target.data?.versionId ?? "Not selected"}</dd></div>
               </dl>
-            </Disclosure>
+            </DialogDisclosure>
 
             {versions.isError || target.isError || diff.isError ? (
               <p className="wf-publication-recovery" role="alert">Version details could not be loaded. Close and try again.</p>
@@ -278,15 +279,4 @@ function ImpactSection({
       </dl>
     </section>
   );
-}
-
-function Disclosure({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const id = useId();
-  return <section className="wf-version-disclosure">
-    <button type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen(value => !value)}>
-      <span aria-hidden="true">{open ? "−" : "+"}</span><strong>{title}</strong>{hint ? <span className="wf-muted">{hint}</span> : null}
-    </button>
-    <div id={id} hidden={!open}>{children}</div>
-  </section>;
 }

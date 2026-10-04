@@ -30,21 +30,25 @@ afterEach(() => {
 });
 
 describe("publication channel UX", () => {
-  it("prioritizes channel, effect, version, readiness, baseline, and compact changes", () => {
+  it("puts the target, effect, version, and readiness in the primary decision card", () => {
     const container = render(review());
 
-    expect(text(container)).toContain("Publication channel");
-    expect(text(container)).toContain("default (normal)");
-    expect(text(container)).toContain("Replace the current publication in default");
-    expect(text(container)).toContain("Assigned automatically by version policy");
+    expect(text(container)).toContain("Version");
+    expect(text(container)).toContain("Channel");
+    expect(text(container)).toContain("default");
+    expect(text(container)).toContain("First publication in default.");
+    expect(text(container)).toContain("Automatic");
     expect(text(container)).toContain("Ready to publish");
-    expect(text(container)).toContain("Baseline:");
-    expect(text(container)).toContain("current captured editor state is included and saved");
-    expect(text(container)).not.toContain("Publication behavior");
-    expect(text(container)).not.toContain("Replace authority in this slot");
+    expect(visibleText(container)).not.toContain("Baseline:");
+    expect(disclosure(container, "Change details")?.getAttribute("aria-expanded")).toBe("false");
+    expect(disclosure(container, "Publication settings")?.getAttribute("aria-expanded")).toBe("false");
+    expect(disclosurePanel(container, "Publication settings")?.hidden).toBe(true);
+    expect(visibleText(container)).toContain("Saves and publishes this draft.");
+    expect(visibleText(container)).not.toContain("Resolved action");
+    expect(visibleText(container)).not.toContain("Preflight token");
   });
 
-  it("keeps technical evidence in progressive disclosures", () => {
+  it("keeps change and technical evidence collapsed until requested", () => {
     const container = render(review({
       preflight: preflight({
         policyRevision: 7,
@@ -52,16 +56,34 @@ describe("publication channel UX", () => {
       })
     }));
 
-    expect(summary(container, "Changes details")).toBeDefined();
-    expect(summary(container, "Advanced details")).toBeDefined();
+    expect(disclosure(container, "Change details")).toBeDefined();
+    expect(disclosure(container, "Advanced details")).toBeDefined();
+    expect(disclosure(container, "Change details")?.getAttribute("aria-expanded")).toBe("false");
+    expect(disclosure(container, "Advanced details")?.getAttribute("aria-expanded")).toBe("false");
+    expect(disclosurePanel(container, "Advanced details")?.hidden).toBe(true);
+    expect(visibleText(container)).not.toContain("host · revision 7");
+    expect(visibleText(container)).not.toContain("http:orders (exclusive)");
+
+    expandDisclosure(container, "Change details");
+    expect(text(container)).toContain("Baseline:");
+    expandDisclosure(container, "Advanced details");
     expect(text(container)).toContain("Policy");
     expect(text(container)).toContain("host · revision 7");
     expect(text(container)).toContain("http:orders (exclusive)");
   });
 
+  it("shows only nonzero change counts in the collapsed details hint", () => {
+    const container = render(review());
+    const button = disclosure(container, "Change details")!;
+
+    expect(button.textContent).toContain("1 activity change");
+    expect(button.textContent).not.toMatch(/\b0\s+(?:activity|input|output|trigger) changes?\b/);
+  });
+
   it("lists existing channels and exposes a distinct create-new path", () => {
     const onReview = vi.fn(async () => undefined);
     const container = render(review({ slots: [occupiedBlue()] }), { onReview });
+    expandDisclosure(container, "Publication settings");
     const select = container.querySelector<HTMLSelectElement>("select[aria-label='Publication channel']")!;
 
     expect([...select.options].map(option => option.textContent)).toEqual([
@@ -80,11 +102,12 @@ describe("publication channel UX", () => {
   it("derives replacement for an occupied named channel and preserves its concurrency guard", () => {
     const onReview = vi.fn(async () => undefined);
     const container = render(review({ slots: [occupiedBlue()] }), { onReview });
+    expandDisclosure(container, "Publication settings");
     const select = container.querySelector<HTMLSelectElement>("select[aria-label='Publication channel']")!;
 
     changeSelect(select, "blue");
 
-    expect(text(container)).toContain("Replace the current publication in blue");
+    expect(text(container)).toContain("Replaces the published version in blue.");
     expect(button(container, "Publish").disabled).toBe(true);
     expect(onReview).toHaveBeenCalledWith(
       expect.anything(),
@@ -98,7 +121,9 @@ describe("publication channel UX", () => {
       slots: [occupiedBlue()],
       slotVersions: { blue: versionDetails("version-blue", { version: "1.4.0", state: { rootActivity: null } }) }
     }), { onReview });
+    expandDisclosure(container, "Publication settings");
     changeSelect(container.querySelector<HTMLSelectElement>("select[aria-label='Publication channel']")!, "blue");
+    expandDisclosure(container, "Change details");
 
     expect(text(container)).toContain("Baseline: blue · 1.4.0");
   });
@@ -106,7 +131,9 @@ describe("publication channel UX", () => {
   it("falls back to the publication's version id in the baseline when no design version was fetched for the slot", () => {
     const onReview = vi.fn(async () => undefined);
     const container = render(review({ slots: [occupiedBlue()] }), { onReview });
+    expandDisclosure(container, "Publication settings");
     changeSelect(container.querySelector<HTMLSelectElement>("select[aria-label='Publication channel']")!, "blue");
+    expandDisclosure(container, "Change details");
 
     expect(text(container)).toContain("Baseline: blue · version-blue");
   });
@@ -115,9 +142,11 @@ describe("publication channel UX", () => {
     const onReview = vi.fn(async () => undefined);
     const container = render(review({ slots: [withoutPublication(importedActivationSlot())] }), { onReview });
 
+    expandDisclosure(container, "Publication settings");
     changeSelect(container.querySelector<HTMLSelectElement>("select[aria-label='Publication channel']")!, "imported");
+    expandDisclosure(container, "Change details");
 
-    expect(text(container)).toContain("Replace the current activation in imported");
+    expect(text(container)).toContain("Replaces the current activation in imported.");
     expect(text(container)).toContain("imported · occupied by artifact-reconciliation (orders-bundle) · not a Studio design version");
     expect(text(container)).toContain("Not compared: imported is occupied by an activation from artifact-reconciliation (orders-bundle)");
     expect(text(container)).not.toContain("no previous publication");
@@ -127,16 +156,16 @@ describe("publication channel UX", () => {
       { mode: "automatic" });
   });
 
-  it("blocks on a foreign-owned target with an owner blocker, disabled Publish, and Not ready readiness", () => {
+  it("keeps foreign ownership visible and Publish disabled", () => {
     const container = render(review({
       preflight: preflight({ canActivate: false, targetSlotOwner: foreignSlotOwner() })
     }));
 
-    expect(text(container)).toContain("Publication channel is owned by another activation source");
-    expect(text(container)).toContain("occupied by an activation from artifact-reconciliation (mounted-artifacts)");
-    expect(text(container)).toContain("operator action");
-    expect(text(container)).not.toContain("Publication channel conflicts");
-    expect(text(container)).toContain("Not ready");
+    expect(visibleText(container)).toContain("Publication channel is owned by another activation source");
+    expect(visibleText(container)).toContain("occupied by an activation from artifact-reconciliation (mounted-artifacts)");
+    expect(visibleText(container)).toContain("operator action");
+    expect(visibleText(container)).not.toContain("Publication channel conflicts");
+    expect(visibleText(container)).toContain("Review the highlighted issue before publishing.");
     expect(button(container, "Publish").disabled).toBe(true);
   });
 
@@ -148,10 +177,10 @@ describe("publication channel UX", () => {
       })
     }));
 
-    expect(text(container)).toContain("Publication channel conflicts");
-    expect(text(container)).toContain("Conflict with default: http:orders");
-    expect(text(container)).not.toContain("owned by another activation source");
-    expect(text(container)).toContain("Not ready");
+    expect(visibleText(container)).toContain("Publication channel conflicts");
+    expect(visibleText(container)).toContain("Conflict with default: http:orders");
+    expect(visibleText(container)).not.toContain("owned by another activation source");
+    expect(visibleText(container)).toContain("Review the highlighted issue before publishing.");
     expect(button(container, "Publish").disabled).toBe(true);
   });
 
@@ -159,9 +188,9 @@ describe("publication channel UX", () => {
     const blockedPreflight = preflight({ canActivate: false, targetSlotOwner: undefined });
     const container = render(review({ preflight: blockedPreflight }));
 
-    expect(text(container)).toContain(publicationBlockedMessage(blockedPreflight));
-    expect(text(container)).not.toContain("owned by another activation source");
-    expect(text(container)).not.toContain("Publication channel conflicts");
+    expect(visibleText(container)).toContain(publicationBlockedMessage(blockedPreflight));
+    expect(visibleText(container)).not.toContain("owned by another activation source");
+    expect(visibleText(container)).not.toContain("Publication channel conflicts");
     expect(button(container, "Publish").disabled).toBe(true);
   });
 
@@ -174,21 +203,23 @@ describe("publication channel UX", () => {
       })
     }));
 
-    expect(text(container)).toContain("Publication channel is owned by another activation source");
-    expect(text(container)).toContain("Publication channel conflicts");
-    expect(text(container)).toContain("Conflict with default: http:orders");
+    expect(visibleText(container)).toContain("Publication channel is owned by another activation source");
+    expect(visibleText(container)).toContain("Publication channel conflicts");
+    expect(visibleText(container)).toContain("Conflict with default: http:orders");
     expect(button(container, "Publish").disabled).toBe(true);
   });
 
   it("states that the current publication is unknown when the backend cannot provide publication slots", () => {
     const visible = render(review());
-    expect(text(visible)).toContain("New channel · default · no previous publication");
+    expect(text(visible)).toContain("First publication in default.");
     expect(visible.querySelector("[role='note']")).toBeNull();
     unmount();
 
     const container = render(review({ slotsUnavailableReason: activationSlotReadsUnavailableReason }));
 
     expect(container.querySelector("[role='note']")?.textContent).toBe(activationSlotReadsUnavailableReason);
+    expect(text(container)).toContain("Current publication unknown.");
+    expandDisclosure(container, "Change details");
     expect(text(container)).toContain("default · current publication unknown");
     expect(text(container)).toContain("Not compared: the current publication in this channel is unknown on this backend.");
     expect(text(container)).not.toContain("no previous publication");
@@ -197,7 +228,8 @@ describe("publication channel UX", () => {
 
   it("shows exact-version editing only when the backend advertises it", () => {
     const unsupported = render(review());
-    expect(summary(unsupported, "Edit version")).toBeUndefined();
+    expandDisclosure(unsupported, "Publication settings");
+    expect(unsupported.querySelector("input[name='publication-version-mode']")).toBeNull();
     unmount();
 
     const supported = render(review({
@@ -211,8 +243,9 @@ describe("publication channel UX", () => {
         issues: []
       }
     }));
-    expect(summary(supported, "Edit version")).toBeDefined();
-    expect(text(supported)).toContain("2.0.0 · assigned automatically by version policy");
+    expandDisclosure(supported, "Publication settings");
+    expect(supported.querySelector("input[name='publication-version-mode']")).not.toBeNull();
+    expect(text(supported)).toContain("2.0.0");
   });
 
   it("automatically requests authoritative review when the exact version changes", () => {
@@ -229,7 +262,7 @@ describe("publication channel UX", () => {
       }
     }), { onReview });
 
-    flushSync(() => summary(container, "Edit version")!.click());
+    expandDisclosure(container, "Publication settings");
     const exactRadio = [...container.querySelectorAll<HTMLInputElement>("input[type='radio']")]
       .find(input => input.parentElement?.textContent?.includes("Exact semantic version"))!;
     flushSync(() => exactRadio.click());
@@ -243,7 +276,7 @@ describe("publication channel UX", () => {
     expect(text(container)).toContain("2.1.0-rc.1");
     expect(text(container)).not.toContain("2.0.0 · assigned automatically");
     expect(button(container, "Publish").disabled).toBe(true);
-    expect(text(container)).toContain("Not ready");
+    expect(visibleText(container)).toContain("Review the highlighted issue before publishing.");
   });
 
   it("keeps a failed authoritative review stable until the author retries or changes the selection", () => {
@@ -401,11 +434,6 @@ function button(container: HTMLElement, label: string) {
     .find(candidate => candidate.textContent === label)!;
 }
 
-function summary(container: HTMLElement, label: string) {
-  return [...container.querySelectorAll<HTMLElement>("summary")]
-    .find(candidate => candidate.textContent === label);
-}
-
 function changeSelect(select: HTMLSelectElement, value: string) {
   flushSync(() => {
     const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!;
@@ -424,4 +452,27 @@ function setInput(input: HTMLInputElement, value: string) {
 
 function text(container: HTMLElement) {
   return container.textContent ?? "";
+}
+
+function visibleText(container: HTMLElement) {
+  const clone = container.cloneNode(true) as HTMLElement;
+  clone.querySelectorAll<HTMLElement>("[hidden]").forEach(element => element.remove());
+  return text(clone);
+}
+
+function disclosure(container: HTMLElement, title: string) {
+  return [...container.querySelectorAll<HTMLButtonElement>(".wf-dialog-disclosure > button")]
+    .find(candidate => candidate.querySelector("strong")?.textContent === title);
+}
+
+function disclosurePanel(container: HTMLElement, title: string) {
+  const id = disclosure(container, title)?.getAttribute("aria-controls");
+  return id ? document.getElementById(id) : null;
+}
+
+function expandDisclosure(container: HTMLElement, title: string) {
+  const button = disclosure(container, title);
+  if (!button) throw new Error(`Missing disclosure: ${title}`);
+  if (button.getAttribute("aria-expanded") !== "true") flushSync(() => button.click());
+  return button;
 }

@@ -13,6 +13,7 @@ import {
   type PublicationReviewState,
   type PublicationVersionSelection
 } from "./publicationReview";
+import { DialogDisclosure } from "./DialogDisclosure";
 import { useDialogFocus } from "./useDialogFocus";
 import "./publicationReview.css";
 
@@ -148,7 +149,6 @@ export function PublicationReviewDialog({
         }}>
           <header className="wf-dialog-heading wf-publication-header">
             <div>
-              <span>Workflow publication</span>
               <h3 id="publication-review-title">
                 {review.phase === "success"
                   ? "Publication complete"
@@ -156,7 +156,6 @@ export function PublicationReviewDialog({
                     ? "Publication needs attention"
                     : "Review and publish"}
               </h3>
-              <p>Confirm where this captured workflow state will become active.</p>
             </div>
           </header>
 
@@ -179,6 +178,19 @@ export function PublicationReviewDialog({
             ) : (
               <>
                 <section className="wf-publication-decision" aria-label="Publication decision">
+                  <dl className="wf-publication-summary">
+                    <DecisionFact label="Version" value={versionSelection.mode === "exact"
+                      ? matchingVersionPreflight?.resolvedVersion || versionSelection.requestedVersion || "Choose a version"
+                      : matchingVersionPreflight?.resolvedVersion || "Automatic"} />
+                    <DecisionFact label="Channel" value={selectedChannel || "Choose a channel"} />
+                  </dl>
+                  <p>{publicationEffect(occupancy, selectedChannel, review.policy.defaultSlotName, isReplacement)}</p>
+                  {review.slotsUnavailableReason ? (
+                    <p className="wf-dialog-note" role="note">{review.slotsUnavailableReason}</p>
+                  ) : null}
+                </section>
+
+                <DialogDisclosure title="Publication settings">
                   <label className="wf-form-field">
                     <span>Publication channel</span>
                     <select
@@ -202,15 +214,9 @@ export function PublicationReviewDialog({
                       ))}
                       <option value={createChannelValue}>Create new channel…</option>
                     </select>
-                    <small>
-                      <strong>{review.policy.defaultSlotName}</strong> is the normal publication channel.
-                      Named channels such as <strong>canary</strong> remain separately addressable.
-                    </small>
+                    <small>Named channels remain separately addressable.</small>
                   </label>
 
-                  {review.slotsUnavailableReason ? (
-                    <p className="wf-dialog-note" role="note">{review.slotsUnavailableReason}</p>
-                  ) : null}
 
                   {channelMode === "create" ? (
                     <label className="wf-form-field">
@@ -229,37 +235,9 @@ export function PublicationReviewDialog({
                     </label>
                   ) : null}
 
-                  <dl className="wf-publication-summary">
-                    <DecisionFact
-                      label="Effect"
-                      value={isReplacement
-                        ? `Replace the current ${occupancy.kind === "foreign" ? "activation" : "publication"} in ${selectedChannel || "this channel"}`
-                        : `Create a separate publication channel named ${selectedChannel || "…"}`}
-                    />
-                    <DecisionFact
-                      label="Version"
-                      value={versionSelection.mode === "exact"
-                        ? matchingVersionPreflight?.resolvedVersion || versionSelection.requestedVersion || "Enter an exact version"
-                        : matchingVersionPreflight?.resolvedVersion
-                          ? `${matchingVersionPreflight.resolvedVersion} · assigned automatically by version policy`
-                          : "Assigned automatically by version policy"}
-                    />
-                    <DecisionFact
-                      label="Readiness"
-                      value={review.reviewPending
-                        ? "Checking current policy and target…"
-                        : reviewedPreflight?.canActivate
-                          && versionEvidenceMatches
-                          && matchingVersionPreflight?.isReady !== false
-                          ? "Ready to publish"
-                          : "Not ready"}
-                    />
-                    <DecisionFact label="Compared with" value={publicationBaselineFor(review, selectedChannel)} />
-                  </dl>
-
                   {review.exactVersionSupported ? (
-                    <details className="wf-publication-disclosure">
-                      <summary>Edit version</summary>
+                    <fieldset className="wf-publication-version-settings">
+                      <legend>Version assignment</legend>
                       <div className="wf-publication-disclosure-body">
                         <label className="wf-publication-version-option">
                           <input
@@ -269,7 +247,7 @@ export function PublicationReviewDialog({
                             disabled={!editableReview || busy}
                             onChange={() => setVersionSelection({ mode: "automatic" })}
                           />
-                          <span><strong>Automatic</strong><small>Foundation assigns the next version according to policy.</small></span>
+                          <span><strong>Automatic</strong><small>Assigned by policy.</small></span>
                         </label>
                         <label className="wf-publication-version-option">
                           <input
@@ -284,7 +262,7 @@ export function PublicationReviewDialog({
                                 : ""
                             })}
                           />
-                          <span><strong>Exact semantic version</strong><small>Must be unused and newer than the latest promoted version.</small></span>
+                          <span><strong>Exact semantic version</strong><small>Unused and newer than the latest promoted version.</small></span>
                         </label>
                         {versionSelection.mode === "exact" ? (
                           <label className="wf-form-field">
@@ -302,26 +280,13 @@ export function PublicationReviewDialog({
                           </label>
                         ) : null}
                       </div>
-                    </details>
+                    </fieldset>
                   ) : null}
-                </section>
-
-                <section className="wf-publication-change-card" aria-labelledby="publication-changes-title">
-                  <div>
-                    <h4 id="publication-changes-title">Captured changes</h4>
-                    <p>{changes ? compactChangeSummary(changes) : comparisonUnavailableMessage(occupancy, selectedChannel)}</p>
-                  </div>
-                  <p className="wf-publication-baseline">Baseline: {publicationBaselineFor(review, selectedChannel)}</p>
-                </section>
-
-                <p className="wf-dialog-note">
-                  The current captured editor state is included and saved when you choose Publish.
-                  Opening this review did not save, promote, or publish it.
-                </p>
+                </DialogDisclosure>
 
                 {review.validationErrors.length ? (
                   <div className="wf-publication-risks" role="alert">
-                    <strong>Publication blocked before mutation</strong>
+                    <strong>Fix validation errors</strong>
                     <ul>{review.validationErrors.map((message, index) => <li key={`${index}-${message}`}>{message}</li>)}</ul>
                   </div>
                 ) : null}
@@ -337,10 +302,8 @@ export function PublicationReviewDialog({
                   <div className="wf-publication-risks" role="alert">
                     <strong>Publication channel is owned by another activation source</strong>
                     <p>
-                      {selectedChannel || reviewedPreflight.slotName} is occupied by an activation
-                      from {describeActivationSource(reviewedPreflight.targetSlotOwner)}. Taking over a
-                      slot another source owns is an operator action, so this cannot be resolved from
-                      this review. Publish side by side into another channel instead.
+                      {selectedChannel || reviewedPreflight.slotName} is occupied by an activation from {describeActivationSource(reviewedPreflight.targetSlotOwner)}.
+                      Taking over requires an operator action. Choose another channel to publish side by side.
                     </p>
                   </div>
                 ) : null}
@@ -380,18 +343,19 @@ export function PublicationReviewDialog({
                   </div>
                 ) : null}
 
-                <details className="wf-publication-disclosure">
-                  <summary>Changes details</summary>
+                <DialogDisclosure title="Change details" hint={changes ? compactChangeSummary(changes) : "Comparison unavailable"}>
+                  <p className="wf-publication-baseline">Baseline: {publicationBaselineFor(review, selectedChannel)}</p>
+                  {!changes ? <p>{comparisonUnavailableMessage(occupancy, selectedChannel)}</p> : null}
                   <dl className="wf-publication-detail-grid">
                     <ChangeSummary label="Activities" value={changes?.activities} />
                     <ChangeSummary label="Inputs" value={changes?.inputs} />
                     <ChangeSummary label="Outputs" value={changes?.outputs} />
                     <div><dt>Triggers</dt><dd>{triggerSummary}</dd></div>
                   </dl>
-                </details>
+                </DialogDisclosure>
 
-                <details className="wf-publication-disclosure">
-                  <summary>Advanced details</summary>
+                <DialogDisclosure title="Advanced details">
+                  <p>Publishing saves this captured draft, promotes a version and activates it in the selected channel.</p>
                   <dl className="wf-publication-detail-grid">
                     <DecisionFact
                       label="Policy"
@@ -409,37 +373,40 @@ export function PublicationReviewDialog({
                       ? <ul>{reviewedPreflight.claims.map(claim => <li key={`${claim.key}-${claim.cardinality}`}>{claim.key} ({claim.cardinality})</li>)}</ul>
                       : <p>No trigger claims.</p>}
                   </div>
-                </details>
+                </DialogDisclosure>
               </>
             )}
           </div>
 
-          <footer className="wf-dialog-actions wf-publication-footer">
-            <button
-              type="button"
-              className={review.phase === "success" ? "wf-primary-action" : undefined}
-              onClick={onCancel}
-              disabled={busy}
-            >
-              {review.phase === "review" || review.phase === "validationBlocked" ? "Cancel" : "Close"}
-            </button>
-            {review.phase === "success" ? (
-              <button type="button" onClick={onOpenPublishedExecutable}>
-                Open published executable
+          <footer className="wf-publication-footer">
+            {editableReview || review.phase === "publishing" ? <p>Saves and publishes this draft.</p> : null}
+            <div className="wf-dialog-actions">
+              <button
+                type="button"
+                className={review.phase === "success" ? "wf-primary-action" : undefined}
+                onClick={onCancel}
+                disabled={busy}
+              >
+                {review.phase === "review" || review.phase === "validationBlocked" ? "Cancel" : "Close"}
               </button>
-            ) : review.phase === "partialFailure" ? (
-              <button type="submit" disabled={submitDisabled}>
-                Retry publication
-              </button>
-            ) : review.phase === "savedFailure" ? (
-              review.validationErrors.length === 0
-                ? <button type="submit" disabled={submitDisabled}>Retry publication</button>
-                : null
-            ) : (
-              <button type="submit" disabled={submitDisabled}>
-                {busy && review.phase === "publishing" ? "Publishing…" : "Publish"}
-              </button>
-            )}
+              {review.phase === "success" ? (
+                <button type="button" onClick={onOpenPublishedExecutable}>
+                  Open published executable
+                </button>
+              ) : review.phase === "partialFailure" ? (
+                <button type="submit" disabled={submitDisabled}>
+                  Retry publication
+                </button>
+              ) : review.phase === "savedFailure" ? (
+                review.validationErrors.length === 0
+                  ? <button type="submit" disabled={submitDisabled}>Retry publication</button>
+                  : null
+              ) : (
+                <button type="submit" disabled={submitDisabled}>
+                  {busy && review.phase === "publishing" ? "Publishing…" : "Publish"}
+                </button>
+              )}
+            </div>
           </footer>
         </form>
       </section>
@@ -458,14 +425,13 @@ function PublicationSuccess({ review }: { review: PublicationReviewState }) {
           <strong>{review.published?.slotName}</strong>.
         </p>
       </div>
-      <details className="wf-publication-disclosure">
-        <summary>Published details</summary>
+      <DialogDisclosure title="Published details">
         <dl className="wf-publication-detail-grid">
           <DecisionFact label="Executable" value={review.published?.artifactId ?? "—"} />
           <DecisionFact label="Source Reference" value={review.published?.sourceReferenceId ?? "—"} />
           <DecisionFact label="Promoted version ID" value={review.promotedVersionId ?? "—"} />
         </dl>
-      </details>
+      </DialogDisclosure>
     </section>
   );
 }
@@ -515,21 +481,22 @@ function comparisonUnavailableMessage(occupancy: PublicationChannelOccupancy, ch
     : "Not compared: the current publication in this channel is unknown on this backend.";
 }
 
+function publicationEffect(occupancy: PublicationChannelOccupancy, channel: string, defaultChannel: string, replacement: boolean) {
+  if (!channel) return "Choose a publication channel in Publication settings.";
+  if (occupancy.kind === "unknown") return `Activate in ${channel}. Current publication unknown.`;
+  if (occupancy.kind === "foreign") return `Replaces the current activation in ${channel}.`;
+  if (occupancy.kind === "empty") return channel === defaultChannel
+    ? `First publication in ${channel}.`
+    : `Creates a separate publication in ${channel}.`;
+  return replacement ? `Replaces the published version in ${channel}.` : `Creates a separate publication in ${channel}.`;
+}
+
 function compactChangeSummary(changes: PublicationReviewState["changes"]) {
-  const counts = [
-    changes.activities.added + changes.activities.changed + changes.activities.removed,
-    changes.inputs.added + changes.inputs.changed + changes.inputs.removed,
-    changes.outputs.added + changes.outputs.changed + changes.outputs.removed,
-    changes.triggers.added + changes.triggers.changed + changes.triggers.removed
-  ];
-  const total = counts.reduce((sum, count) => sum + count, 0);
-  if (total === 0) return "No structural changes detected against this channel.";
-  return [
-    `${counts[0]} activity ${counts[0] === 1 ? "change" : "changes"}`,
-    `${counts[1]} input ${counts[1] === 1 ? "change" : "changes"}`,
-    `${counts[2]} output ${counts[2] === 1 ? "change" : "changes"}`,
-    `${counts[3]} trigger ${counts[3] === 1 ? "change" : "changes"}`
-  ].join(" · ");
+  return Object.entries(changes)
+    .map(([kind, value]) => ({ kind, count: value.added + value.changed + value.removed }))
+    .filter(({ count }) => count > 0)
+    .map(({ kind, count }) => `${count} ${kind === "activities" ? "activity" : kind.slice(0, -1)} ${count === 1 ? "change" : "changes"}`)
+    .join(" · ") || "No structural changes";
 }
 
 function publicationStatusMessage(review: PublicationReviewState, blocked: boolean, causeNeutralBlockMessage?: string) {
@@ -546,7 +513,7 @@ function publicationStatusMessage(review: PublicationReviewState, blocked: boole
     };
     return review.progressStep ? messages[review.progressStep] : "Publishing…";
   }
-  if (review.reviewPending) return "Checking the selected Publication channel and version…";
+  if (review.reviewPending) return "Checking channel and version…";
   if (blocked) return causeNeutralBlockMessage ?? "Review the highlighted issue before publishing.";
-  return "Ready to publish. Nothing changes until you choose Publish.";
+  return "Ready to publish";
 }

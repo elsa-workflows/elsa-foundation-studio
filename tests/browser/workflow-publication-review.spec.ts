@@ -5,11 +5,21 @@ test("keeps the publication decision calm and actions visible at constrained hei
   await page.goto("/?mode=publication-review&theme=dark");
 
   const dialog = page.getByRole("dialog", { name: "Review and publish" });
-  await expect(dialog).toContainText("Publication channel");
-  await expect(dialog).toContainText("Replace the current publication in default");
-  await expect(dialog).toContainText("2.0.0 · assigned automatically by version policy");
+  await expect(dialog.locator(".wf-publication-summary")).toContainText("Version");
+  await expect(dialog.locator(".wf-publication-summary")).toContainText("Channel");
+  await expect(dialog).toContainText("Replaces the published version in default.");
+  await expect(dialog.locator(".wf-publication-summary")).toContainText("2.0.0");
   await expect(dialog).toContainText("Ready to publish");
-  await expect(dialog.getByText("Advanced details")).toBeVisible();
+  const changeDetails = dialog.getByRole("button", { name: /Change details/ });
+  const advancedDetails = dialog.getByRole("button", { name: /Advanced details/ });
+  await expect(changeDetails).toHaveAttribute("aria-expanded", "false");
+  await expect(advancedDetails).toHaveAttribute("aria-expanded", "false");
+  const advancedPanelId = await advancedDetails.getAttribute("aria-controls");
+  expect(advancedPanelId).not.toBeNull();
+  const advancedPanel = dialog.locator(`[id="${advancedPanelId}"]`);
+  await expect(advancedPanel).toBeHidden();
+  await expect(changeDetails).toContainText(/\d+ .*change/);
+  await expect(dialog.getByRole("button", { name: /Publication settings/ })).toHaveAttribute("aria-expanded", "false");
   await expect(dialog.getByRole("button", { name: "Publish" })).toBeVisible();
 
   const dialogBox = await dialog.boundingBox();
@@ -23,11 +33,12 @@ test("keeps the publication decision calm and actions visible at constrained hei
 test("creates a named Publication channel and refreshes review automatically", async ({ page }) => {
   await page.goto("/?mode=publication-review");
   const dialog = page.getByRole("dialog", { name: "Review and publish" });
+  await dialog.getByRole("button", { name: /Publication settings/ }).click();
 
   await dialog.getByLabel("Publication channel").selectOption("__create-publication-channel__");
   await dialog.getByLabel("New publication channel").fill("canary");
 
-  await expect(dialog).toContainText("Create a separate publication channel named canary");
+  await expect(dialog).toContainText("Creates a separate publication in canary.");
   await expect(dialog).toContainText("Ready to publish");
   await expect(dialog.getByRole("button", { name: "Publish" })).toBeEnabled();
 });
@@ -36,7 +47,7 @@ test("offers exact version editing only when the server advertises support", asy
   await page.goto("/?mode=publication-review");
   const dialog = page.getByRole("dialog", { name: "Review and publish" });
 
-  await dialog.getByText("Edit version").click();
+  await dialog.getByRole("button", { name: /Publication settings/ }).click();
   await dialog.getByRole("radio", { name: /Exact semantic version/ }).check();
   await dialog.getByRole("textbox", { name: "Exact semantic version" }).fill("2.3.0-rc.1");
 
@@ -45,7 +56,9 @@ test("offers exact version editing only when the server advertises support", asy
   await expect(dialog.getByRole("button", { name: "Publish" })).toBeEnabled();
 
   await page.goto("/?mode=publication-review&exact=unsupported");
-  await expect(page.getByRole("dialog", { name: "Review and publish" }).getByText("Edit version")).toHaveCount(0);
+  const unsupported = page.getByRole("dialog", { name: "Review and publish" });
+  await unsupported.getByRole("button", { name: /Publication settings/ }).click();
+  await expect(unsupported.getByRole("radio", { name: /Exact semantic version/ })).toHaveCount(0);
 });
 
 test("success and retained-promotion recovery keep their actions in the fixed footer", async ({ page }) => {
