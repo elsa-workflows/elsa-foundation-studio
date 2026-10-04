@@ -162,22 +162,41 @@ describe("workflow run history", () => {
     await waitFor(() => expect(getJson.mock.calls.map(([url]) => url)).toContain("/runtime/workflows/instances/health?incidentHealth=active&take=25"));
   });
 
-  it("reports unsupported health filtering without querying an older server or claiming zero matches", async () => {
-    window.history.replaceState({}, "", "/workflows/instances?incidentHealth=active");
+  it("lets a legacy health deep link clear only that filter before searching older servers", async () => {
+    window.history.replaceState({}, "", "/workflows/instances?status=Faulted&definitionId=definition-1&incidentHealth=active");
     const getJson = vi.fn(async (url: string) => {
       if (url === "/capabilities") return capabilities;
+      if (url.startsWith("/runtime/workflows/instances/page?")) return page("legacy-run");
       throw new Error(`Unexpected request: ${url}`);
     });
-    const container = render(context(getJson), vi.fn());
+    const navigate = vi.fn((path: string) => window.history.pushState({}, "", path));
+    const container = render(context(getJson), navigate);
 
     await waitFor(() => expect(container.textContent).toContain("This host cannot filter by current incident health."));
     expect(container.textContent).toContain("No workflow runs were loaded.");
     expect(container.textContent).toContain("Clear the incident-health filter");
     expect(container.textContent).not.toContain("these results are not filtered");
     expect(container.textContent).not.toContain("No workflow runs match these filters");
-    expect(container.querySelector<HTMLSelectElement>("select[aria-label='Workflow run incident health']")?.disabled).toBe(true);
+    const healthFilter = container.querySelector<HTMLSelectElement>("select[aria-label='Workflow run incident health']")!;
+    expect(healthFilter.disabled).toBe(false);
+    expect(healthFilter.querySelector<HTMLOptionElement>("option[value='active']")?.disabled).toBe(true);
+    expect(container.querySelector<HTMLSelectElement>("select[aria-label='Workflow run status']")?.value).toBe("Faulted");
+    expect(input(container, "Workflow run definition").value).toBe("definition-1");
     expect(getJson).toHaveBeenCalledTimes(1);
     expect(getJson).toHaveBeenCalledWith("/capabilities");
+
+    select(healthFilter, "");
+    expect(healthFilter.disabled).toBe(true);
+    click(buttonByText(container, "Apply filters"));
+    await waitFor(() => expect(container.textContent).toContain("legacy-run"));
+    const ordinaryRequest = getJson.mock.calls.map(([url]) => url).find(url => url.startsWith("/runtime/workflows/instances/page?"));
+    expect(ordinaryRequest).toContain("status=Faulted");
+    expect(ordinaryRequest).toContain("definitionId=definition-1");
+    expect(ordinaryRequest).not.toContain("incidentHealth=");
+    const appliedUrl = navigate.mock.lastCall?.[0];
+    expect(appliedUrl).toContain("status=Faulted");
+    expect(appliedUrl).toContain("definitionId=definition-1");
+    expect(appliedUrl).not.toContain("incidentHealth=");
   });
 });
 

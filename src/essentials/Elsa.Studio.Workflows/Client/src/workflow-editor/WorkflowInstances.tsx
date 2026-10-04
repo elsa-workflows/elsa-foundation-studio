@@ -107,6 +107,7 @@ export function WorkflowInstances({ context, navigate }: {
   const cursorScope = { backend: context, query: buildRunHistoryUrl({ ...location, cursor: null }) };
   const cursorHistory = useRef(createCursorHistory(cursorScope, location.cursor));
   const previousPage = getPreviousCursor(cursorHistory.current, cursorScope, location.cursor, page);
+  const canFilterByHealth = healthFilterSupported === true;
 
   const load = useCallback(async () => {
     const requestId = ++requestSequence.current;
@@ -220,11 +221,11 @@ export function WorkflowInstances({ context, navigate }: {
         </label>
         <label className="wf-toolbar-field">
           <span>Incident health</span>
-          <select aria-label="Workflow run incident health" value={draftFilters.incidentHealth} disabled={healthFilterSupported !== true} onChange={event => setDraftFilters(current => ({ ...current, incidentHealth: event.target.value as RunHistoryFilters["incidentHealth"] }))}>
+          <select aria-label="Workflow run incident health" value={draftFilters.incidentHealth} disabled={!canFilterByHealth && !draftFilters.incidentHealth} onChange={event => setDraftFilters(current => ({ ...current, incidentHealth: event.target.value as RunHistoryFilters["incidentHealth"] }))}>
             <option value="">All health states</option>
-            <option value="active">Active incidents</option>
-            <option value="blocking">Needs intervention</option>
-            <option value="none">No active incidents</option>
+            <option value="active" disabled={!canFilterByHealth}>Active incidents</option>
+            <option value="blocking" disabled={!canFilterByHealth}>Needs intervention</option>
+            <option value="none" disabled={!canFilterByHealth}>No active incidents</option>
           </select>
           {healthFilterSupported === false ? <small>Current health filtering is not available from this host.</small> : null}
         </label>
