@@ -15,7 +15,7 @@ import type {
   WorkflowInstanceDetails,
   WorkflowInstanceSummary
 } from "../workflowTypes";
-import { sequenceActivity, writeLine } from "./fixtures";
+import { bpmnActivity, sequenceActivity, writeLine } from "./fixtures";
 
 const api = vi.hoisted(() => ({
   getActivityExecutionInspection: vi.fn(),
@@ -28,6 +28,7 @@ const api = vi.hoisted(() => ({
   listActivities: vi.fn()
 }));
 const mockFlowInstance = vi.hoisted(() => ({ fitView: vi.fn() }));
+const useActualReactFlow = vi.hoisted(() => ({ enabled: false }));
 
 vi.mock("../api/runtime", () => ({
   ...api,
@@ -38,13 +39,19 @@ vi.mock("@xyflow/react", async importOriginal => {
   const actual = await importOriginal<typeof import("@xyflow/react")>();
   return {
     ...actual,
-    ReactFlow: ({ nodes, onInit }: {
+    ReactFlow: (props: {
       nodes: Array<{ id: string; selected?: boolean; data: Record<string, unknown> }>;
+      edges?: unknown[];
       onInit?: (instance: ReactFlowInstance) => void;
+      [key: string]: unknown;
     }) => {
+      const { nodes, onInit } = props;
       React.useEffect(() => {
-        onInit?.(mockFlowInstance as unknown as ReactFlowInstance);
+        if (!useActualReactFlow.enabled) onInit?.(mockFlowInstance as unknown as ReactFlowInstance);
       }, [onInit]);
+      if (useActualReactFlow.enabled) {
+        return React.createElement(actual.ReactFlow as React.ComponentType<Record<string, unknown>>, props);
+      }
       return (
         <div className="wf-mock-react-flow">
           {nodes.map(node => {
@@ -79,15 +86,30 @@ let observedWidth = 1100;
 beforeEach(() => {
   window.localStorage.clear();
   window.localStorage.setItem("elsa-studio-run-detail-inspector-maximized", "true");
+  useActualReactFlow.enabled = false;
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
   observedWidth = 1100;
   vi.stubGlobal("ResizeObserver", class {
     private readonly callback: ResizeObserverCallback;
+    private readonly observed = new WeakSet<Element>();
+    private active = true;
     constructor(callback: ResizeObserverCallback) { this.callback = callback; }
-    observe() { this.callback([{ contentRect: { width: observedWidth } } as ResizeObserverEntry], this as unknown as ResizeObserver); }
-    disconnect() {}
+    observe(target: Element) {
+      if (this.observed.has(target)) return;
+      this.observed.add(target);
+      const isFlowNode = target.classList.contains("react-flow__node");
+      setTimeout(() => {
+        if (!this.active) return;
+        this.callback([{
+          target,
+          contentRect: { width: isFlowNode ? 220 : observedWidth, height: isFlowNode ? 110 : 800 }
+        } as ResizeObserverEntry], this as unknown as ResizeObserver);
+      });
+    }
+    unobserve() {}
+    disconnect() { this.active = false; }
   });
 
   const catalog = [sequenceActivity, { ...writeLine, inputs: [{
@@ -113,6 +135,50 @@ afterEach(() => {
 });
 
 describe("workflow run workbench incident navigation", () => {
+  it("keeps measured BPMN runtime nodes and incident cues visible when incident navigation rebuilds overlays", async () => {
+    useActualReactFlow.enabled = true;
+    vi.stubGlobal("DOMMatrixReadOnly", class { readonly m22 = 1; });
+    api.listActivities.mockResolvedValue({ activities: [sequenceActivity, bpmnActivity, writeLine] });
+    api.getExecutable.mockResolvedValue(bpmnExecutable());
+    const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
+    const nodeBounds = { x: 0, y: 0, width: 220, height: 110, top: 0, right: 220, bottom: 110, left: 0, toJSON: () => ({}) } as DOMRect;
+    const boundsSpy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains("react-flow__node") ? nodeBounds : originalGetBoundingClientRect.call(this);
+    });
+    const widthSpy = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains("react-flow__node") ? 220 : 0;
+    });
+    const heightSpy = vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains("react-flow__node") ? 110 : 0;
+    });
+    try {
+      renderWorkbench();
+
+      const task = () => container.querySelector<HTMLElement>(".react-flow__node[data-id='bpmn-task']");
+      await vi.waitFor(() => expect(task()).toBeTruthy());
+      await vi.waitFor(() => {
+        expect(task()).toBeTruthy();
+        expect(getComputedStyle(task()!).visibility).toBe("visible");
+        expect(task()?.querySelector(".wf-bpmn-incident-action")).toBeTruthy();
+      });
+
+      click(buttonByText(container, "Show affected activity"));
+      await vi.waitFor(() => expect(container.querySelector("[data-tab-id='activity']")?.getAttribute("aria-selected")).toBe("true"));
+      expect(getComputedStyle(task()!).visibility).toBe("visible");
+      expect(task()?.querySelector(".wf-bpmn-incident-action")).toBeTruthy();
+
+      click(container.querySelector<HTMLButtonElement>("[data-tab-id='issues']"));
+      click(buttonByText(container, "Show affected activity"));
+      await vi.waitFor(() => expect(container.querySelector("[data-tab-id='activity']")?.getAttribute("aria-selected")).toBe("true"));
+      expect(getComputedStyle(task()!).visibility).toBe("visible");
+      expect(task()?.querySelector(".wf-bpmn-incident-action")).toBeTruthy();
+    } finally {
+      boundsSpy.mockRestore();
+      widthSpy.mockRestore();
+      heightSpy.mockRestore();
+    }
+  });
+
   it("restores the nested canvas from a maximized Issues view and keeps input evidence navigation in Activity", async () => {
     renderWorkbench();
 
@@ -862,6 +928,44 @@ function executable(): WorkflowExecutableDetails {
     rootActivity,
     chosenReference: { sourceReferenceId: "reference-1", selection: "requested", layout: [] },
     references: []
+  };
+}
+
+function bpmnExecutable(): WorkflowExecutableDetails {
+  const target: WorkflowExecutableNode = {
+    executableNodeId: "compiled-target",
+    authoredActivityId: "target-node",
+    activityType: writeLine.activityTypeKey,
+    activityTypeVersion: writeLine.version,
+    inputBindings: [],
+    childSlots: []
+  };
+  const rootActivity: WorkflowExecutableNode = {
+    ...target,
+    executableNodeId: "compiled-bpmn",
+    authoredActivityId: "bpmn-root",
+    activityType: bpmnActivity.activityTypeKey,
+    activityTypeVersion: bpmnActivity.version,
+    structureKind: "elsa.bpmn.structure",
+    childSlots: [{ name: "Bpmn.Activities", activities: [target] }],
+    bpmnStructure: {
+      elements: [
+        { elementId: "bpmn-start", elementType: "startEvent" },
+        { elementId: "bpmn-task", elementType: "task", childNodeId: target.executableNodeId },
+        { elementId: "bpmn-end", elementType: "endEvent" }
+      ],
+      sequenceFlows: [
+        { flowId: "start-task", sourceRef: "bpmn-start", targetRef: "bpmn-task" },
+        { flowId: "task-end", sourceRef: "bpmn-task", targetRef: "bpmn-end" }
+      ]
+    }
+  };
+  return {
+    ...executable(),
+    rootActivityType: bpmnActivity.activityTypeKey,
+    rootActivityVersion: bpmnActivity.version,
+    nodeCount: 2,
+    rootActivity
   };
 }
 
