@@ -916,6 +916,17 @@ describe("WorkflowActivityExecutionDetails", () => {
     expect(getActivityExecutionValuePayload).not.toHaveBeenCalled();
   });
 
+  it.each(["captureState", "state"])("blocks resolution for a failed sensitive capture reported through %s without a failure object", async stateField => {
+    vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([valueEvidence({
+      captureState: undefined, state: undefined, [stateField]: "captureFailed",
+      captureReason: "Capturing this value failed.", isSensitive: true
+    })]));
+    const container = render(<WorkflowActivityExecutionDetails context={context} activity={activity} activityCatalog={catalog} />);
+    await waitFor(() => expect(container.querySelector(".wf-input-inspection-value")?.textContent).toContain("Capturing this value failed."));
+    expect(getActivityExecutionValuePayload).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain("Show captured value");
+  });
+
   it("shows an empty state when no input snapshots exist", async () => {
     vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([]));
 

@@ -74,9 +74,10 @@ export function RuntimeValueEvidenceContent({ snapshot, presentation = "card" }:
   const access = snapshot.accessState ?? snapshot.access;
   const accessKey = access?.toLowerCase() ?? "";
   const captureModeKey = snapshot.captureMode.replace(/[^a-z]/gi, "").toLowerCase();
-  const captureStateKey = snapshot.captureState?.replace(/[^a-z]/gi, "").toLowerCase();
+  const captureStateKey = (snapshot.captureState ?? snapshot.state)?.replace(/[^a-z]/gi, "").toLowerCase();
   const supportedCaptureMode = captureModeKey === "payload" || captureModeKey === "diagnosticsnapshot";
-  const capturedState = !captureStateKey || captureStateKey === "payloadcaptured" || captureStateKey === "diagnosticsnapshotcaptured";
+  const capturedState = !captureStateKey || captureStateKey === "payloadcaptured" || captureStateKey === "diagnosticsnapshotcaptured"
+    || (!snapshot.captureState && captureStateKey === "captured");
   const permissionAllowsResolution = accessKey === "resolutionavailable";
   const canResolve = !!scope && !!evidenceId && supportedCaptureMode && capturedState && permissionAllowsResolution && !snapshot.failure;
   const resolutionIdentity = JSON.stringify([runtimeValueContextId(scope?.context), scope?.workflowExecutionId, scope?.activityExecutionId, evidenceId, captureModeKey]);
