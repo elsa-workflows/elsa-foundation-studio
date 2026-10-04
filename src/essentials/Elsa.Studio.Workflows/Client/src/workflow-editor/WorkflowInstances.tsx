@@ -39,12 +39,10 @@ import { buildBpmnCanvas, type BpmnNodeData } from "../bpmn/bpmnAdapter";
 import { CopyValueButton } from "./executableShared";
 import {
   formatCaptureMode,
-  formatSnapshotKind,
   formatSnapshotPayload,
-  isKnownSnapshotNode,
-  previewSnapshotPayload,
   runtimeValueContextId,
   RuntimeValueEvidenceCard,
+  RuntimeValueEvidenceContent,
   RuntimeValueEvidenceResolutionProvider
 } from "./RuntimeValueEvidence";
 export { formatSnapshotPayload } from "./RuntimeValueEvidence";
@@ -2062,7 +2060,7 @@ function WorkflowActivityInputEvidence({
           Inputs
           {rows.length > 0 ? <span className="wf-runtime-evidence-count" aria-label={`${rows.length} inputs`}>{rows.length}</span> : null}
         </h4>
-        <span className="wf-runtime-capture-mode">Paired evidence</span>
+        <span className="wf-input-inspection-caption">Evaluated at runtime</span>
       </header>
       {state.status === "loading" ? <p>Loading runtime input evidence...</p> : null}
       {state.status === "failed" ? (
@@ -2081,6 +2079,7 @@ function WorkflowActivityInputEvidence({
               sourceAccess={executableNodeFacts?.authoredInputsAccess}
               expressionEditors={expressionEditors}
               focusInput={!!focusInputKey && row.inputKey === focusInputKey}
+              inspectionStatus={state.status}
             />
           ))}
         </div>
@@ -2093,12 +2092,14 @@ function InputInspectionRowCard({
   row,
   sourceAccess,
   expressionEditors,
-  focusInput = false
+  focusInput = false,
+  inspectionStatus
 }: {
   row: InputInspectionRow;
   sourceAccess?: string | null;
   expressionEditors: StudioExpressionEditorContribution[];
   focusInput?: boolean;
+  inspectionStatus: ActivityExecutionInspectionState["status"];
 }) {
   const latest = row.latestEvaluation;
   const sourceKind = row.authoredSource?.expressionType || row.compiledBinding?.source || "No source";
@@ -2128,34 +2129,31 @@ function InputInspectionRowCard({
     return () => cancelAnimationFrame(frame);
   }, [focusInput, row.rowKey]);
 
+  const sensitiveInput = masked || row.authoredSource?.isSensitive || row.compiledBinding?.isSensitive;
+  const runtimeSnapshot = latest && sensitiveInput && !latest.isSensitive ? { ...latest, isSensitive: true } : latest;
+
   return (
     <div className="wf-runtime-input wf-input-inspection-row" role="listitem">
-      <details ref={detailsRef}>
-        <summary ref={summaryRef} className="wf-input-inspection-summary" aria-controls={regionId}>
-          <span className="wf-input-inspection-summary-grid">
-            <span className="wf-input-inspection-identity">
-              <strong className="wf-input-inspection-name">{row.name}</strong>
-              <small className="wf-input-inspection-type">{row.declaredType || "Unknown type"}</small>
-            </span>
-            <span className="wf-input-inspection-preview">
-              <small>Evaluated at runtime</small>
-            <code>{runtimeEvidencePreview(latest)}</code>
-            </span>
-            <span className="wf-input-inspection-preview">
-              <small>{sourceKind}</small>
-              <code>{sourcePreview(row, shownSource, sourceProtected, sourceAccess)}</code>
-            </span>
-          </span>
+      <div className="wf-input-inspection-value-row">
+        <div className="wf-input-inspection-identity">
+          <strong className="wf-input-inspection-name">{row.name}</strong>
+          <small className="wf-input-inspection-type" title={row.declaredType}>{shortTypeName(row.declaredType) || "Unknown type"}</small>
+        </div>
+        <div className="wf-input-inspection-value" aria-label={`${row.name} runtime value`}>
+          {runtimeSnapshot ? <RuntimeValueEvidenceContent snapshot={runtimeSnapshot} presentation="input" /> : (
+            <p className="wf-input-inspection-unavailable">
+              {inspectionStatus === "loading" ? "Loading captured value…" : inspectionStatus === "failed" ? "Runtime evidence unavailable" : "Not evaluated"}
+            </p>
+          )}
+        </div>
+      </div>
+      <details ref={detailsRef} className="wf-input-inspection-disclosure">
+        <summary ref={summaryRef} tabIndex={0} className="wf-input-inspection-summary" aria-controls={regionId}>
+          <ChevronRight size={14} aria-hidden="true" />
+          <span>Source &amp; diagnostics</span>
+          <small>{sourceProtected ? (isProtectedSourceAccess(sourceAccess) ? "Source hidden" : "Protected source") : sourceKind}</small>
         </summary>
-        <div id={regionId} className="wf-runtime-input-content wf-input-inspection-content">
-          {row.states.length > 0 ? (
-            <p className="wf-instance-note">{row.states.map(formatInputInspectionState).join(" · ")}</p>
-          ) : null}
-          <section className="wf-input-inspection-detail" aria-label={`${row.name} runtime evidence`}>
-            <h5>Evaluated at runtime</h5>
-            {latest ? <RuntimeValueEvidenceCard snapshot={latest} listItem={false} /> : <p>No evaluation evidence was recorded for this input.</p>}
-            {row.evaluations.length > 1 ? <InputEvaluationHistory evaluations={row.evaluations} /> : null}
-          </section>
+        <div id={regionId} className="wf-input-inspection-content">
           <section className="wf-input-inspection-detail wf-input-inspection-source" aria-label={`${row.name} authored source`}>
             <h5>Authored source</h5>
             <AuthoredInputSource
@@ -2166,6 +2164,22 @@ function InputInspectionRowCard({
               protectedSource={sourceProtected}
               expressionEditors={expressionEditors}
             />
+          </section>
+          <section className="wf-input-inspection-detail" aria-label={`${row.name} runtime evidence`}>
+            <h5>Capture details</h5>
+            {latest ? (
+              <dl className="wf-input-inspection-metadata">
+                {[
+                  ["Type", row.declaredType || "Unknown type"],
+                  ["Capture", formatCaptureMode(latest.captureMode)],
+                  ["Captured", formatDate(latest.capturedAt)],
+                  ...(evaluationPhase(latest) ? [["Phase", formatCaptureMode(evaluationPhase(latest)!)]] : []),
+                  ...(typeof evaluationSequence(latest) === "number" ? [["Sequence", String(evaluationSequence(latest))]] : [])
+                ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+              </dl>
+            ) : <p>No runtime evaluation was recorded.</p>}
+            {row.states.length > 0 ? <p className="wf-instance-note">{row.states.map(formatInputInspectionState).join(" · ")}</p> : null}
+            {row.evaluations.length > 1 ? <InputEvaluationHistory evaluations={row.evaluations} /> : null}
           </section>
         </div>
       </details>
@@ -2297,28 +2311,6 @@ function GenericExpressionSource({ expressionType, value, expanded = false }: { 
 function compiledBindingDetails(binding: ExecutableGraphNodeFacts["inputBindings"][number]) {
   const { inputName: _inputName, inputKey: _inputKey, summary: _summary, ...details } = binding;
   return details;
-}
-
-function runtimeEvidencePreview(snapshot: ActivityExecutionInspectionValueSnapshot | undefined) {
-  if (!snapshot) return "No evaluation evidence";
-  if (snapshot.failure) return snapshot.failure.code || "Evaluation failed";
-  const access = snapshot.accessState ?? snapshot.access;
-  if (access?.toLowerCase() === "resolutionavailable") return "Captured value available";
-  if (access?.toLowerCase() === "resolutionpermissionrequired") return "Additional permission required";
-  if (access && access.toLowerCase() !== "visible" && access.toLowerCase() !== "allowed") return formatCaptureMode(access);
-  if (snapshot.isSensitive) return "Protected value";
-  const node = snapshot.snapshot;
-  if (node && isKnownSnapshotNode(node) && node.kind === "string") return previewSnapshotPayload(node.preview ?? "");
-  if (node && isKnownSnapshotNode(node) && (node.kind === "scalar" || node.kind === "number")) return previewSnapshotPayload(formatSnapshotPayload(node.value));
-  if (node) return formatSnapshotKind(node.kind);
-  if (snapshot.captureMode === "Payload" && snapshot.payload !== undefined) return previewSnapshotPayload(formatSnapshotPayload(snapshot.payload));
-  return snapshot.captureReason || formatCaptureMode(snapshot.captureState ?? snapshot.state ?? snapshot.captureMode);
-}
-
-function sourcePreview(row: InputInspectionRow, source: InputInspectionRow["authoredSource"], protectedSource: boolean, sourceAccess?: string | null) {
-  if (protectedSource) return isProtectedSourceAccess(sourceAccess) ? "Source hidden" : "Protected source";
-  if (!source) return row.compiledBinding ? "Compiled source only" : "Source unavailable";
-  return previewSnapshotPayload(formatSnapshotPayload(source.value));
 }
 
 function isProtectedSourceAccess(access: string | null | undefined) {
