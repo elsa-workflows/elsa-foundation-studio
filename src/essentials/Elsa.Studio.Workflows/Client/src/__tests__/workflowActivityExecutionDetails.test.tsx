@@ -927,6 +927,26 @@ describe("WorkflowActivityExecutionDetails", () => {
     expect(container.textContent).not.toContain("Show captured value");
   });
 
+  it.each(["unavailable", "redacted", "permissionHidden", "resolutionPermissionRequired"])(
+    "preserves a failed capture incident only when its %s access permits a safe diagnostic", async accessState => {
+      vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([valueEvidence({
+        captureState: "captureFailed", accessState,
+        failure: { code: "CaptureFailed", message: "The capture failed.", incidentId: "incident-capture" },
+        snapshot: { kind: "string", preview: "PRIVATE_RUNTIME_VALUE" }, payload: "PRIVATE_RUNTIME_VALUE"
+      })]));
+      const container = render(<WorkflowActivityExecutionDetails context={context} activity={activity} activityCatalog={catalog} />);
+      await waitFor(() => expect(container.querySelector(".wf-input-inspection-value")).not.toBeNull());
+      if (accessState === "unavailable") {
+        expect(container.querySelector(".wf-input-inspection-value")?.textContent).toContain("The capture failed. Incident incident-capture.");
+      } else {
+        expect(container.textContent).not.toContain("incident-capture");
+        expect(container.textContent).not.toContain("The capture failed.");
+      }
+      expect(container.innerHTML).not.toContain("PRIVATE_RUNTIME_VALUE");
+      expect(getActivityExecutionValuePayload).not.toHaveBeenCalled();
+    }
+  );
+
   it("shows an empty state when no input snapshots exist", async () => {
     vi.mocked(getActivityExecutionInspection).mockResolvedValue(inspection([]));
 

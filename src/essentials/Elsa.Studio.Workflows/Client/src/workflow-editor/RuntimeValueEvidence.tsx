@@ -142,7 +142,7 @@ export function RuntimeValueEvidenceContent({ snapshot, presentation = "card" }:
                 <RuntimeInputPayload payload={currentResolution.payload} />
               </>
         ) : protectedAccess ? (
-          <p>{formatEvidenceMessage(snapshot)}</p>
+          <p>{formatEvidenceMessage(snapshot)}{accessKey === "unavailable" && snapshot.failure?.incidentId ? ` Incident ${snapshot.failure.incidentId}.` : ""}</p>
         ) : snapshot.failure || captureStateKey === "capturefailed" ? (
           <p>{snapshot.failure ? snapshot.failure.message || snapshot.failure.code || "The input could not be evaluated." : formatEvidenceMessage(snapshot)}{snapshot.failure?.incidentId ? ` Incident ${snapshot.failure.incidentId}.` : ""}</p>
         ) : snapshot.isSensitive ? (
