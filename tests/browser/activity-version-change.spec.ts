@@ -5,17 +5,18 @@ test("reviews and applies one exact version while preserving stable and unresolv
   await page.goto("/?mode=version-change");
 
   await page.getByRole("button", { name: "Change exact version" }).click();
-  const dialog = page.getByRole("dialog", { name: "Review exact Activity Definition Version change" });
-  await expect(dialog).toContainText("v1.0.0 · version-1");
+  const dialog = page.getByRole("dialog", { name: "Change activity version" });
+  await expect(dialog).toContainText("Current v1.0.0");
   await expect(dialog.getByRole("radio", { name: /v2\.0\.0.*Recommended/ })).toBeChecked();
-  await expect(dialog.getByRole("radio", { name: /v0\.9\.0.*Active/ })).toBeVisible();
+  await expect(dialog.getByRole("radio", { name: /v0\.9\.0/ })).toBeVisible();
   await expect(dialog).not.toContainText("version-retired");
   await expect(dialog).toContainText("Breaking");
-  await expect(dialog).toContainText("Amount");
+  await expect(dialog.getByRole("button", { name: "Change details", exact: false })).toHaveAttribute("aria-expanded", "false");
+  await expect(dialog.getByText("version-1", { exact: true })).not.toBeVisible();
   await expect(dialog).toContainText("Legacy");
   await expect(dialog).toContainText("Rejected");
 
-  await dialog.getByRole("button", { name: "Apply to this occurrence" }).click();
+  await dialog.getByRole("button", { name: "Apply version" }).click();
   await expect(page.getByText("Authoritative exact version change applied")).toBeVisible();
   await expect(page.getByTestId("invoice-one")).toContainText("version-2");
   await expect(page.getByTestId("invoice-two")).toContainText("version-1");
@@ -28,9 +29,11 @@ test("explicitly applies to every matching occurrence in only the current draft"
   await page.goto("/?mode=version-change");
 
   await page.getByRole("button", { name: "Change exact version" }).click();
-  const dialog = page.getByRole("dialog", { name: "Review exact Activity Definition Version change" });
-  await dialog.getByRole("radio", { name: "All matching occurrences in this workflow draft" }).check();
-  await dialog.getByRole("button", { name: "Apply to 2 occurrences" }).click();
+  const dialog = page.getByRole("dialog", { name: "Change activity version" });
+  await dialog.getByRole("button", { name: /Apply scope/ }).click();
+  await dialog.getByRole("radio", { name: "All matching nodes (2)", exact: true }).check();
+  await expect(dialog.locator("footer")).toContainText("2 matching nodes");
+  await dialog.getByRole("button", { name: "Apply version" }).click();
 
   await expect(page.getByTestId("invoice-one")).toContainText("version-2");
   await expect(page.getByTestId("invoice-two")).toContainText("version-2");
@@ -43,10 +46,10 @@ test("allows deliberate rollback to an older active version", async ({ page }) =
   await page.goto("/?mode=version-change");
 
   await page.getByRole("button", { name: "Change exact version" }).click();
-  const dialog = page.getByRole("dialog", { name: "Review exact Activity Definition Version change" });
-  await dialog.getByRole("radio", { name: /v0\.9\.0.*Active/ }).check();
-  await expect(dialog).toContainText("v0.9.0 · version-0");
-  await dialog.getByRole("button", { name: "Apply to this occurrence" }).click();
+  const dialog = page.getByRole("dialog", { name: "Change activity version" });
+  await dialog.getByRole("radio", { name: /v0\.9\.0/ }).check();
+  await expect(dialog.getByRole("radio", { name: /v0\.9\.0/ })).toBeChecked();
+  await dialog.getByRole("button", { name: "Apply version" }).click();
 
   await expect(page.getByTestId("invoice-one")).toContainText("version-0");
 });
@@ -56,8 +59,8 @@ test("stale review preserves local work and performs no authoritative write", as
   await page.goto("/?mode=version-change&stale=true");
 
   await page.getByRole("button", { name: "Change exact version" }).click();
-  const dialog = page.getByRole("dialog", { name: "Review exact Activity Definition Version change" });
-  await dialog.getByRole("button", { name: "Apply to this occurrence" }).click();
+  const dialog = page.getByRole("dialog", { name: "Change activity version" });
+  await dialog.getByRole("button", { name: "Apply version" }).click();
 
   await expect(dialog.getByRole("alert")).toContainText("local work was kept");
   await expect(page.getByTestId("invoice-one")).toContainText("version-1");
