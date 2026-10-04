@@ -104,7 +104,7 @@ html[data-theme="meridian"] {
 }
 
 /* Drift floats: larger, softer, more diffuse shadows so panels read as islands over the canvas. */
-html[data-theme="drift"] {
+html:is([data-theme="drift"], [data-theme="drift-coast"], [data-theme="drift-sand"], [data-theme="drift-ink"]) {
   --shadow-sm: 0 1px 3px oklch(0.3 0.03 200 / 0.08);
   --shadow-md: 0 2px 4px oklch(0.3 0.03 200 / 0.05), 0 10px 24px -6px oklch(0.3 0.03 200 / 0.14);
   --shadow-lg: 0 2px 6px oklch(0.3 0.03 200 / 0.05), 0 22px 50px -12px oklch(0.3 0.03 200 / 0.22);
@@ -175,7 +175,7 @@ html[data-theme="dusk"] {
   --studio-accent-soft: color-mix(in srgb, var(--primary) 12%, transparent);
 }
 
-html:is([data-theme="meridian"], [data-theme="drift"], [data-theme="schematic"], [data-theme="atelier"], [data-theme="dusk"])[data-theme-mode="dark"] {
+html:is([data-theme="meridian"], [data-theme="drift"], [data-theme="drift-coast"], [data-theme="drift-sand"], [data-theme="drift-ink"], [data-theme="schematic"], [data-theme="atelier"], [data-theme="dusk"])[data-theme-mode="dark"] {
   --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.3);
   --shadow-md: 0 1px 2px oklch(0 0 0 / 0.3), 0 8px 20px -6px oklch(0 0 0 / 0.45);
   --shadow-lg: 0 2px 6px oklch(0 0 0 / 0.3), 0 22px 50px -12px oklch(0 0 0 / 0.6);

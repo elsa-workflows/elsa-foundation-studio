@@ -192,16 +192,28 @@ const meridian = definition(
   }
 );
 
-const drift = definition(
+const driftTypography: ThemeTypography = {
+  sans: `"Manrope Variable", "Manrope", ${sansFallback}`,
+  mono: `"DM Mono", ${monoFallback}`
+};
+
+const driftShape: StudioThemeDefinition["shape"] = {
+  radiusSm: "8px", radius: "12px", radiusMd: "14px", radiusLg: "18px", radiusXl: "22px"
+};
+
+function driftTheme(
+  id: string,
+  name: string,
+  description: string,
+  modes: Required<StudioThemeDefinition["modes"]>
+): StudioThemeDefinition {
+  return definition(id, name, description, driftTypography, driftShape, "floating", modes);
+}
+
+const drift = driftTheme(
   "drift",
   "Drift",
   "Soft, rounded surfaces that float over a calm canvas, with a jade accent.",
-  {
-    sans: `"Manrope Variable", "Manrope", ${sansFallback}`,
-    mono: `"DM Mono", ${monoFallback}`
-  },
-  { radiusSm: "8px", radius: "12px", radiusMd: "14px", radiusLg: "18px", radiusXl: "22px" },
-  "floating",
   {
     light: mode({
       scheme: "light", hue: 195, chroma: 0.008,
@@ -222,6 +234,87 @@ const drift = definition(
       wash: oklch(0.4, 0.05, 172), activeForeground: oklch(0.88, 0.1, 172)
     }),
     highContrast: highContrast(oklch(0.88, 0.15, 175), 175)
+  }
+);
+
+const driftCoast = driftTheme(
+  "drift-coast",
+  "Drift Coast",
+  "Drift’s floating surfaces in cool blue slate, with a clear ocean-blue accent.",
+  {
+    light: mode({
+      scheme: "light", hue: 225, chroma: 0.012,
+      background: 0.958, card: 0.997, muted: 0.948, border: 0.9, input: 0.955, sidebar: 0.997, foreground: 0.22, mutedForeground: 0.43,
+      primary: oklch(0.45, 0.13, 245), primaryForeground: white,
+      wash: oklch(0.94, 0.035, 245), activeForeground: oklch(0.35, 0.1, 245)
+    }),
+    dark: mode({
+      scheme: "dark", hue: 225, chroma: 0.016,
+      background: 0.17, card: 0.215, muted: 0.25, border: 0.3, input: 0.235, sidebar: 0.215, foreground: 0.95, mutedForeground: 0.74,
+      primary: oklch(0.73, 0.13, 235), primaryForeground: oklch(0.18, 0.03, 235),
+      wash: oklch(0.3, 0.055, 235), activeForeground: oklch(0.87, 0.075, 235)
+    }),
+    dim: mode({
+      scheme: "dim", hue: 230, chroma: 0.022,
+      background: 0.3, card: 0.345, muted: 0.38, border: 0.43, input: 0.365, sidebar: 0.345, foreground: 0.96, mutedForeground: 0.78,
+      primary: oklch(0.76, 0.12, 235), primaryForeground: oklch(0.2, 0.03, 235),
+      wash: oklch(0.4, 0.06, 235), activeForeground: oklch(0.9, 0.08, 235)
+    }),
+    highContrast: highContrast(oklch(0.88, 0.15, 235), 235)
+  }
+);
+
+const driftSand = driftTheme(
+  "drift-sand",
+  "Drift Sand",
+  "Drift’s floating surfaces in warm paper and taupe, with a restrained bronze accent.",
+  {
+    light: mode({
+      scheme: "light", hue: 72, chroma: 0.018,
+      background: 0.955, card: 0.996, muted: 0.944, border: 0.89, input: 0.955, sidebar: 0.993, foreground: 0.22, mutedForeground: 0.43,
+      primary: oklch(0.44, 0.085, 58), primaryForeground: white,
+      wash: oklch(0.94, 0.03, 68), activeForeground: oklch(0.34, 0.07, 58)
+    }),
+    dark: mode({
+      scheme: "dark", hue: 67, chroma: 0.014,
+      background: 0.17, card: 0.215, muted: 0.25, border: 0.3, input: 0.235, sidebar: 0.215, foreground: 0.95, mutedForeground: 0.74,
+      primary: oklch(0.75, 0.105, 65), primaryForeground: oklch(0.19, 0.035, 65),
+      wash: oklch(0.3, 0.045, 65), activeForeground: oklch(0.88, 0.07, 65)
+    }),
+    dim: mode({
+      scheme: "dim", hue: 65, chroma: 0.022,
+      background: 0.3, card: 0.345, muted: 0.38, border: 0.43, input: 0.365, sidebar: 0.345, foreground: 0.96, mutedForeground: 0.78,
+      primary: oklch(0.78, 0.105, 65), primaryForeground: oklch(0.2, 0.035, 65),
+      wash: oklch(0.4, 0.05, 65), activeForeground: oklch(0.9, 0.07, 65)
+    }),
+    highContrast: highContrast(oklch(0.89, 0.13, 68), 68)
+  }
+);
+
+const driftInk = driftTheme(
+  "drift-ink",
+  "Drift Ink",
+  "Drift’s floating surfaces in neutral graphite and silver, with a quiet monochrome accent.",
+  {
+    light: mode({
+      scheme: "light", hue: 255, chroma: 0.004,
+      background: 0.958, card: 0.997, muted: 0.948, border: 0.9, input: 0.955, sidebar: 0.997, foreground: 0.2, mutedForeground: 0.43,
+      primary: oklch(0.34, 0.012, 255), primaryForeground: white,
+      wash: oklch(0.94, 0.008, 255), activeForeground: oklch(0.3, 0.014, 255)
+    }),
+    dark: mode({
+      scheme: "dark", hue: 255, chroma: 0.006,
+      background: 0.17, card: 0.215, muted: 0.25, border: 0.3, input: 0.235, sidebar: 0.215, foreground: 0.95, mutedForeground: 0.74,
+      primary: oklch(0.8, 0.008, 255), primaryForeground: oklch(0.17, 0.004, 255),
+      wash: oklch(0.3, 0.01, 255), activeForeground: oklch(0.91, 0.006, 255)
+    }),
+    dim: mode({
+      scheme: "dim", hue: 255, chroma: 0.009,
+      background: 0.3, card: 0.345, muted: 0.38, border: 0.43, input: 0.365, sidebar: 0.345, foreground: 0.96, mutedForeground: 0.78,
+      primary: oklch(0.83, 0.01, 255), primaryForeground: oklch(0.2, 0.005, 255),
+      wash: oklch(0.4, 0.012, 255), activeForeground: oklch(0.94, 0.008, 255)
+    }),
+    highContrast: highContrast(oklch(0.91, 0.01, 255), 255)
   }
 );
 
@@ -423,6 +516,6 @@ const dusk = definition(
   }
 );
 
-export const foundationThemeIds = ["meridian", "drift", "schematic", "atelier", "elsa-cloud", "signal", "dusk"] as const;
+export const foundationThemeIds = ["meridian", "drift", "drift-coast", "drift-sand", "drift-ink", "schematic", "atelier", "elsa-cloud", "signal", "dusk"] as const;
 
-export const foundationThemeDefinitions: StudioThemeDefinition[] = [meridian, drift, schematic, atelier, elsaCloud, signal, dusk];
+export const foundationThemeDefinitions: StudioThemeDefinition[] = [meridian, drift, driftCoast, driftSand, driftInk, schematic, atelier, elsaCloud, signal, dusk];

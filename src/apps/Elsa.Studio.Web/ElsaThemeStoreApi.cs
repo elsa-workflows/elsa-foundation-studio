@@ -25,6 +25,9 @@ internal static class ElsaThemeStoreApi
     {
         "meridian",
         "drift",
+        "drift-coast",
+        "drift-sand",
+        "drift-ink",
         "schematic",
         "atelier",
         "elsa-cloud",
