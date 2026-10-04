@@ -19,6 +19,46 @@ afterEach(() => {
 });
 
 describe("workflow run history", () => {
+  it("navigates retained forward-only cursor history and resets it for filters and page size", async () => {
+    window.history.replaceState({}, "", "/workflows/instances?pageSize=10");
+    const getJson = vi.fn(async (url: string) => {
+      if (url === "/capabilities") return capabilities;
+      if (url.includes("cursor=next-cursor")) return forwardOnlyPage("execution-2", "after-page-2");
+      if (url.includes("cursor=after-page-2")) return forwardOnlyPage("execution-3");
+      return forwardOnlyPage("execution-1", "next-cursor", 42);
+    });
+    const navigate = vi.fn((path: string) => window.history.pushState({}, "", path));
+    const container = render(context(getJson), navigate);
+
+    await waitFor(() => expect(container.textContent).toContain("execution-1"));
+    click(button(container, "Next workflow run page"));
+    await waitFor(() => expect(container.textContent).toContain("execution-2"));
+    expect(button(container, "Previous workflow run page").disabled).toBe(false);
+
+    click(button(container, "Previous workflow run page"));
+    await waitFor(() => expect(container.textContent).toContain("execution-1"));
+    expect(getJson).toHaveBeenCalledWith("/runtime/workflows/instances/page?take=10");
+
+    click(button(container, "Next workflow run page"));
+    await waitFor(() => expect(container.textContent).toContain("execution-2"));
+    expect(button(container, "Previous workflow run page").disabled).toBe(false);
+
+    fill(input(container, "Workflow run correlation"), "correlation-1");
+    click(buttonByText(container, "Apply filters"));
+    await waitFor(() => expect(container.textContent).toContain("execution-1"));
+    expect(button(container, "Previous workflow run page").disabled).toBe(true);
+    expect(navigate).toHaveBeenLastCalledWith(expect.not.stringContaining("cursor="));
+    expect(getJson).toHaveBeenCalledWith(expect.stringMatching(/instances\/page\?.*correlationId=correlation-1.*take=10/));
+
+    click(button(container, "Next workflow run page"));
+    await waitFor(() => expect(container.textContent).toContain("execution-2"));
+    select(container.querySelector<HTMLSelectElement>("select[aria-label='Workflow run page size']")!, "25");
+    await waitFor(() => expect(container.textContent).toContain("execution-1"));
+    expect(button(container, "Previous workflow run page").disabled).toBe(true);
+    expect(navigate).toHaveBeenLastCalledWith(expect.not.stringContaining("cursor="));
+    expect(getJson).toHaveBeenCalledWith(expect.stringMatching(/instances\/page\?.*correlationId=correlation-1.*take=25/));
+  });
+
   it("restores filters from the URL and navigates cursor pages without rendering retained history", async () => {
     window.history.replaceState({}, "", "/workflows/instances?definitionId=definition-1&artifactId=artifact-1&pageSize=10");
     const getJson = vi.fn(async (url: string) => {
@@ -193,6 +233,11 @@ function page(workflowExecutionId: string, overrides: Record<string, unknown> = 
     totalCount: 1,
     ...overrides
   };
+}
+
+function forwardOnlyPage(workflowExecutionId: string, nextCursor: string | null = null, totalCount = 1) {
+  const items = page(workflowExecutionId).items;
+  return { items, nextCursor, hasNext: Boolean(nextCursor), count: items.length, totalCount };
 }
 
 const capabilities = {
