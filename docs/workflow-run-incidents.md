@@ -10,6 +10,8 @@ Current incident health and the runtime's reported lifecycle status are separate
 
 The incident-health filter is available only when the Runtime host advertises the health-filter capability. On older hosts, Studio disables that filter and explains that current health cannot be used to select runs. Missing current-health counts are shown as unavailable; they are not inferred from the historical total.
 
+For hosts with forward-only paging, Studio remembers visited page cursors so **Previous** returns to the preceding page, including the first page. Changing filters or page size starts a new history. A cursor opened directly without visited history cannot provide a previous page unless the host supplies a reverse cursor. Counts and filtering remain authoritative server results.
+
 ## Following an incident to runtime evidence
 
 Open **Issues** from the run header or select an incident marker on the canvas. Studio associates incidents with their exact activity execution when the Runtime provides that identity, so repeated executions of the same activity remain distinct. Selecting an affected activity opens its incident; **View input evidence** opens the input snapshot for that execution when one was recorded.

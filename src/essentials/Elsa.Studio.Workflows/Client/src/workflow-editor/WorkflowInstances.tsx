@@ -1,4 +1,5 @@
 import "./activityInspection.css";
+import { createCursorHistory, getPreviousCursor, moveCursorHistoryNext, moveCursorHistoryPrevious, reconcileCursorHistory } from "./cursorHistory";
 import { Component, lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { applyNodeChanges, ReactFlow, Background, Controls, MiniMap, type Edge, type Node, type NodeChange, type ReactFlowInstance } from "@xyflow/react";
 import { Activity as ActivityIcon, AlertCircle, Boxes, ChevronLeft, ChevronRight, ListTree, Maximize2, Minimize2, RotateCcw, SlidersHorizontal, Sparkles, Workflow as WorkflowIcon } from "lucide-react";
@@ -105,6 +106,9 @@ export function WorkflowInstances({ context, navigate }: {
   const [page, setPage] = useState<WorkflowInstanceListPage>(emptyRunHistoryPage);
   const [healthFilterSupported, setHealthFilterSupported] = useState<boolean | null>(null);
   const requestSequence = useRef(0);
+  const cursorScope = { backend: context, query: buildRunHistoryUrl({ ...location, cursor: null }) };
+  const cursorHistory = useRef(createCursorHistory(cursorScope, location.cursor));
+  const previousPage = getPreviousCursor(cursorHistory.current, cursorScope, location.cursor, page);
 
   const load = useCallback(async () => {
     const requestId = ++requestSequence.current;
@@ -157,6 +161,10 @@ export function WorkflowInstances({ context, navigate }: {
   }, []);
 
   const updateLocation = (next: RunHistoryLocation, syncDraft = true) => {
+    cursorHistory.current = reconcileCursorHistory(cursorHistory.current, {
+      backend: context, query: buildRunHistoryUrl({ ...next, cursor: null })
+    }, next.cursor);
+    setState("loading");
     setLocation(next);
     if (syncDraft) setDraftFilters(next.filters);
     navigate(buildRunHistoryUrl(next));
@@ -308,14 +316,20 @@ export function WorkflowInstances({ context, navigate }: {
             </select>
           </label>
           <div className="wf-page-controls">
-            <button type="button" disabled={!page.hasPrevious || !page.previousCursor} onClick={() => {
-              if (page.previousCursor) updateLocation({ ...location, cursor: page.previousCursor }, false);
+            <button type="button" disabled={!previousPage.available} onClick={() => {
+              const previous = moveCursorHistoryPrevious(cursorHistory.current, cursorScope, location.cursor, page);
+              if (!previous.destination.available) return;
+              cursorHistory.current = previous.history;
+              updateLocation({ ...location, cursor: previous.destination.cursor }, false);
             }} aria-label="Previous workflow run page">
               <ChevronLeft size={14} /> Previous
             </button>
             <span role="status">{page.hasNext ? "More results" : "End of results"}</span>
             <button type="button" disabled={!page.hasNext || !page.nextCursor} onClick={() => {
-              if (page.nextCursor) updateLocation({ ...location, cursor: page.nextCursor }, false);
+              const next = moveCursorHistoryNext(cursorHistory.current, cursorScope, location.cursor, page.nextCursor);
+              if (!next.destination.available) return;
+              cursorHistory.current = next.history;
+              updateLocation({ ...location, cursor: next.destination.cursor }, false);
             }} aria-label="Next workflow run page">
               Next <ChevronRight size={14} />
             </button>
