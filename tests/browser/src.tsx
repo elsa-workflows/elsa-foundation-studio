@@ -1,3 +1,4 @@
+import { ActivityInputEvidenceFixture } from "./activityInputEvidenceFixture";
 import React, { lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -69,7 +70,8 @@ const searchParams = new URLSearchParams(window.location.search);
 const scrollingFixture = searchParams.get("mode") === "scroll";
 const dictionaryFixture = searchParams.get("mode") === "dictionary";
 const lazyBoundaryFixture = searchParams.get("mode") === "lazy-boundary";
-const runDetailFixture = searchParams.get("mode") === "run-detail";
+const inputEvidenceFixture = searchParams.get("mode") === "input-evidence";
+const runDetailFixture = searchParams.get("mode") === "run-detail" || inputEvidenceFixture;
 const moveDefinitionsFixture = searchParams.get("mode") === "move-definitions";
 const folderRestructureFixture = searchParams.get("mode") === "folder-restructure";
 const moveDefinitionsFailureFixture = moveDefinitionsFixture && searchParams.get("move") === "failure";
@@ -992,7 +994,7 @@ function RunDetailFixture() {
             <div className="wf-side-resize-spacer" />
             <aside className="wf-instance-inspector" aria-label="Run details">
               <header><h3>Activity details</h3></header>
-              <div className="wf-instance-section">Evaluated inputs</div>
+              {inputEvidenceFixture ? <div className="wf-instance-tab-content"><ActivityInputEvidenceFixture context={endpointContext} /></div> : <div className="wf-instance-section">Evaluated inputs</div>}
             </aside>
           </div>
         </section>
