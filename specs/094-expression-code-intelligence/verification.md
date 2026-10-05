@@ -20,10 +20,13 @@ frozen offline installation succeeds without dependency changes before the real 
 The final test adds actual Colour mode controls, lazy first-preview/no rich mount, keyboard
 activation, actual-text-parent foreground contrast on composited backgrounds, nonzero/contrasting
 focus outline, property-pane containment, version-matched hover/catalog help, diagnostics,
-single undo restoring exact persisted source and shared compact/expanded continuity. Independent
+actual native select-all with readable computed `::selection` colors that exactly match shared
+accent/on-fill tokens, single undo restoring exact persisted source and shared compact/expanded continuity. Independent
 harness review catches a diagnostic-container false-positive; root changes measurement to every
 actual text parent's foreground and adds focus/pane checks. Final source re-review finds no
 material test defect. That review is not runtime proof. Scoped browser ESLint and diff check pass.
+The final selection review's possible browser-default false-positive is closed by normalizing
+the pseudo colors and central token values through the same canvas and comparing their RGBA bytes.
 Existing M3 assertions, bundle/timing budgets and trace/screenshot/video policies are unchanged.
 
 The isolated presentation writer owns unit tests-first implementation. Final integrated browser,
