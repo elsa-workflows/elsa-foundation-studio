@@ -1,12 +1,48 @@
 # Expression Code Intelligence — Verification
 
-Last reconciled: 2026-10-06 for Program #2310 M3 accessor correction and Liquid integration candidate; baseline pair green, Liquid paired-host failure under correction, delivery and human acceptance pending
+Last reconciled: 2026-10-06 for Program #2310 final automated M3 proof and M4 Task#568 start; all PRs draft/unmerged, current-head manual AT and human acceptance pending
 
 ## Program #2310 status
 
-T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head automated M2 gate under the documented unavailable-external-review fallback. Studio spike #553 / T035 settles the technical decision: reject the current deeper-service candidate and retain the baseline path. No dependency or production integration is adopted. Deeper language help, three-theme presentation, formatting and current-head manual accessibility/continuity acceptance (T032-T034, T036-T038) remain open. The 2026-07-28 evidence remains historical. All program PRs remain draft and unmerged; final human acceptance is outstanding.
+T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head automated M2 gate under the documented unavailable-external-review fallback. Studio spike #553 / T035 settles the technical decision: reject the current deeper-service candidate and retain the baseline path. No deeper-service dependency is adopted. T032-T034 pass their final exact-head automated M3 gate below, permitting assigned M4 Task#568 / T036. Three-theme presentation, active parameters/overloads, formatting and current-head manual accessibility/continuity acceptance (T036-T038) remain open. The 2026-07-28 evidence remains historical. All program PRs remain draft and unmerged; final human acceptance is outstanding.
 
 ## Passing evidence
+
+### Final M3 automated gate — Studio #560/#561 and Foundation #2379, 2026-10-06
+
+Final integrated Studio `473cf1a9f9622c5abd3091b846e91037e7da55c6` (draft#565,
+stacked on baseline `5ac5d71de80aa27ef6ed71bb0c3bae6fe003b6fd`, draft#562) pairs with
+Foundation `5cd44d6312d9de85b13f4619fc7aa972a557d033` (draft#2380).
+Root rebuilt normal hosts pass4/4 in3.2 minutes, including actual Liquid output-member help,
+compact/expanded mid-token filter/tag application, signatures, explicit interpolation,
+exact persisted source and undo, JavaScript help, activity-definition editing and independent
+missing-editor/provider controls. No assertion, timing budget or retained-source policy was relaxed.
+Log: `/private/tmp/elsa-561-root-normal-host-third.log`.
+
+Studio CI37384606857 passes all three jobs at exact473cf: lint/typecheck, complete/shuffled
+units, client builds and unchanged bundle budgets; generic Chromium; rebuilt paired normal hosts.
+Baseline Studio CI37377085581 also passes all three jobs at exact5ac5d7. Foundation CI37376029424
+and Maps37376054285 pass at exact5cd44d. Root Foundation scopes pass catalog27, Expressions236,
+Design534, DesignAPI143, Publishing714, Jint126 and architecture17; authenticated rebuilt
+Workbench3 and freshly rebuilt Debug JavaScript REST10 pass. Full local architecture is not
+claimed: its full hosted gate passes. REST log: `/private/tmp/elsa-2379-root-rest-accessor-final.log`.
+
+Root complete CodeEditor93/93, Liquid25/25, JavaScript15/15, CodeEditor typecheck/build,
+scoped ESLint and diff checks pass. Removing the mid-token authoritative-ownership guard makes
+the local-completion suffix control fail1/1 (the authoritative collision control still passes).
+Root restores the guard, verifies the production diff is empty, and reruns all93 successfully.
+Logs: `/private/tmp/elsa-565-root-midtoken-ownership-red.log`,
+`/private/tmp/elsa-565-root-editor-ownership-restored-final.log`. Earlier red controls and paired-host
+failures below are historical diagnostic checkpoints, not current failures or accepted heads.
+
+Independent restored/final production and browser-harness review finds no actionable remaining
+finding. Copilot CLI requests return success, but GitHub reports no current-head review or review
+request for any M3 draft; this is not external approval. The documented unavailable-external-review
+fallback applies only after the local, independent and hosted gates above pass. Last actual Copilot
+reviews belong to predecessor M2 heads, not this pair. The automated M3 dependency is satisfied;
+current-head manual AT, human acceptance and delivery remain open. All PRs stay draft/unmerged.
+
+M4 Task#568 / Decision19 owns T036 on this immutable baseline; T037/T038 remain separate open gates.
 
 ### M3 Liquid mid-token completion correction — Studio #561, 2026-10-06
 

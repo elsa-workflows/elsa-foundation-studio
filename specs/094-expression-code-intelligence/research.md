@@ -220,3 +220,31 @@ changes form one isolated worker slice. Root owns final integration and compact/
 proof, with controlled-removal or tests-first failures for adverse boundaries. M4 presentation and
 formatting remain separate. Final-head CI/review and manual acceptance are not inferred from the
 reviewed predecessor's local browser pass; all PRs stay draft and unmerged.
+
+## Decision 19: Bounded presentation-only syntax previews and shared theme roles
+
+**Decision**: Studio Task#568 owns T036, starting from the passing automated M3 pair
+Studio `473cf1a9` / Foundation `5cd44d63`. Add centrally defined, documented syntax-foreground
+roles to the shared `--studio-*` token contract. Existing accent/status fill and on-fill roles are
+not generic code foregrounds. Light, Dark and Dim foregrounds must meet 4.5:1 against the actual
+preview/editor background; unknown-host and high-contrast paths may use the primary text fallback.
+Module CSS consumes shared roles, not global theme identities or module-local palettes.
+
+An optional internal language-adapter highlighter returns only bounded plain `{ from, to, kind }`
+spans. Reuse installed JavaScript/Liquid parsers and one closed category/class mapping for rich
+editor and escaped React preview output. No engine node crosses the SDK or wire boundary; no
+language service, evaluation, metadata request or expression-source logging is introduced.
+
+The collapsed preview remains an immediate plain-text button and lazily acquires presentation
+spans without constructing an editor/state/history session. Bound source size and spans, skip
+offscreen or oversized content, and preserve exact authored source. Late results must be rejected
+after source/language change, unmount or authorization revocation; source and document identity
+remain hidden immediately on revocation. Completion, hover, signature and diagnostic surfaces
+retain accessible focus/selection and narrow wrapping in all three supported appearances.
+
+**Consequences**: Root owns integration, actual normal-host color-mode/contrast/narrow proof and
+complete affected gates. The bounded worker owns presentation implementation/tests and central
+token documentation only. Active-argument/overload semantics and explicit behavior-preserving
+format actions remain T037; final manual AT and human acceptance remain T038. No runtime, catalog,
+SDK, wire, persistence, performance measurement or bundle-budget change is authorized by this seam.
+All PRs remain draft and unmerged.
