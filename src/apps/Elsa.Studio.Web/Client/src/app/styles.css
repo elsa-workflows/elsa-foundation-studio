@@ -3,6 +3,7 @@
 @import "./themes/layouts.css";
 @import "./themes/elsaCloud.css";
 @import "./themes/signal.css";
+@import "./themes/material.css";
 
 :root {
   /* Typography */

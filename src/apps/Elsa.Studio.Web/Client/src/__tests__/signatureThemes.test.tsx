@@ -109,7 +109,21 @@ describe("signature themes", () => {
   });
 
   it("gives each signature theme its layout", () => {
-    expect(foundationThemeIds.map(id => getTheme(id)!.layout)).toEqual(["classic", "floating", "floating", "floating", "floating", "workbench", "editorial", "classic", "classic", "classic"]);
+    expect(foundationThemeIds.map(id => getTheme(id)!.layout)).toEqual(["classic", "classic", "floating", "floating", "floating", "floating", "workbench", "editorial", "classic", "classic", "classic"]);
+  });
+
+  it("gives Material a tonal role recipe in every mode without texture", () => {
+    const theme = getTheme("material")!;
+
+    expect(theme.typography?.sans).toContain('"Roboto"');
+    expect(theme.layout).toBe("classic");
+    for (const mode of allThemeModes) {
+      const variables = getThemeModeDefinition(theme, mode)?.material?.cssVariables;
+      expect(variables?.["--studio-material-panel-bg"]).toBe("var(--studio-surface)");
+      expect(variables?.["--studio-material-active-bg"]).toContain("--studio-accent");
+      expect(variables).not.toHaveProperty("--studio-material-texture");
+    }
+    expect(getThemeModeDefinition(theme, "high-contrast")?.material?.cssVariables?.["--studio-material-shadow"]).toContain("transparent");
   });
 
   it.each(foundationThemeIds)("%s high contrast is black-grounded with a bright accent", id => {
@@ -333,6 +347,24 @@ describe("ThemeProvider and ThemeSwitcher", () => {
     expect(html.getAttribute("data-theme")).toBe("meridian");
     expect(html.style.getPropertyValue("--font-sans")).toContain("Geist Variable");
     expect(html.style.getPropertyValue("--radius")).toBe("7px");
+  });
+
+  it("offers Material through the normal theme selector and applies its roles", async () => {
+    await render();
+    expect(api!.availableThemes.some(theme => theme.id === "material")).toBe(true);
+
+    await act(() => api!.setTheme("material"));
+    const html = document.documentElement;
+
+    expect(html.getAttribute("data-theme")).toBe("material");
+    expect(html.getAttribute("data-theme-material")).toBe("material");
+    expect(html.getAttribute("data-theme-layout")).toBe("classic");
+    expect(html.style.getPropertyValue("--font-sans")).toContain('"Roboto"');
+    expect(html.style.getPropertyValue("--studio-material-panel-bg-strong")).toContain("--studio-accent");
+
+    await act(() => api!.setMode("high-contrast"));
+    expect(html.getAttribute("data-theme-appearance")).toBe("high-contrast");
+    expect(html.style.getPropertyValue("--studio-material-shadow")).toContain("transparent");
   });
 
   it("keeps data-theme-mode as the colour scheme and exposes the exact mode as data-theme-appearance", async () => {

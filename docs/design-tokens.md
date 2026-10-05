@@ -51,7 +51,7 @@ Optionally supply `--font-display` (title face; defaults to `--font-sans`).
 
 Studio offers four modes: `light`, `dark`, `dim` and `high-contrast`. Every theme defines Light
 and Dark; Dim and High contrast are optional per theme (the signature themes — Meridian,
-Drift and its Coast, Sand and Ink palettes, Schematic, Atelier, Elsa Cloud, Signal, Dusk — define all four). ThemeProvider sets two attributes:
+Drift and its Coast, Sand and Ink palettes, Schematic, Atelier, Elsa Cloud, Signal, Dusk, Material — define all four). ThemeProvider sets two attributes:
 
 | Attribute | Values | Meaning |
 | --- | --- | --- |
@@ -154,10 +154,10 @@ They are gated on the `html[data-theme-material]` attribute, so **flat themes ar
 [Rules](#rules)). A module opts into the material look by consuming these tokens **inside a
 `[data-theme-material]` guard**; without the guard the module stays flat.
 
-No built-in theme is a material theme any more (Stone, Blueprint and Brass Instrument were the
-last; see [Removed in the next major version](#removed-in-the-next-major-version)), so Studio's own
-shell never sets `data-theme-material`. The vocabulary stays for hosts and themes that supply their
-own recipes: the shared `html[data-theme-material]` block in `tokens.css` defines a neutral, flat
+The built-in **Material** theme sets `data-theme-material="material"` and uses this vocabulary for
+tonal surfaces and restrained elevation inspired by Material Design. It supplies no material
+texture or beveled inset treatment. Other built-ins remain flat. Hosts and custom themes can
+supply their own recipes: the shared `html[data-theme-material]` block in `tokens.css` defines a neutral, flat
 fallback for every token below, and a material theme overrides the rungs it restyles. If you add a
 new `--studio-material-*` token you MUST give it a fallback in that shared block.
 
@@ -213,7 +213,7 @@ Texture/grid: `--studio-material-texture`, `--studio-material-texture-size`,
    selectors and stay allowed: `[data-theme-mode="dark"]` for the colour scheme,
    `[data-theme-appearance="high-contrast"]` for a High-contrast-only adjustment the tokens
    cannot express, and `[data-theme-layout="…"]` for arrangement (see [Modes and the `<html>` attributes](#modes-and-the-html-attributes)).
-4. **Gate every material treatment on `[data-theme-material]`.** Flat themes — every built-in:
+4. **Gate every material treatment on `[data-theme-material]`.** Flat built-in themes:
    `meridian`, `drift`, `drift-coast`, `drift-sand`, `drift-ink`, `schematic`, `atelier`, `elsa-cloud`, `signal`, `dusk` — must stay flat. Any rule
    consuming a `--studio-material-*` token belongs inside an `html[data-theme-material] …`
    guard.

@@ -10,7 +10,7 @@ const referenced = (css: string, prefix: string) =>
   [...new Set([...css.matchAll(new RegExp(`var\\((${prefix}[\\w-]+)`, "g"))].map(match => match[1]))].sort();
 
 describe("material token contract", () => {
-  // No built-in theme supplies material recipes, so the shared block is the only definition.
+  // Shared defaults must cover all consumers even before a theme supplies its own recipes.
   it("defines every --studio-material-* token the host stylesheets consume", () => {
     const defined = Object.keys(ruleDeclarations(tokensCss, "html[data-theme-material]"));
 

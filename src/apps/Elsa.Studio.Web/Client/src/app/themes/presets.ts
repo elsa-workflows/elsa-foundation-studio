@@ -228,12 +228,8 @@ export function cloneThemeDefinition(theme: StudioThemeDefinition): StudioThemeD
   })) as StudioThemeDefinition;
 }
 
-/**
- * Built-in themes that opt into the textured `--studio-material-*` treatment (ThemeProvider sets
- * `data-theme-material` for them). None ships today; the registry stays so the material
- * vocabulary keeps a single switch.
- */
-export const materialThemeIds: readonly string[] = [];
+/** Built-in themes that opt into the host's `--studio-material-*` surface-role treatment. */
+export const materialThemeIds: readonly string[] = ["material"];
 
 export const isMaterialTheme = (themeId: string): boolean => materialThemeIds.includes(themeId);
 

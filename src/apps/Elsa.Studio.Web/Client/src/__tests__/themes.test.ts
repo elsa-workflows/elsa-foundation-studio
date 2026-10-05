@@ -13,9 +13,12 @@ describe("theme presets", () => {
     expect(builtInThemeDefinitions.every(theme => theme.source === "built-in")).toBe(true);
   });
 
-  it("registers no built-in material theme", () => {
-    expect(materialThemeIds).toEqual([]);
-    expect(builtInThemeDefinitions.some(theme => isMaterialTheme(theme.id))).toBe(false);
+  it("registers Material as a selectable material theme without changing the default", () => {
+    expect(materialThemeIds).toEqual(["material"]);
+    expect(getTheme("material")?.name).toBe("Material");
+    expect(isMaterialTheme("material")).toBe(true);
+    expect(builtInThemeDefinitions.some(theme => isMaterialTheme(theme.id))).toBe(true);
+    expect(normalizeThemeStore().defaultThemeId).toBe("meridian");
   });
 
   it.each(retiredThemeIds)("no longer ships the retired %s theme", themeId => {

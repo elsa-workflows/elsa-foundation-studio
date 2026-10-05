@@ -157,9 +157,73 @@ function definition(
   };
 }
 
+/** Material surfaces use tonal layering for depth; elevation stays quiet and high contrast stays flat. */
+function materialSurfaceRoles(scheme: Scheme): Record<string, string> {
+  const highContrast = scheme === "high-contrast";
+  const dark = scheme === "dark" || scheme === "dim";
+  const shadow = highContrast
+    ? "0 0 0 0 transparent"
+    : dark
+      ? "0 1px 2px color-mix(in srgb, black 24%, transparent), 0 8px 24px color-mix(in srgb, black 22%, transparent)"
+      : "0 1px 2px color-mix(in srgb, black 5%, transparent), 0 8px 24px color-mix(in srgb, black 7%, transparent)";
+  const strongShadow = highContrast
+    ? "0 0 0 0 transparent"
+    : dark
+      ? "0 2px 6px color-mix(in srgb, black 28%, transparent), 0 16px 36px color-mix(in srgb, black 26%, transparent)"
+      : "0 2px 6px color-mix(in srgb, black 7%, transparent), 0 16px 36px color-mix(in srgb, black 9%, transparent)";
+  const noInset = "0 0 0 0 transparent";
+
+  return {
+    "--studio-material-body-bg": "var(--studio-bg)",
+    "--studio-material-content-bg": "var(--studio-bg)",
+    "--studio-material-canvas-bg": "var(--studio-bg)",
+    "--studio-material-panel-bg": "var(--studio-surface)",
+    "--studio-material-panel-bg-strong": "color-mix(in srgb, var(--studio-surface-raised) 94%, var(--studio-accent) 6%)",
+    "--studio-material-panel-bg-soft": "color-mix(in srgb, var(--studio-surface-muted) 96%, var(--studio-accent) 4%)",
+    "--studio-material-node-bg": "var(--studio-surface-raised)",
+    "--studio-material-node-shadow": shadow,
+    "--studio-material-edge": "var(--studio-border)",
+    "--studio-material-edge-strong": "color-mix(in srgb, var(--studio-accent) 42%, var(--studio-border))",
+    "--studio-material-shadow": shadow,
+    "--studio-material-shadow-strong": strongShadow,
+    "--studio-material-grid-size": "32px 32px",
+    "--studio-material-radius": "var(--studio-radius-lg)",
+    "--studio-material-body-bg-size": "auto",
+    "--studio-material-content-bg-size": "auto",
+    "--studio-material-canvas-bg-size": "auto",
+    "--studio-material-panel-bg-size": "auto",
+    "--studio-material-node-bg-size": "auto",
+    "--studio-material-control-bg": "var(--studio-material-panel-bg-soft)",
+    "--studio-material-hover-bg": "color-mix(in srgb, var(--studio-accent) 10%, var(--studio-surface-muted))",
+    "--studio-material-active-bg": "color-mix(in srgb, var(--studio-accent) 16%, var(--studio-surface))",
+    "--studio-material-inset": noInset,
+    "--studio-material-inset-low": noInset,
+    "--studio-material-send-bg": "var(--studio-accent)",
+    "--studio-material-send-text": "var(--studio-accent-text)",
+    "--studio-material-row-bg": "var(--studio-material-panel-bg-soft)",
+    "--studio-material-row-bg-size": "auto",
+    "--studio-material-well-bg": "color-mix(in srgb, var(--studio-surface-muted) 96%, black 4%)",
+    "--studio-material-well-bg-size": "auto",
+    "--studio-material-well-shadow": noInset
+  };
+}
+
+function materialMode(spec: ModeSpec): ThemeModeDefinition {
+  return { ...mode(spec), material: { cssVariables: materialSurfaceRoles(spec.scheme) } };
+}
+
+function materialHighContrast(): ThemeModeDefinition {
+  return { ...highContrast(oklch(0.88, 0.18, 258), 258), material: { cssVariables: materialSurfaceRoles("high-contrast") } };
+}
+
 const geistTypography: ThemeTypography = {
   sans: `"Geist Variable", "Geist", ${sansFallback}`,
   mono: `"Geist Mono Variable", "Geist Mono", ${monoFallback}`
+};
+
+const materialTypography: ThemeTypography = {
+  sans: `"Roboto", ${sansFallback}`,
+  mono: monoFallback
 };
 
 const meridian = definition(
@@ -189,6 +253,36 @@ const meridian = definition(
       wash: oklch(0.37, 0.07, 268), activeForeground: oklch(0.86, 0.08, 268)
     }),
     highContrast: highContrast(oklch(0.91, 0.18, 100), 100)
+  }
+);
+
+const material = definition(
+  "material",
+  "Material",
+  "A familiar workflow workspace with blue tonal surfaces, readable evidence and gently rounded actions.",
+  materialTypography,
+  { radiusSm: "12px", radius: "16px", radiusMd: "18px", radiusLg: "20px", radiusXl: "24px" },
+  "classic",
+  {
+    light: materialMode({
+      scheme: "light", hue: 258, chroma: 0.012,
+      background: 0.965, card: 0.99, muted: 0.93, border: 0.865, input: 0.99, sidebar: 0.965, foreground: 0.22, mutedForeground: 0.48,
+      primary: oklch(0.5, 0.18, 258), primaryForeground: white,
+      wash: oklch(0.93, 0.045, 258), activeForeground: oklch(0.34, 0.12, 258)
+    }),
+    dark: materialMode({
+      scheme: "dark", hue: 258, chroma: 0.012,
+      background: 0.145, card: 0.19, muted: 0.245, border: 0.32, input: 0.165, sidebar: 0.16, foreground: 0.95, mutedForeground: 0.74,
+      primary: oklch(0.76, 0.14, 258), primaryForeground: oklch(0.18, 0.04, 258),
+      wash: oklch(0.3, 0.06, 258), activeForeground: oklch(0.92, 0.08, 258)
+    }),
+    dim: materialMode({
+      scheme: "dim", hue: 258, chroma: 0.018,
+      background: 0.265, card: 0.31, muted: 0.365, border: 0.43, input: 0.285, sidebar: 0.245, foreground: 0.95, mutedForeground: 0.79,
+      primary: oklch(0.78, 0.15, 258), primaryForeground: oklch(0.19, 0.04, 258),
+      wash: oklch(0.39, 0.07, 258), activeForeground: oklch(0.94, 0.08, 258)
+    }),
+    highContrast: materialHighContrast()
   }
 );
 
@@ -516,6 +610,6 @@ const dusk = definition(
   }
 );
 
-export const foundationThemeIds = ["meridian", "drift", "drift-coast", "drift-sand", "drift-ink", "schematic", "atelier", "elsa-cloud", "signal", "dusk"] as const;
+export const foundationThemeIds = ["meridian", "material", "drift", "drift-coast", "drift-sand", "drift-ink", "schematic", "atelier", "elsa-cloud", "signal", "dusk"] as const;
 
-export const foundationThemeDefinitions: StudioThemeDefinition[] = [meridian, drift, driftCoast, driftSand, driftInk, schematic, atelier, elsaCloud, signal, dusk];
+export const foundationThemeDefinitions: StudioThemeDefinition[] = [meridian, material, drift, driftCoast, driftSand, driftInk, schematic, atelier, elsaCloud, signal, dusk];

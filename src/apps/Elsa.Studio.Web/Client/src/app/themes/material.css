@@ -1,0 +1,59 @@
+/* Material theme chrome refinements. Keep layout and authoring contracts in their owners. */
+html[data-theme="material"][data-theme-material] .sidebar {
+  box-shadow: none;
+}
+
+html[data-theme="material"][data-theme-material] .nav-section a {
+  border-radius: 999px;
+  color: var(--studio-text-muted);
+}
+
+html[data-theme="material"][data-theme-material] .nav-section a:hover {
+  border-color: transparent;
+  background: var(--studio-material-hover-bg);
+  color: var(--studio-text);
+  box-shadow: none;
+}
+
+html[data-theme="material"][data-theme-material] .nav-section a.active,
+html[data-theme="material"][data-theme-material] .nav-section a.has-active-child {
+  border-color: transparent;
+  background: var(--studio-material-active-bg);
+  color: var(--studio-text);
+  box-shadow: none;
+}
+
+html[data-theme="material"][data-theme-material] .nav-section a.active::before {
+  display: none;
+}
+
+html[data-theme="material"][data-theme-material] .nav-icon-tile {
+  border-color: transparent;
+  background: transparent;
+  color: var(--studio-text-muted);
+  box-shadow: none;
+}
+
+html[data-theme="material"][data-theme-material] .nav-section a.active .nav-icon-tile {
+  background: transparent;
+  color: var(--studio-accent);
+  box-shadow: none;
+}
+
+html[data-theme="material"][data-theme-material] .studio-button[data-variant="primary"],
+html[data-theme="material"][data-theme-material] .studio-button.studio-button-primary,
+html[data-theme="material"][data-theme-material] .ad-primary-action,
+html[data-theme="material"][data-theme-material] .wf-primary-action {
+  min-height: 40px;
+  border-radius: 999px;
+  padding-inline: 18px;
+  box-shadow: none;
+}
+
+html[data-theme="material"][data-theme-material] .wf-node .react-flow__handle {
+  box-shadow: none;
+}
+
+html[data-theme="material"][data-theme-material] .react-flow__edge-path {
+  filter: none;
+}
