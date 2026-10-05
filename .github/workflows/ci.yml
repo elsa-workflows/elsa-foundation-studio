@@ -109,7 +109,7 @@ jobs:
           repository: elsa-workflows/elsa-foundation
           # Program #2310 M3 is stacked across repositories. Pin the reviewed producer source;
           # neither moving branches nor arbitrary main prove this language-help pair.
-          ref: 58238b8678dce6dc3dc7510d88c630d106892393
+          ref: 5cd44d6312d9de85b13f4619fc7aa972a557d033
           path: .normal-host-foundation
           persist-credentials: false
 

@@ -189,6 +189,53 @@ describe("JavaScript expression editor module", () => {
     expect(getCatalog).toHaveBeenCalledWith(expect.anything(), expect.anything(), "Math.abs", undefined, expect.anything());
   });
 
+  it.each([
+    { allowed: false, variableName: "customer" },
+    { allowed: true, variableName: "customer" },
+    { allowed: false, variableName: "variable" },
+    { allowed: true, variableName: "variable" }
+  ])("does not reinsert or overwrite the filtered getVariable accessor: $allowed / $variableName", async ({ allowed, variableName }) => {
+    const accessor = {
+      id: "javascript:getVariable", name: "getVariable", kind: "function",
+      documentation: "Policy-approved accessor.",
+      signatures: [{ label: "getVariable(name)", parameters: [{ name: "name" }], returnShapeId: "any" }]
+    };
+    const projection = createStudioCodeToolingProjection({
+      document: { source: "" },
+      authoringContext: {
+        rootSymbols: allowed ? [accessor] : [],
+        visibleVariables: [{ id: "variable", name: variableName, kind: "value" }]
+      },
+      tooling: { getCatalog: vi.fn().mockResolvedValue({ state: "ready", data: { symbols: allowed ? [accessor] : [] } }) },
+      languageProjection: javaScriptToolingProjection
+    });
+    const document = { uri: "test://accessor", language: "javascript", value: "getVariable", version: 1 };
+    const signal = new AbortController().signal;
+
+    const completions = await projection.completionProvider({ document, position: 11, explicit: true, signal });
+    const hover = await projection.hoverProvider(document, 11, signal);
+    const signature = await projection.signatureProvider({ ...document, value: "getVariable(" }, 12, signal);
+
+    expect(completions?.filter(item => item.label === "getVariable")).toHaveLength(allowed ? 1 : 0);
+    if (allowed) {
+      expect(completions).toContainEqual(expect.objectContaining({ label: "getVariable", documentation: { markdown: accessor.documentation } }));
+      expect(hover?.documentation).toEqual({ markdown: accessor.documentation });
+      expect(signature).toMatchObject(accessor.signatures[0]);
+    } else {
+      expect(completions).not.toContainEqual(expect.objectContaining({ label: "getVariable" }));
+      expect(hover).toBeNull();
+      expect(signature).toBeNull();
+    }
+  });
+
+  it("omits the variable accessor without visible bindings, even when declared in the catalog", () => {
+    const accessor = { id: "javascript:getVariable", name: "getVariable", kind: "function" };
+    const context = { rootSymbols: [accessor], visibleVariables: [] };
+
+    expect(javaScriptToolingProjection.projectContext?.(context)).not.toContainEqual(accessor);
+    expect(javaScriptToolingProjection.projectCatalog?.([accessor], context)).toEqual([]);
+  });
+
   it.each(["'Math.abs('", "Math.abs('unfinished", "/* Math.abs(", "`Math.abs(`", "unknown("])(
     "does not invent a signature for unknown or non-code call paths: %s", async source => {
       const projection = createStudioCodeToolingProjection({
