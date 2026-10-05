@@ -8,6 +8,45 @@ T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head autom
 
 ## Passing evidence
 
+### M3 Liquid mid-token completion correction — Studio #561, 2026-10-06
+
+Integrated `b6fd1ca3e4b73cf514d43601adc0686bd9b6b5e2` fixes the missing activity-output
+member: root rebuilt normal hosts now pass3/4, but the expanded depth case exposes a separate
+compact `upXX` mid-token completion failure. Exact-head CI37383110522 reproduces the same
+1 failure/3 passing controls; its full/shuffled units, lint/typecheck, bundle gate and generic
+Chromium pass. Revision-matched successful rich catalog traffic is retained without source or
+search text. Neither passing units nor the earlier member correction accepts this head.
+
+Root reproduces the filter gap in a real CodeMirror test before changing production: the old
+test's completion label matched the complete token and hid the defect. CodeMirror filters against
+the result's full from/to range, so `upXX` suppresses `upcase` even though the cursor prefix is `up`.
+The adapter now filters at the cursor and applies the parser's complete replacement span through
+plain/snippet application. Mid-token results requery on every document edit rather than reuse
+position-dependent closures. Independent review identifies that only explicitly ranged authoritative
+items should own suffix replacement; root scopes application accordingly and adds mixed-source
+controls for local prefix insertion and authoritative collision precedence. Ordinary completion
+filtering and JavaScript local-help merging remain intact. No provider, SDK, wire, dependency,
+authority, browser assertion or timing change.
+
+Root complete CodeEditor passes93/93, including filter/tag mid-token acceptance, exact source and
+selection undo, snippet tab stops and fresh queries after typing inside a token. Re-enabling cached
+result reuse makes the new query-freshness control fail1/1; the guard is restored and all93 pass.
+Complete Liquid25/25 and JavaScript15/15, CodeEditor typecheck/build and scoped ESLint pass.
+The initial package-filter invocation for
+Liquid/JavaScript matches no projects and is not passing evidence.
+Logs: `/private/tmp/elsa-565-root-midtoken-filter-red.log`,
+`/private/tmp/elsa-565-root-midtoken-reuse-guard-red.log`,
+`/private/tmp/elsa-565-root-editor-midtoken-final.log`,
+`/private/tmp/elsa-565-root-midtoken-typecheck.log`,
+`/private/tmp/elsa-565-root-midtoken-lint.log`,
+`/private/tmp/elsa-565-root-liquid-midtoken-final.log`,
+`/private/tmp/elsa-565-root-js-midtoken-final.log`,
+`/private/tmp/elsa-561-root-normal-host-second.log`; value-free traffic:
+`/private/tmp/elsa-565-root-midtoken-failure-safe-traffic.json`.
+
+Corrected exact-head independent review, rebuilt paired hosts and full CI remain pending.
+M3/M4, manual AT and human acceptance remain open. All program PRs remain draft and unmerged.
+
 ### M3 Liquid member-projection correction — Studio #561, 2026-10-06
 
 The previous integrated head's missing `Line` completion reproduces locally in the rebuilt
@@ -42,9 +81,10 @@ byte-identical after integration. Logs: `/private/tmp/elsa-565-liquid-projection
 `/private/tmp/elsa-565-root-shape-guard-red.log` and
 `/private/tmp/elsa-561-root-normal-host-first.log`.
 
-The corrected integrated paired browser and exact committed-head configured/full CI/review remain
-pending. The previous failure is not closed by scoped units or source review. M3, M4, manual AT,
-human acceptance and delivery remain open; all PRs stay draft and unmerged.
+The corrected integrated paired browser and exact-head CI pass the original member gap but fail
+1/4 at the subsequent mid-token filter case, documented above. The candidate is not accepted by
+scoped units or source review. M3, M4, manual AT, human acceptance and delivery remain open;
+all PRs stay draft and unmerged.
 
 ### M3 Liquid integration candidate — Studio #561, 2026-10-05
 
