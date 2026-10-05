@@ -111,6 +111,12 @@ completeTest("normal-host expression previews and help remain readable in Light,
       await expect(editor).toBeFocused();
       await expect(editor.locator("[class*='studio-code-token-']").first()).toBeVisible();
       await expectReadableCodeSurface(editor, { focused: true });
+      await editor.press("ControlOrMeta+A");
+      await expect.poll(() => editor.evaluate(element => {
+        const selection = window.getSelection();
+        return !!selection && !selection.isCollapsed && element.contains(selection.anchorNode);
+      })).toBe(true);
+      await expectReadableCodeSurface(editor, { focused: true, selected: true });
 
       const position = language === "JavaScript" ? source.indexOf("abs") + 4 : source.indexOf("append") + 6;
       await moveEditorCursor(editor, source, position);
@@ -341,9 +347,9 @@ async function expectExpandedSourceContinuity(page: Page, pair: NormalHostPair,
   await expect.poll(() => readPersistedSource(page, pair, draft)).toBe(source);
 }
 
-async function expectReadableCodeSurface(surface: Locator, options: { focused?: boolean } = {}) {
+async function expectReadableCodeSurface(surface: Locator, options: { focused?: boolean; selected?: boolean } = {}) {
   await expect(surface).toBeVisible();
-  const measurements = await surface.evaluate(element => {
+  const measurements = await surface.evaluate((element, selected) => {
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = 1;
     const context = canvas.getContext("2d", { willReadFrequently: true });
@@ -379,8 +385,11 @@ async function expectReadableCodeSurface(surface: Locator, options: { focused?: 
       if (text.textContent?.trim() && text.parentElement) nodes.add(text.parentElement);
     }
     const ratios = [...nodes].map(node => {
-      const style = getComputedStyle(node);
-      return { className: node.className, contrast: contrast(rgba(style.color), backgroundOf(node)) };
+      const style = getComputedStyle(node, selected ? "::selection" : null);
+      const selectionBackground = selected ? rgba(style.backgroundColor) : undefined;
+      const background = selectionBackground ? blend(selectionBackground, backgroundOf(node)) : backgroundOf(node);
+      return { className: node.className, contrast: contrast(rgba(style.color), background),
+        selectionAlpha: selectionBackground?.[3] };
     });
     const bounds = element.getBoundingClientRect();
     const pane = element.closest(".wf-properties");
@@ -394,10 +403,11 @@ async function expectReadableCodeSurface(surface: Locator, options: { focused?: 
       focus: editor && focusStyle ? { width: parseFloat(focusStyle.outlineWidth), style: focusStyle.outlineStyle,
         contrast: contrast(rgba(focusStyle.outlineColor), backgroundOf(editor.parentElement ?? editor)) } : null
     };
-  });
+  }, options.selected === true);
   expect(measurements.ratios.length).toBeGreaterThan(0);
   for (const measurement of measurements.ratios) {
     expect(measurement.contrast, `Text contrast for ${measurement.className}`).toBeGreaterThanOrEqual(4.5);
+    if (options.selected) expect(measurement.selectionAlpha).toBeGreaterThan(0);
   }
   expect(measurements.left).toBeGreaterThanOrEqual(-1);
   expect(measurements.right).toBeLessThanOrEqual(measurements.viewportWidth + 1);
