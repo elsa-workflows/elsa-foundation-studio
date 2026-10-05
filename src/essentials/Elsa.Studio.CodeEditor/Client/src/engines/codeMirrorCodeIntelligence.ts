@@ -1,4 +1,4 @@
-import { autocompletion, closeCompletion, completionStatus, type Completion, type CompletionSource } from "@codemirror/autocomplete";
+import { autocompletion, closeCompletion, completionStatus, snippetCompletion, type Completion, type CompletionSource } from "@codemirror/autocomplete";
 import { StateEffect, StateField, type Extension } from "@codemirror/state";
 import { EditorView, hoverTooltip, panels, showPanel, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 import { sanitizeStudioCodeMarkdown } from "../StudioCodeDocumentation";
@@ -260,7 +260,7 @@ function createCompletionSource(
   return context => {
     const word = context.matchBefore(/[\p{L}\p{Nd}_$]*/u);
     if (!word && !context.explicit) return null;
-    const from = word?.from ?? context.pos;
+    const defaultFrom = word?.from ?? context.pos;
     const controller = new AbortController();
     completionRequests.add(controller);
     context.addEventListener("abort", () => controller.abort(), { onDocChange: true });
@@ -278,21 +278,24 @@ function createCompletionSource(
     return Promise.all([supplied, Promise.all(local)])
       .then(([authorized, results]) => {
         if (controller.signal.aborted || context.aborted) return null;
+        const replacement = authorized?.find(item => item.range)?.range;
+        const from = replacement?.from ?? defaultFrom;
+        const to = replacement?.to ?? context.pos;
         const merged = new Map<string, Completion>();
         for (const result of results) {
-          if (result?.from !== from) continue;
+          if (result?.from !== defaultFrom) continue;
           for (const item of result.options) merged.set(item.label, item);
         }
         // Authoritative documentation/application wins collisions with syntax-only help.
         for (const item of authorized ?? []) merged.set(item.label, toCodeMirrorCompletion(item));
-        return merged.size ? { from, options: [...merged.values()], validFor: /^[\p{L}\p{Nd}_$]*$/u } : null;
+        return merged.size ? { from, to, options: [...merged.values()], validFor: /^[\p{L}\p{Nd}_$]*$/u } : null;
       })
       .finally(() => completionRequests.delete(controller));
   };
 }
 
 function toCodeMirrorCompletion(completion: StudioCodeCompletion) {
-  return {
+  const item = {
     label: completion.label,
     detail: completion.detail,
     type: completion.kind,
@@ -307,4 +310,7 @@ function toCodeMirrorCompletion(completion: StudioCodeCompletion) {
         }
       : undefined
   };
+  return completion.snippet && completion.apply
+    ? snippetCompletion(completion.apply, item)
+    : item;
 }

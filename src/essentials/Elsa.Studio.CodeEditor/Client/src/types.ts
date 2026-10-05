@@ -35,6 +35,10 @@ export interface StudioCodeCompletion {
   detail?: string;
   kind?: "function" | "method" | "property" | "variable" | "keyword" | "filter" | "tag" | "value";
   apply?: string;
+  /** Optional parser-derived replacement range; defaults to the engine's normal word range. */
+  range?: { from: number; to: number };
+  /** Applies `apply` using the editor engine's snippet/tab-stop support. */
+  snippet?: boolean;
   documentation?: StudioCodeDocumentation;
   /** Higher values are suggested before otherwise equivalent entries. */
   boost?: number;
