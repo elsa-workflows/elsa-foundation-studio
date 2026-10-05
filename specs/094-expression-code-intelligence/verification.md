@@ -8,6 +8,29 @@ T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head autom
 
 ## Passing evidence
 
+### M4 T036 readiness/red checkpoint — Studio #568, 2026-10-06 (not accepted)
+
+Root integration starts at `69ee8e08` (spec reconciliation only; production remains473cf1a9).
+The new actual-host Light/Dark/Dim/narrow journey fails on the unchanged implementation exactly
+at the missing collapsed JavaScript `studio-code-token-*` span. Both hosts are rebuilt and their
+owned processes stop after the failure. Log: `/private/tmp/elsa-568-root-theme-browser-red.log`.
+The preceding setup-only invocation with missing node_modules is not feature red evidence;
+frozen offline installation succeeds without dependency changes before the real red run.
+
+The final test adds actual Colour mode controls, lazy first-preview/no rich mount, keyboard
+activation, actual-text-parent foreground contrast on composited backgrounds, nonzero/contrasting
+focus outline, property-pane containment, version-matched hover/catalog help, diagnostics,
+single undo restoring exact persisted source and shared compact/expanded continuity. Independent
+harness review catches a diagnostic-container false-positive; root changes measurement to every
+actual text parent's foreground and adds focus/pane checks. Final source re-review finds no
+material test defect. That review is not runtime proof. Scoped browser ESLint and diff check pass.
+Existing M3 assertions, bundle/timing budgets and trace/screenshot/video policies are unchanged.
+
+The isolated presentation writer owns unit tests-first implementation. Final integrated browser,
+affected complete suites, exact-head CI/review, manual AT and human acceptance remain pending;
+T036 is unchecked and all PRs remain draft/unmerged. T037 refinement is separate, not an assigned
+formatter implementation or new dependency adoption.
+
 ### Final M3 automated gate — Studio #560/#561 and Foundation #2379, 2026-10-06
 
 Final integrated Studio `473cf1a9f9622c5abd3091b846e91037e7da55c6` (draft#565,

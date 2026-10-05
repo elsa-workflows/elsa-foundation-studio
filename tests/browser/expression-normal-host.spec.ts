@@ -72,6 +72,105 @@ completeTest("persisted workflow drafts use live JavaScript and Liquid assistanc
   expect(consoleErrors).toEqual([]);
 });
 
+completeTest("normal-host expression previews and help remain readable in Light, Dark and Dim at narrow width", async ({ page, hostPair, signInToStudio, recordSafeBackendTraffic, recordSafeConsoleErrors }) => {
+  const traffic = recordSafeBackendTraffic(page, hostPair);
+  const consoleErrors = recordSafeConsoleErrors(page);
+  await signInToStudio(page, hostPair);
+  const draft = await createPersistedExpressionDraft(page, hostPair);
+  await openWorkflowDraft(page, hostPair, draft);
+  await selectWorkflowTarget(page, draft);
+  const syntax = page.getByRole("button", { name: `${draft.inputName} expression syntax` });
+  // A preview may load a static parser, but it must not create a rich editor session.
+  const firstPreview = page.getByRole("button", { name: "JavaScript expression. Activate to edit." });
+  await expect(firstPreview.locator("[class*='studio-code-token-']").first()).toBeVisible();
+  await expect(page.locator(".studio-code-editor-rich .cm-editor")).toHaveCount(0);
+
+  for (const language of ["JavaScript", "Liquid"] as const) {
+    if (language === "Liquid") {
+      await syntax.click();
+      await page.getByRole("option", { name: language, exact: true }).click();
+    }
+    const preview = page.getByRole("button", { name: `${language} expression. Activate to edit.` });
+    await preview.click();
+    const editor = page.locator(".studio-code-editor-rich-compact .cm-content");
+    const source = language === "JavaScript" ? "Math.abs(-2)" : "{{ customerName | append: 'x' }}";
+    const sourcePhase = await replacePersistedWorkflowSource(page, hostPair, editor, draft, traffic, language, source);
+    // Leaving the compact editor returns to the same lazy preview without editing the value.
+    await syntax.focus();
+    await expect(preview).toBeVisible();
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    for (const mode of ["Light", "Dark", "Dim"] as const) {
+      await page.getByRole("radiogroup", { name: "Colour mode" }).getByRole("radio", { name: mode, exact: true }).click();
+      await expect(page.locator("html")).toHaveAttribute("data-theme-appearance", mode.toLowerCase());
+      await expect(preview.locator("[class*='studio-code-token-']").first()).toBeVisible();
+      await expectReadableCodeSurface(preview);
+      await expect.poll(() => readPersistedSource(page, hostPair, draft)).toBe(source);
+      await preview.focus();
+      await expect(editor).toBeVisible();
+      await expect(editor).toBeFocused();
+      await expect(editor.locator("[class*='studio-code-token-']").first()).toBeVisible();
+      await expectReadableCodeSurface(editor, { focused: true });
+
+      const position = language === "JavaScript" ? source.indexOf("abs") + 4 : source.indexOf("append") + 6;
+      await moveEditorCursor(editor, source, position);
+      const section = editor.locator("xpath=ancestor::section[@data-studio-code-editor='true'][1]");
+      const signature = section.locator(".studio-code-editor-signature");
+      await expect(signature).toContainText(language === "JavaScript" ? "abs(x): Number" : "append(value): String");
+      await expectReadableCodeSurface(signature);
+      await moveEditorCursor(editor, source, language === "JavaScript" ? source.indexOf("abs") + 3 : position);
+      await expect(async () => {
+        await editor.press("Alt+i");
+        const hover = page.getByRole("status", { name: "Hover information" });
+        await expect(hover).toBeVisible({ timeout: 1_000 });
+        await expectReadableCodeSurface(hover);
+      }).toPass({ timeout: 15_000 });
+      await editor.press("Escape");
+      await moveEditorCursor(editor, source, language === "JavaScript" ? source.indexOf("abs") + 2 : position);
+      await expect(async () => {
+        await editor.press("Control+Space");
+        const menu = page.locator(".cm-tooltip-autocomplete");
+        await expect(menu).toBeVisible({ timeout: 1_000 });
+        await expectReadableCodeSurface(menu.locator('[aria-selected="true"]'));
+      }).toPass({ timeout: 15_000 });
+      await editor.press("Escape");
+      if (mode === "Light") {
+        // Prove this language's current-source help is backed by successful version-matched
+        // assistance; later repeated help may legitimately reuse that authorized metadata.
+        await expect.poll(() => language === "Liquid"
+          ? hasFreshCatalog(traffic.slice(sourcePhase.start), draft, language, sourcePhase.previousRevision)
+          : hasFreshAssistance(traffic.slice(sourcePhase.start), draft, language,
+            "/expression-tooling/hover", sourcePhase.previousRevision)).toBe(true);
+      }
+      await expect.poll(() => readEditorSource(editor)).toBe(source);
+      await expect.poll(() => readPersistedSource(page, hostPair, draft)).toBe(source);
+      await replacePersistedWorkflowSource(page, hostPair, editor, draft, traffic, language,
+        language === "JavaScript" ? "if (" : "{{ customerName");
+      const diagnostics = section.locator(".studio-code-editor-diagnostics");
+      await expect(diagnostics).toContainText(`${language}/Syntax`);
+      await expectReadableCodeSurface(diagnostics);
+      await editor.press("ControlOrMeta+Z");
+      await expect.poll(() => readEditorSource(editor)).toBe(source);
+      await expect.poll(() => readPersistedSource(page, hostPair, draft)).toBe(source);
+      // Actual keyboard exit is preserved even after help and completion were dismissed.
+      await editor.press("Escape");
+      await editor.press("Tab");
+      await expect(syntax).toBeFocused();
+      await expect(preview).toBeVisible();
+      await expectReadableCodeSurface(preview);
+      // Expanded rendering uses the same theme roles and exact source, not a separate engine.
+      await expectExpandedSourceContinuity(page, hostPair, draft, source);
+      await expect(preview).toBeVisible();
+    }
+
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await expectExpandedSourceContinuity(page, hostPair, draft, source);
+    await expect(preview).toBeVisible();
+    await expect.poll(() => readPersistedSource(page, hostPair, draft)).toBe(source);
+  }
+  expect(consoleErrors).toEqual([]);
+});
+
 completeTest("Activity Definition graph authoring edits a persisted activity expression through both editor sizes", async ({ page, hostPair, signInToStudio, recordSafeBackendTraffic, recordSafeConsoleErrors }) => {
   const traffic = recordSafeBackendTraffic(page, hostPair);
   const consoleErrors = recordSafeConsoleErrors(page);
@@ -229,6 +328,90 @@ missingLiquidProviderTest("missing Liquid provider preserves authored Liquid and
   await expect.poll(() => readPersistedSource(page, hostPair, draft)).toEqual(preservedLiquid);
   expect(consoleErrors).toEqual([]);
 });
+
+async function expectExpandedSourceContinuity(page: Page, pair: NormalHostPair,
+  draft: PersistedExpressionDraft, source: string) {
+  await page.getByRole("button", { name: `Open expanded ${draft.inputName} editor` }).click();
+  const dialog = page.getByRole("dialog");
+  const expanded = dialog.locator(".studio-code-editor-rich-expanded .cm-content");
+  await expect.poll(() => readEditorSource(expanded)).toBe(source);
+  await expectReadableCodeSurface(expanded);
+  await dialog.getByRole("button", { name: `Close ${draft.inputName} editor` }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect.poll(() => readPersistedSource(page, pair, draft)).toBe(source);
+}
+
+async function expectReadableCodeSurface(surface: Locator, options: { focused?: boolean } = {}) {
+  await expect(surface).toBeVisible();
+  const measurements = await surface.evaluate(element => {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 1;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) throw new Error("Canvas color conversion is unavailable.");
+    const rgba = (color: string) => {
+      context.clearRect(0, 0, 1, 1);
+      context.fillStyle = color;
+      context.fillRect(0, 0, 1, 1);
+      return Array.from(context.getImageData(0, 0, 1, 1).data);
+    };
+    const blend = (front: number[], back: number[]) => front.slice(0, 3)
+      .map((channel, index) => channel * front[3] / 255 + back[index] * (1 - front[3] / 255));
+    const luminance = (rgb: number[]) => rgb.slice(0, 3).map(channel => {
+      const normalized = channel / 255;
+      return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+    }).reduce((total, channel, index) => total + channel * [0.2126, 0.7152, 0.0722][index], 0);
+    const contrast = (foreground: number[], background: number[]) => {
+      const a = luminance(blend(foreground, background));
+      const b = luminance(background);
+      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    };
+    const backgroundOf = (node: Element) => {
+      const ancestors: Element[] = [];
+      for (let current: Element | null = node; current; current = current.parentElement) ancestors.push(current);
+      return ancestors.reverse().reduce((background, ancestor) =>
+        blend(rgba(getComputedStyle(ancestor).backgroundColor), background), [255, 255, 255]);
+    };
+    // Measure each actual text parent's foreground: diagnostics/docs may override the container.
+    // Read only colors and classes, never authored text, into the returned evidence.
+    const nodes = new Set<Element>();
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    for (let text = walker.nextNode(); text; text = walker.nextNode()) {
+      if (text.textContent?.trim() && text.parentElement) nodes.add(text.parentElement);
+    }
+    const ratios = [...nodes].map(node => {
+      const style = getComputedStyle(node);
+      return { className: node.className, contrast: contrast(rgba(style.color), backgroundOf(node)) };
+    });
+    const bounds = element.getBoundingClientRect();
+    const pane = element.closest(".wf-properties");
+    const paneBounds = pane?.getBoundingClientRect();
+    const editor = element.closest(".cm-editor");
+    const focusStyle = editor && getComputedStyle(editor);
+    return {
+      ratios, left: bounds.left, right: bounds.right, viewportWidth: window.innerWidth,
+      pane: pane && paneBounds ? { left: paneBounds.left, right: paneBounds.right,
+        scrollWidth: pane.scrollWidth, clientWidth: pane.clientWidth } : null,
+      focus: editor && focusStyle ? { width: parseFloat(focusStyle.outlineWidth), style: focusStyle.outlineStyle,
+        contrast: contrast(rgba(focusStyle.outlineColor), backgroundOf(editor.parentElement ?? editor)) } : null
+    };
+  });
+  expect(measurements.ratios.length).toBeGreaterThan(0);
+  for (const measurement of measurements.ratios) {
+    expect(measurement.contrast, `Text contrast for ${measurement.className}`).toBeGreaterThanOrEqual(4.5);
+  }
+  expect(measurements.left).toBeGreaterThanOrEqual(-1);
+  expect(measurements.right).toBeLessThanOrEqual(measurements.viewportWidth + 1);
+  if (measurements.pane) {
+    expect(measurements.pane.left).toBeGreaterThanOrEqual(-1);
+    expect(measurements.pane.right).toBeLessThanOrEqual(measurements.viewportWidth + 1);
+    expect(measurements.pane.scrollWidth).toBeLessThanOrEqual(measurements.pane.clientWidth + 1);
+  }
+  if (options.focused) {
+    expect(measurements.focus?.style).toBe("solid");
+    expect(measurements.focus?.width).toBeGreaterThanOrEqual(2);
+    expect(measurements.focus?.contrast).toBeGreaterThanOrEqual(3);
+  }
+}
 
 async function openWorkflowDraft(page: Page, pair: NormalHostPair, draft: PersistedExpressionDraft) {
   await page.goto(new URL(`/workflows/definitions?definition=${encodeURIComponent(draft.definitionId)}`, pair.studioUrl).toString());
