@@ -22,7 +22,7 @@ The shell UX is adapted from [`elsa-workflows/elsa-foundation-designer`](https:/
 
 ## Modular features (CShells)
 
-Studio is a modular monolith built on [CShells](https://www.cshells.io/). Each module is a class library that exposes a CShells *feature* (`IShellFeature` / `IWebShellFeature`) instead of being hardwired into the host. The host (`Elsa.Studio.Web`) does not call module-specific registration methods — it enables features per shell from `appsettings.json`:
+Studio is a modular monolith built on [CShells](https://www.cshells.io/). Each module is a class library that exposes a CShells *feature* (`IShellFeature` / `IWebShellFeature`) instead of being hardwired into the host. The host (`Elsa.Studio.Web`) does not call module-specific registration methods — it enables features per shell from `shells.json`:
 
 ```json
 {
@@ -34,8 +34,7 @@ Studio is a modular monolith built on [CShells](https://www.cshells.io/). Each m
           "ConsoleStream": {},
           "DashboardStudio": {},
           "AttentionStudio": {},
-          "WorkflowsDashboardStudio": {},
-          "WeatherForecastSample": {}
+          "WorkflowsDashboardStudio": {}
         },
         "Configuration": {
           "WebRouting": { "Path": "" }
@@ -59,10 +58,10 @@ Features ship in:
 | `DashboardStudio` | `Elsa.Studio.Dashboard` | `IShellFeature` |
 | `AttentionStudio` | `Elsa.Studio.Attention` | `IShellFeature` |
 | `WorkflowsDashboardStudio` | `Elsa.Studio.Workflows.Dashboard` | `IShellFeature` |
-| `WeatherForecastSample` | `Elsa.Studio.Samples.WeatherForecast` | `IWebShellFeature` |
+| `WeatherForecastSample` | `Elsa.Studio.Samples.WeatherForecast` | `IWebShellFeature` (opt-in) |
 | `ExtensionBuilderStudio` | `Elsa.Studio.ExtensionBuilder` | `IWebShellFeature` (opt-in, not in the default `shells.json`) |
 
-The host discovers in-box features only in the assemblies listed in `StudioFeatureAssemblies` (in `Elsa.Studio.Web`), plus installed Nuplane packages. CShells stops scanning host assemblies once that list is registered, so every new in-box feature needs its assembly added there, opt-in features such as `ExtensionBuilderStudio` included. Otherwise CShells skips the feature with a startup warning when `shells.json` enables it, and Feature Management cannot enable it. `WeatherForecastSample` is the exception: the host does not reference it, and it activates once its package (`artifacts/packages/Elsa.Studio.Samples.WeatherForecast.*.nupkg`) is installed into the `packages` feed. Until then, the startup warning for it is expected.
+The host discovers in-box features only in the assemblies listed in `StudioFeatureAssemblies` (in `Elsa.Studio.Web`), plus installed Nuplane packages. CShells stops scanning host assemblies once that list is registered, so every new in-box feature needs its assembly added there, opt-in features such as `ExtensionBuilderStudio` included. Otherwise CShells skips the feature with a startup warning when `shells.json` enables it, and Feature Management cannot enable it. `WeatherForecastSample` is package-loaded and disabled by default. To use it, install its package (`artifacts/packages/Elsa.Studio.Samples.WeatherForecast.*.nupkg`) into the `packages` feed and add `"WeatherForecastSample": {}` to the shell’s `Features`. Requesting it before the package is available produces a startup warning.
 
 ### Opting into Extension Builder
 

@@ -11,8 +11,8 @@ namespace Elsa.Studio.Tests;
 
 public sealed class WebHostShellFeatureDiscoveryTests : IAsyncLifetime
 {
-    // Features the Web host enables in shells.json but deliberately does not reference: their assemblies arrive through
-    // an installed Nuplane package, so they only become discoverable once that package is dropped into the feed.
+    // Optional features the Web host does not reference or enable by default. Their assemblies arrive through
+    // an installed Nuplane package, after which they can be enabled in shells.json.
     private static readonly string[] PackageLoadedFeatures = ["WeatherForecastSample"];
 
     private HashSet<string> _enabled = null!;
@@ -32,7 +32,6 @@ public sealed class WebHostShellFeatureDiscoveryTests : IAsyncLifetime
     public void EveryFeatureEnabledInShellsJson_ResolvesToDiscoverableFeatureType()
     {
         var undiscoverable = _enabled
-            .Except(PackageLoadedFeatures, StringComparer.OrdinalIgnoreCase)
             .Where(feature => !_discovered.Contains(feature));
 
         Assert.NotEmpty(_enabled);
@@ -48,11 +47,11 @@ public sealed class WebHostShellFeatureDiscoveryTests : IAsyncLifetime
     }
 
     [Fact]
-    public void PackageLoadedFeatures_AreEnabledButNotInBox()
+    public void PackageLoadedFeatures_AreOptInAndNotInBox()
     {
         Assert.All(PackageLoadedFeatures, feature =>
         {
-            Assert.Contains(feature, _enabled);
+            Assert.DoesNotContain(feature, _enabled);
             Assert.DoesNotContain(feature, _shipped);
             Assert.DoesNotContain(feature, _discovered);
         });
