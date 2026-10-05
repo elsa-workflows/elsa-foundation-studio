@@ -1,0 +1,52 @@
+/* Quiet chrome shared by the three classic-layout themes. Surface recipes live in the catalog. */
+html[data-theme-material]:is([data-theme="porcelain"], [data-theme="nordic"], [data-theme="obsidian"]) {
+  --studio-surface-raised: var(--card);
+  --studio-accent-soft: color-mix(in srgb, var(--primary) 10%, transparent);
+  --studio-title-weight: 600;
+}
+
+html[data-theme-material]:is([data-theme="porcelain"], [data-theme="nordic"], [data-theme="obsidian"]) .sidebar,
+html[data-theme-material]:is([data-theme="porcelain"], [data-theme="nordic"], [data-theme="obsidian"]) .nav-icon-tile {
+  box-shadow: none;
+}
+
+html[data-theme-material]:is([data-theme="porcelain"], [data-theme="nordic"], [data-theme="obsidian"]) .nav-icon-tile {
+  background: transparent;
+  border-color: transparent;
+}
+
+html[data-theme-material]:is([data-theme="porcelain"], [data-theme="nordic"], [data-theme="obsidian"]) .nav-section a.active,
+html[data-theme-material]:is([data-theme="porcelain"], [data-theme="nordic"], [data-theme="obsidian"]) .nav-section a.has-active-child {
+  background: var(--studio-material-active-bg);
+  box-shadow: none;
+}
+
+html[data-theme-material]:is([data-theme="porcelain"], [data-theme="nordic"], [data-theme="obsidian"]) .react-flow__edge-path {
+  filter: none;
+}
+
+html[data-theme-material]:is([data-theme="porcelain"], [data-theme="nordic"], [data-theme="obsidian"]) .react-flow__background circle {
+  fill: var(--studio-material-dot);
+}
+
+html[data-theme-material]:is([data-theme="porcelain"], [data-theme="nordic"], [data-theme="obsidian"]) .wf-node .react-flow__handle {
+  box-shadow: none;
+}
+
+/* Serif only for display hierarchy; controls and technical labels keep Instrument Sans. */
+html[data-theme="porcelain"] {
+  --studio-title-weight: 400;
+}
+
+html[data-theme="porcelain"] .wf-editor-heading > strong {
+  font-family: var(--studio-font-display);
+  font-size: 22px;
+  font-weight: 400;
+}
+
+/* Obsidian separates its surfaces with fine borders rather than diffuse elevation. */
+html[data-theme="obsidian"] {
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+}

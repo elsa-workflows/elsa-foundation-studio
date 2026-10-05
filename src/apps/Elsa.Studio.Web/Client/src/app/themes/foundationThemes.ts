@@ -216,6 +216,132 @@ function materialHighContrast(): ThemeModeDefinition {
   return { ...highContrast(oklch(0.88, 0.18, 258), 258), material: { cssVariables: materialSurfaceRoles("high-contrast") } };
 }
 
+/** Convert the approved preview swatches into the OKLCH token format used by the contrast audit. */
+function previewColor(hex: string): string {
+  if (!/^#[\da-f]{6}$/i.test(hex)) {
+    throw new Error(`Expected a six-digit hex colour, received ${hex}`);
+  }
+
+  const linearize = (part: string) => {
+    const channel = parseInt(part, 16) / 255;
+    return channel <= 0.04045
+      ? channel / 12.92
+      : ((channel + 0.055) / 1.055) ** 2.4;
+  };
+  const [red, green, blue] = [hex.slice(1, 3), hex.slice(3, 5), hex.slice(5, 7)].map(linearize) as [number, number, number];
+  const l = (0.4122214708 * red + 0.5363325363 * green + 0.0514459929 * blue) ** (1 / 3);
+  const m = (0.2119034982 * red + 0.6806995451 * green + 0.1073969566 * blue) ** (1 / 3);
+  const s = (0.0883024619 * red + 0.2817188376 * green + 0.6299787005 * blue) ** (1 / 3);
+  const lightness = 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s;
+  const a = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s;
+  const b = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s;
+  const chroma = Math.hypot(a, b);
+  const hue = (Math.atan2(b, a) * 180 / Math.PI + 360) % 360;
+
+  return oklch(Number(lightness.toFixed(6)), Number(chroma.toFixed(6)), Number(hue.toFixed(4)));
+}
+
+interface PreviewPalette {
+  page: string;
+  surface: string;
+  surface2: string;
+  nav: string;
+  canvas: string;
+  input: string;
+  ink: string;
+  secondary: string;
+  muted: string;
+  line: string;
+  accent: string;
+  accentInk: string;
+  accentSoft: string;
+  good: string;
+  goodInk: string;
+  dot: string;
+  lightShadow: string;
+  darkShadow: string;
+}
+
+function previewMode(scheme: Scheme, palette: PreviewPalette): ThemeModeDefinition {
+  const primary = previewColor(palette.accent);
+  const activeForeground = primary;
+
+  return mode({
+    scheme,
+    hue: 0,
+    chroma: 0,
+    background: 0.96,
+    card: 0.99,
+    muted: 0.93,
+    border: 0.88,
+    input: 0.96,
+    sidebar: 0.92,
+    foreground: 0.22,
+    mutedForeground: 0.48,
+    primary,
+    primaryForeground: previewColor(palette.accentInk),
+    wash: previewColor(palette.accentSoft),
+    activeForeground,
+    overrides: {
+      primary,
+      primaryForeground: previewColor(palette.accentInk),
+      secondary: previewColor(palette.surface2),
+      secondaryForeground: previewColor(palette.secondary),
+      accent: previewColor(palette.accentSoft),
+      accentForeground: previewColor(palette.ink),
+      success: previewColor(palette.good),
+      successForeground: previewColor(palette.goodInk),
+      background: previewColor(palette.page),
+      foreground: previewColor(palette.ink),
+      card: previewColor(palette.surface),
+      cardForeground: previewColor(palette.ink),
+      muted: previewColor(palette.surface2),
+      mutedForeground: previewColor(palette.muted),
+      border: previewColor(palette.line),
+      input: previewColor(palette.input),
+      sidebar: previewColor(palette.nav),
+      sidebarForeground: previewColor(palette.ink),
+      sidebarActive: previewColor(palette.accentSoft),
+      sidebarActiveForeground: activeForeground,
+      ring: primary
+    }
+  });
+}
+
+/** Flat shared Material roles let opt-in modules read a complete surface ladder without texture or inset effects. */
+function previewMaterialRoles(scheme: Scheme, palette?: PreviewPalette): Record<string, string> {
+  const noShadow = "0 0 0 0 transparent";
+  const shadow = scheme === "high-contrast" || !palette
+    ? noShadow
+    : scheme === "light" ? palette.lightShadow : palette.darkShadow;
+
+  return {
+    ...materialSurfaceRoles(scheme),
+    "--studio-material-canvas-bg": palette ? previewColor(palette.canvas) : "var(--studio-bg)",
+    "--studio-material-panel-bg": "var(--studio-surface)",
+    "--studio-material-panel-bg-strong": "var(--studio-surface)",
+    "--studio-material-panel-bg-soft": "var(--studio-surface-muted)",
+    "--studio-material-node-bg": "var(--studio-surface)",
+    "--studio-material-node-shadow": shadow,
+    "--studio-material-shadow": shadow,
+    "--studio-material-shadow-strong": shadow,
+    "--studio-material-grid-size": "20px 20px",
+    "--studio-material-dot": palette ? previewColor(palette.dot) : "var(--studio-border)",
+    "--studio-material-control-bg": "var(--input)",
+    "--studio-material-hover-bg": "var(--accent)",
+    "--studio-material-active-bg": "var(--accent)",
+    "--studio-material-well-bg": "var(--input)"
+  };
+}
+
+function previewMaterialMode(scheme: Scheme, palette: PreviewPalette): ThemeModeDefinition {
+  return { ...previewMode(scheme, palette), material: { cssVariables: previewMaterialRoles(scheme, palette) } };
+}
+
+function previewHighContrast(accent: string, hue: number): ThemeModeDefinition {
+  return { ...highContrast(previewColor(accent), hue), material: { cssVariables: previewMaterialRoles("high-contrast") } };
+}
+
 const geistTypography: ThemeTypography = {
   sans: `"Geist Variable", "Geist", ${sansFallback}`,
   mono: `"Geist Mono Variable", "Geist Mono", ${monoFallback}`
@@ -610,6 +736,104 @@ const dusk = definition(
   }
 );
 
-export const foundationThemeIds = ["meridian", "material", "drift", "drift-coast", "drift-sand", "drift-ink", "schematic", "atelier", "elsa-cloud", "signal", "dusk"] as const;
+const porcelainSans = `"Instrument Sans Variable", "Instrument Sans", ${sansFallback}`;
+const porcelainDisplay = `"Instrument Serif", Georgia, "Times New Roman", serif`;
+const nordicSans = `"Manrope Variable", "Manrope", ${sansFallback}`;
+const existingMono = `"JetBrains Mono Variable", "JetBrains Mono", ${monoFallback}`;
+const porcelainElevation = {
+  lightShadow: "0 2px 5px #49301d09, 0 12px 32px #49301d06",
+  darkShadow: "0 2px 5px #0002, 0 12px 32px #0001"
+} satisfies Pick<PreviewPalette, "lightShadow" | "darkShadow">;
+const nordicElevation = {
+  lightShadow: "0 2px 5px #233c5206, 0 12px 32px #233c5205",
+  darkShadow: "0 2px 5px #0002, 0 12px 32px #0001"
+} satisfies Pick<PreviewPalette, "lightShadow" | "darkShadow">;
+const obsidianElevation = {
+  lightShadow: "0 0 0 0 transparent",
+  darkShadow: "0 0 0 0 transparent"
+} satisfies Pick<PreviewPalette, "lightShadow" | "darkShadow">;
 
-export const foundationThemeDefinitions: StudioThemeDefinition[] = [meridian, material, drift, driftCoast, driftSand, driftInk, schematic, atelier, elsaCloud, signal, dusk];
+const porcelain = definition(
+  "porcelain",
+  "Porcelain",
+  "Warm ivory paper, ink and restrained terracotta with an editorial serif display face.",
+  { sans: porcelainSans, display: porcelainDisplay, mono: existingMono },
+  { radiusSm: "7px", radius: "12px", radiusMd: "14px", radiusLg: "16px", radiusXl: "18px" },
+  "classic",
+  {
+    light: previewMaterialMode("light", {
+      page: "#f5f2ed", surface: "#fffcf8", surface2: "#eee8df", nav: "#eae3d8", canvas: "#f8f5ef", input: "#f4efe7",
+      ink: "#2b2926", secondary: "#625b52", muted: "#6c6358", line: "#ded6ca", accent: "#8e5341", accentInk: "#fffaf5",
+      accentSoft: "#f1e0d6", good: "#377257", goodInk: "#ffffff", dot: "#cfc6b9", ...porcelainElevation
+    }),
+    dark: previewMaterialMode("dark", {
+      page: "#211e1a", surface: "#2b2722", surface2: "#332e27", nav: "#25211c", canvas: "#24211c", input: "#24201b",
+      ink: "#f4ebe0", secondary: "#d4c6b5", muted: "#b6a897", line: "#4c4237", accent: "#e3aa8f", accentInk: "#372219",
+      accentSoft: "#4b352c", good: "#9dc3a9", goodInk: "#283b2e", dot: "#463d31", ...porcelainElevation
+    }),
+    dim: previewMaterialMode("dim", {
+      page: "#302922", surface: "#3d352e", surface2: "#494036", nav: "#393129", canvas: "#352f28", input: "#352e26",
+      ink: "#f3e8db", secondary: "#d1c1b1", muted: "#c0ab96", line: "#63564a", accent: "#e0a58a", accentInk: "#39251b",
+      accentSoft: "#544034", good: "#9cc2a8", goodInk: "#243a2c", dot: "#55493a", ...porcelainElevation
+    }),
+    highContrast: previewHighContrast("#ffb99e", 40)
+  }
+);
+
+const nordic = definition(
+  "nordic",
+  "Nordic",
+  "Cool mist, slate and muted blue with calm tonal layers and soft geometry.",
+  { sans: nordicSans, display: nordicSans, mono: existingMono },
+  { radiusSm: "9px", radius: "16px", radiusMd: "18px", radiusLg: "20px", radiusXl: "24px" },
+  "classic",
+  {
+    light: previewMaterialMode("light", {
+      page: "#edf3f6", surface: "#fbfdff", surface2: "#eaf0f5", nav: "#e1eaf0", canvas: "#f1f6f9", input: "#eef3f7",
+      ink: "#233545", secondary: "#4b6375", muted: "#586d7e", line: "#d4e0e9", accent: "#386b96", accentInk: "#ffffff",
+      accentSoft: "#e0edf7", good: "#316c5c", goodInk: "#ffffff", dot: "#c6d7e3", ...nordicElevation
+    }),
+    dark: previewMaterialMode("dark", {
+      page: "#19222c", surface: "#25313e", surface2: "#2c3946", nav: "#1e2a36", canvas: "#1d2833", input: "#202c37",
+      ink: "#e9f1f8", secondary: "#b9ccdc", muted: "#9db3c5", line: "#3c5062", accent: "#96c0e3", accentInk: "#142b3f",
+      accentSoft: "#2a465e", good: "#a0ccba", goodInk: "#2a423b", dot: "#354958", ...nordicElevation
+    }),
+    dim: previewMaterialMode("dim", {
+      page: "#22303c", surface: "#324354", surface2: "#3d5062", nav: "#293a4b", canvas: "#273745", input: "#2c3c4d",
+      ink: "#edf3f7", secondary: "#bfceda", muted: "#b6c7d6", line: "#536879", accent: "#a0c9e9", accentInk: "#1b344a",
+      accentSoft: "#394f63", good: "#a4cbb9", goodInk: "#263d36", dot: "#4b6071", ...nordicElevation
+    }),
+    highContrast: previewHighContrast("#abd6fa", 242)
+  }
+);
+
+const obsidian = definition(
+  "obsidian",
+  "Obsidian",
+  "Quiet graphite, warm off-white and amber with crisp steel hairlines and compact controls.",
+  { sans: geistTypography.sans, display: geistTypography.sans, mono: geistTypography.mono },
+  { radiusSm: "4px", radius: "6px", radiusMd: "6px", radiusLg: "8px", radiusXl: "10px" },
+  "classic",
+  {
+    light: previewMaterialMode("light", {
+      page: "#f0f0ed", surface: "#fafaf7", surface2: "#e8e8e3", nav: "#e0e0da", canvas: "#f4f4f0", input: "#ededE7",
+      ink: "#262721", secondary: "#57594f", muted: "#64675b", line: "#d3d4cb", accent: "#7f5b20", accentInk: "#ffffff",
+      accentSoft: "#ede3cb", good: "#326e53", goodInk: "#ffffff", dot: "#d1d1c7", ...obsidianElevation
+    }),
+    dark: previewMaterialMode("dark", {
+      page: "#171819", surface: "#232527", surface2: "#2b2e30", nav: "#1c1e20", canvas: "#1a1c1e", input: "#1d1f21",
+      ink: "#efefeb", secondary: "#c0c1bb", muted: "#a2a69f", line: "#3e4141", accent: "#d7b877", accentInk: "#2c2313",
+      accentSoft: "#403829", good: "#9ec9b1", goodInk: "#253a30", dot: "#35383b", ...obsidianElevation
+    }),
+    dim: previewMaterialMode("dim", {
+      page: "#202224", surface: "#303336", surface2: "#393d40", nav: "#242729", canvas: "#272a2c", input: "#292c2e",
+      ink: "#f0f0ec", secondary: "#c5c7c1", muted: "#a9ada6", line: "#575b5c", accent: "#e0c481", accentInk: "#2d2517",
+      accentSoft: "#4a4031", good: "#a3c7b2", goodInk: "#283c32", dot: "#46494b", ...obsidianElevation
+    }),
+    highContrast: previewHighContrast("#f3cc7f", 85)
+  }
+);
+
+export const foundationThemeIds = ["meridian", "material", "drift", "drift-coast", "drift-sand", "drift-ink", "schematic", "atelier", "elsa-cloud", "signal", "dusk", "porcelain", "nordic", "obsidian"] as const;
+
+export const foundationThemeDefinitions: StudioThemeDefinition[] = [meridian, material, drift, driftCoast, driftSand, driftInk, schematic, atelier, elsaCloud, signal, dusk, porcelain, nordic, obsidian];

@@ -14,7 +14,7 @@ describe("theme presets", () => {
   });
 
   it("registers Material as a selectable material theme without changing the default", () => {
-    expect(materialThemeIds).toEqual(["material"]);
+    expect(materialThemeIds).toEqual(["material", "porcelain", "nordic", "obsidian"]);
     expect(getTheme("material")?.name).toBe("Material");
     expect(isMaterialTheme("material")).toBe(true);
     expect(builtInThemeDefinitions.some(theme => isMaterialTheme(theme.id))).toBe(true);

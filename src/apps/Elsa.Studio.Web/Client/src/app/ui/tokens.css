@@ -233,8 +233,8 @@ html[data-theme-material] {
   --studio-focus: color-mix(in srgb, var(--studio-accent) 30%, transparent);
 
   /*
-   * Neutral surface-role ladder. No built-in theme ships a material recipe any more, so these
-   * flat fallbacks keep the vocabulary closed: a material theme overrides only the rungs it
+   * Neutral surface-role ladder. These flat fallbacks keep the vocabulary closed:
+   * a theme with surface roles overrides only the rungs it
    * restyles, and every `--studio-material-*` reference still resolves.
    */
   --studio-material-body-bg: var(--studio-bg);
@@ -251,6 +251,7 @@ html[data-theme-material] {
   --studio-material-shadow-strong: var(--studio-shadow-sm);
 
   --studio-material-grid-size: 32px 32px;
+  --studio-material-dot: var(--studio-border);
   --studio-material-radius: var(--studio-radius);
   --studio-material-texture-size: 480px 480px;
   --studio-material-body-bg-size: auto, var(--studio-material-grid-size), var(--studio-material-grid-size), auto;

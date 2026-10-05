@@ -51,7 +51,8 @@ Optionally supply `--font-display` (title face; defaults to `--font-sans`).
 
 Studio offers four modes: `light`, `dark`, `dim` and `high-contrast`. Every theme defines Light
 and Dark; Dim and High contrast are optional per theme (the signature themes — Meridian,
-Drift and its Coast, Sand and Ink palettes, Schematic, Atelier, Elsa Cloud, Signal, Dusk, Material — define all four). ThemeProvider sets two attributes:
+Drift and its Coast, Sand and Ink palettes, Schematic, Atelier, Elsa Cloud, Signal, Dusk, Material,
+Porcelain, Nordic and Obsidian — define all four). ThemeProvider sets two attributes:
 
 | Attribute | Values | Meaning |
 | --- | --- | --- |
@@ -156,7 +157,11 @@ They are gated on the `html[data-theme-material]` attribute, so **flat themes ar
 
 The built-in **Material** theme sets `data-theme-material="material"` and uses this vocabulary for
 tonal surfaces and restrained elevation inspired by Material Design. It supplies no material
-texture or beveled inset treatment. Other built-ins remain flat. Hosts and custom themes can
+texture or beveled inset treatment. **Porcelain**, **Nordic** and **Obsidian** reuse the same flat
+surface roles, with their own palettes, typography and corner shapes. All four preserve the
+classic editor layout and support Light, Dark, Dim and High contrast. Porcelain uses warm ivory
+with Instrument Sans and serif display headings; Nordic uses cool slate with Manrope; Obsidian
+uses graphite and amber with Geist. Hosts and custom themes can
 supply their own recipes: the shared `html[data-theme-material]` block in `tokens.css` defines a neutral, flat
 fallback for every token below, and a material theme overrides the rungs it restyles. If you add a
 new `--studio-material-*` token you MUST give it a fallback in that shared block.
@@ -164,6 +169,9 @@ new `--studio-material-*` token you MUST give it a fallback in that shared block
 ### The surface-role ladder
 
 Material surfaces form a role ladder, recessed → raised. Pick the rung by role, not by look:
+
+`--studio-material-dot` supplies the workflow canvas marker colour, falling back to
+`--studio-border` when a theme does not override it.
 
 ```
 shell  <  panel  <  card  <  row  <  well

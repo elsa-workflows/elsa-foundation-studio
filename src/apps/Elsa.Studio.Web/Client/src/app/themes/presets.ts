@@ -229,7 +229,7 @@ export function cloneThemeDefinition(theme: StudioThemeDefinition): StudioThemeD
 }
 
 /** Built-in themes that opt into the host's `--studio-material-*` surface-role treatment. */
-export const materialThemeIds: readonly string[] = ["material"];
+export const materialThemeIds: readonly string[] = ["material", "porcelain", "nordic", "obsidian"];
 
 export const isMaterialTheme = (themeId: string): boolean => materialThemeIds.includes(themeId);
 

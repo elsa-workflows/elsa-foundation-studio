@@ -109,7 +109,23 @@ describe("signature themes", () => {
   });
 
   it("gives each signature theme its layout", () => {
-    expect(foundationThemeIds.map(id => getTheme(id)!.layout)).toEqual(["classic", "classic", "floating", "floating", "floating", "floating", "workbench", "editorial", "classic", "classic", "classic"]);
+    const distinctiveLayouts: Record<string, string> = {
+      drift: "floating", "drift-coast": "floating", "drift-sand": "floating", "drift-ink": "floating",
+      schematic: "workbench", atelier: "editorial"
+    };
+    for (const id of foundationThemeIds) {
+      expect(getTheme(id)!.layout, id).toBe(distinctiveLayouts[id] ?? "classic");
+    }
+  });
+
+  it.each(["porcelain", "nordic", "obsidian"])("%s has quiet surfaces in every mode", id => {
+    const theme = getTheme(id)!;
+    expect(theme.layout).toBe("classic");
+    for (const mode of allThemeModes) {
+      const variables = getThemeModeDefinition(theme, mode)?.material?.cssVariables;
+      expect(variables?.["--studio-material-panel-bg"]).toBe("var(--studio-surface)");
+      expect(variables).not.toHaveProperty("--studio-material-texture");
+    }
   });
 
   it("gives Material a tonal role recipe in every mode without texture", () => {
@@ -365,6 +381,25 @@ describe("ThemeProvider and ThemeSwitcher", () => {
     await act(() => api!.setMode("high-contrast"));
     expect(html.getAttribute("data-theme-appearance")).toBe("high-contrast");
     expect(html.style.getPropertyValue("--studio-material-shadow")).toContain("transparent");
+  });
+
+  it.each([
+    ["porcelain", "Instrument Sans", "Instrument Serif", "12px"],
+    ["nordic", "Manrope", "Manrope", "16px"],
+    ["obsidian", "Geist", "Geist", "6px"]
+  ])("selects %s and persists its mode without changing the editor layout", async (id, sans, display, radius) => {
+    await render();
+    expect(api!.availableThemes.some(theme => theme.id === id)).toBe(true);
+    await act(() => api!.setTheme(id));
+    const html = document.documentElement;
+    expect(html.getAttribute("data-theme-material")).toBe(id);
+    expect(html.getAttribute("data-theme-layout")).toBe("classic");
+    expect(html.style.getPropertyValue("--font-sans")).toContain(sans);
+    expect(html.style.getPropertyValue("--font-display")).toContain(display);
+    expect(html.style.getPropertyValue("--radius")).toBe(radius);
+    await act(() => api!.setMode("dim"));
+    expect(html.getAttribute("data-theme-appearance")).toBe("dim");
+    expect(localStorage.getItem("elsa-studio-theme")).toBe(id);
   });
 
   it("keeps data-theme-mode as the colour scheme and exposes the exact mode as data-theme-appearance", async () => {
