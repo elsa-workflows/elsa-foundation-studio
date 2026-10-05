@@ -84,6 +84,18 @@ describe("Liquid cursor classification", () => {
     });
   });
 
+  it("classifies an unfinished trailing member separator as an empty member position", async () => {
+    const classify = createLiquidCursorClassifier();
+    const source = "{{ predecessor.";
+    expect(await classify(source, source.length)).toMatchObject({
+      region: "value",
+      from: source.length,
+      to: source.length,
+      prefix: "",
+      valuePath: ["predecessor", ""]
+    });
+  });
+
   it("uses parsed built-in tag-name bounds so tag arguments remain value positions", async () => {
     const classify = createLiquidCursorClassifier();
     const source = "{%- if customer -%}";

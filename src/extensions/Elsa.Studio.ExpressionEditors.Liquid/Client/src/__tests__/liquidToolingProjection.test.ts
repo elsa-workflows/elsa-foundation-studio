@@ -31,6 +31,20 @@ const catalogSymbols = [
   { id: "value-budget", name: "budget", kind: "value" }
 ];
 
+const activityOutput = {
+  id: "activity-result:predecessor.Line",
+  name: "predecessor.Line",
+  kind: "value",
+  documentation: "Activity output",
+  shapeId: "line-shape"
+};
+
+const activityOutputContext = {
+  ...authoringContext,
+  rootSymbols: [...authoringContext.rootSymbols, activityOutput],
+  visibleActivityOutputs: [activityOutput]
+};
+
 function setup(getCatalog = vi.fn().mockResolvedValue({ state: "ready", data: { symbols: catalogSymbols } })) {
   return createLiquidToolingProjection({
     document,
@@ -85,6 +99,183 @@ describe("Liquid tooling projection", () => {
     expect(values?.map(item => item.label)).not.toContain("safeFilter");
   });
 
+  it("projects flattened authorized activity outputs through a Liquid member path", async () => {
+    const context = {
+      ...activityOutputContext,
+      rootSymbols: [...activityOutputContext.rootSymbols, {
+        id: "filter:predecessor.unsafe",
+        name: "predecessor.unsafe",
+        kind: "filter",
+        shapeId: "filter-shape"
+      }]
+    };
+    const getCatalog = vi.fn().mockResolvedValue({ state: "ready", data: { symbols: [] } });
+    const projection = createLiquidToolingProjection({
+      document,
+      authoringContext: context,
+      tooling: { getCatalog, getValueShape: vi.fn().mockResolvedValue({ state: "ready", data: { id: "line-shape", members: [] } }) }
+    });
+    const source = "{{ predecessor.";
+    const signal = new AbortController().signal;
+    const completions = await projection.completionProvider({
+      document: { ...document, value: source }, position: source.length, explicit: true, signal
+    });
+
+    expect(completions).toContainEqual(expect.objectContaining({
+      label: "Line",
+      range: { from: source.length, to: source.length }
+    }));
+    expect(completions?.filter(item => item.label === "Line")).toHaveLength(1);
+    expect(completions?.map(item => item.label)).not.toContain("unsafe");
+    expect(getCatalog).toHaveBeenCalledWith(
+      expect.objectContaining({ source, sourceVersion: 2 }), context, "predecessor", undefined, signal
+    );
+
+    const memberSource = "{{ predecessor.Line }}";
+    const memberFrom = memberSource.indexOf("Line");
+    await expect(projection.hoverProvider(
+      { ...document, value: memberSource }, memberFrom + 2, signal
+    )).resolves.toMatchObject({
+      range: { from: memberFrom, to: memberFrom + "Line".length },
+      documentation: { markdown: "Line\n\nActivity output" }
+    });
+
+    const unauthorizedProjection = createLiquidToolingProjection({
+      document,
+      authoringContext: context,
+      tooling: { getCatalog: vi.fn().mockResolvedValue({ state: "unauthorized" }) }
+    });
+    await expect(unauthorizedProjection.completionProvider({
+      document: { ...document, value: source }, position: source.length, explicit: true, signal
+    })).resolves.toEqual([]);
+  });
+
+  it("projects flat catalog-only values while keeping same-name filters out of value roots", async () => {
+    const getCatalog = vi.fn().mockResolvedValue({ state: "ready", data: { symbols: [
+      activityOutput,
+      { id: "filter:append", name: "append", kind: "filter", documentation: "Append text." }
+    ] } });
+    const context = {
+      ...authoringContext,
+      rootSymbols: [...authoringContext.rootSymbols,
+        { id: "filter:append", name: "append", kind: "filter", documentation: "Context filter." }],
+      visibleVariables: [{ id: "variable:append", name: "append", kind: "value", documentation: "Variable append." }]
+    };
+    const projection = createLiquidToolingProjection({ document, authoringContext: context, tooling: { getCatalog } });
+    const signal = new AbortController().signal;
+
+    const memberSource = "{{ predecessor.";
+    await expect(projection.completionProvider({
+      document: { ...document, value: memberSource }, position: memberSource.length, explicit: true, signal
+    })).resolves.toContainEqual(expect.objectContaining({ label: "Line", documentation: { markdown: "Activity output" } }));
+
+    const valueSource = "{{ app }}";
+    const values = await projection.completionProvider({
+      document: { ...document, value: valueSource }, position: valueSource.indexOf("app") + 3, explicit: true, signal
+    });
+    expect(values?.filter(item => item.label === "append")).toEqual([
+      expect.objectContaining({ label: "append", documentation: { markdown: "Variable append." } })
+    ]);
+
+    const filterSource = "{{ customer | app }}";
+    await expect(projection.completionProvider({
+      document: { ...document, value: filterSource }, position: filterSource.indexOf("app") + 3, explicit: true, signal
+    })).resolves.toEqual([expect.objectContaining({ label: "append", kind: "filter" })]);
+  });
+
+  it("merges flat context children with runtime shape facts without losing runtime metadata", async () => {
+    const output = {
+      ...activityOutput,
+      shapeId: "context-line-shape",
+      signatures: [{ label: "Line()" }]
+    };
+    const context = {
+      ...authoringContext,
+      rootSymbols: [...authoringContext.rootSymbols,
+        { id: "activity-output-root", name: "predecessor", kind: "value", shapeId: "predecessor-shape" }, output],
+      visibleActivityOutputs: [output]
+    };
+    const getCatalog = vi.fn().mockResolvedValue({ state: "ready", data: { symbols: [] } });
+    const getValueShape = vi.fn(async (_document: unknown, _context: unknown, shapeId: string) => ({
+      state: "ready" as const,
+      data: shapeId === "predecessor-shape"
+        ? { id: shapeId, members: [{ name: "Line", shapeId: "runtime-line-shape" }] }
+        : { id: shapeId, members: [{ name: "value", shapeId: "scalar-shape" }] }
+    }));
+    const projection = createLiquidToolingProjection({ document, authoringContext: context, tooling: { getCatalog, getValueShape } });
+    const signal = new AbortController().signal;
+    const source = "{{ predecessor.";
+    const completions = await projection.completionProvider({
+      document: { ...document, value: source }, position: source.length, explicit: true, signal
+    });
+    expect(completions?.filter(item => item.label === "Line")).toEqual([
+      expect.objectContaining({ label: "Line", detail: "Line()", documentation: { markdown: "Activity output" } })
+    ]);
+
+    const nestedSource = "{{ predecessor.Line.";
+    await expect(projection.completionProvider({
+      document: { ...document, value: nestedSource }, position: nestedSource.length, explicit: true, signal
+    })).resolves.toContainEqual(expect.objectContaining({ label: "value" }));
+    expect(getValueShape.mock.calls.map(([, , shapeId]) => shapeId)).toEqual([
+      "predecessor-shape", "predecessor-shape", "runtime-line-shape"
+    ]);
+  });
+
+  it.each(["unavailable", "unauthorized", "incompatible", "stale", "canceled"] as const)(
+    "keeps flattened children quiet when their declared parent shape is %s",
+    async state => {
+      const context = {
+        ...activityOutputContext,
+        rootSymbols: [...activityOutputContext.rootSymbols,
+          { id: "activity-output-root", name: "predecessor", kind: "value", shapeId: "predecessor-shape" }]
+      };
+      const getValueShape = vi.fn().mockResolvedValue({ state } as never);
+      const getCompletions = vi.fn();
+      const getHover = vi.fn();
+      const projection = createLiquidToolingProjection({
+        document,
+        authoringContext: context,
+        tooling: {
+          getCatalog: vi.fn().mockResolvedValue({ state: "ready", data: { symbols: [] } }),
+          getValueShape,
+          getCompletions,
+          getHover
+        }
+      });
+      const source = "{{ predecessor.";
+      const signal = new AbortController().signal;
+      await expect(projection.completionProvider({
+        document: { ...document, value: source }, position: source.length, explicit: true, signal
+      })).resolves.toEqual([]);
+      const hoverSource = "{{ predecessor.Line }}";
+      await expect(projection.hoverProvider(
+        { ...document, value: hoverSource }, hoverSource.indexOf("Line") + 2, signal
+      )).resolves.toBeNull();
+      expect(getValueShape).toHaveBeenCalledTimes(2);
+      expect(getCompletions).not.toHaveBeenCalled();
+      expect(getHover).not.toHaveBeenCalled();
+    }
+  );
+
+  it("normalizes dotted shape members only within the four-segment Liquid lookup bound", async () => {
+    const getCatalog = vi.fn().mockResolvedValue({ state: "ready", data: { symbols: [] } });
+    const getValueShape = vi.fn().mockResolvedValue({
+      state: "ready",
+      data: { id: "customer-shape", members: [{ name: "address.city.name", documentation: "Nested member.", shapeId: "name-shape" }] }
+    });
+    const projection = createLiquidToolingProjection({ document, authoringContext, tooling: { getCatalog, getValueShape } });
+    const allowedSource = "{{ customer.address.city.";
+    await expect(projection.completionProvider({
+      document: { ...document, value: allowedSource }, position: allowedSource.length, explicit: true, signal: new AbortController().signal
+    })).resolves.toContainEqual(expect.objectContaining({ label: "name" }));
+
+    const overLimitSource = "{{ customer.address.city.name.";
+    await expect(projection.completionProvider({
+      document: { ...document, value: overLimitSource }, position: overLimitSource.length, explicit: true, signal: new AbortController().signal
+    })).resolves.toEqual([]);
+    expect(getCatalog).toHaveBeenCalledTimes(1);
+  });
+
   it("uses rich catalog documentation, exact ranges and signature metadata for filter and tag help", async () => {
     const projection = setup();
     const source = "{{ value | safeFilter }}";
@@ -114,7 +305,10 @@ describe("Liquid tooling projection", () => {
     const memberSource = "{{ customer.email }}";
     const memberPosition = memberSource.indexOf("email") + 2;
     await expect(projection.hoverProvider({ ...document, value: memberSource }, memberPosition, new AbortController().signal))
-      .resolves.toMatchObject({ documentation: { markdown: "Email address." } });
+      .resolves.toMatchObject({
+        range: { from: memberSource.indexOf("email"), to: memberSource.indexOf("email") + "email".length },
+        documentation: { markdown: "email\n\nEmail address." }
+      });
   });
 
   it("keeps strings and raw/comment bodies quiet", async () => {

@@ -18,6 +18,7 @@ export interface LiquidToolingProjectionOptions {
 }
 
 const valueKinds = new Set(["value", "function", "namespace", "member", "keyword"]);
+const maximumLiquidValuePathSegments = 4;
 
 /** Liquid's help is authorized from the rich catalog and classified from the actual Liquid parser. */
 export function createLiquidToolingProjection(options: LiquidToolingProjectionOptions) {
@@ -76,12 +77,10 @@ export function createLiquidToolingProjection(options: LiquidToolingProjectionOp
     } else if (memberPath && cursor.valuePath) {
       const memberPrefix = cursor.valuePath.at(-1) ?? "";
       const ownerPath = cursor.valuePath.slice(0, -1);
-      candidates = await membersForPath(ownerPath, mergeSymbols(symbols, contextSymbols(options.authoringContext)), request.document.value, request.signal);
+      candidates = await membersForPath(ownerPath, projectedValueSymbols(symbols, options.authoringContext), request.document.value, request.signal);
       candidates = candidates.filter(symbol => symbol.name.toLocaleLowerCase().startsWith(memberPrefix.toLocaleLowerCase()));
     } else {
-      const scoped = contextSymbols(options.authoringContext);
-      candidates = mergeSymbols(symbols.filter(symbol => valueKinds.has(symbol.kind ?? "")), scoped)
-        .filter(symbol => valueKinds.has(symbol.kind ?? ""));
+      candidates = projectedValueSymbols(symbols, options.authoringContext);
     }
 
     return candidates
@@ -103,15 +102,19 @@ export function createLiquidToolingProjection(options: LiquidToolingProjectionOp
     else if (cursor.valuePath?.length) {
       const path = cursor.valuePath;
       const currentName = path.at(-1)!;
+      const valueSymbols = projectedValueSymbols(symbols, options.authoringContext);
       if (path.length === 1) {
-        symbol = mergeSymbols(symbols, contextSymbols(options.authoringContext)).find(candidate => candidate.name === currentName);
+        symbol = valueSymbols.find(candidate => candidate.name === currentName);
       } else {
-        const siblings = await membersForPath(path.slice(0, -1), mergeSymbols(symbols, contextSymbols(options.authoringContext)), document.value, signal);
+        const siblings = await membersForPath(path.slice(0, -1), valueSymbols, document.value, signal);
         symbol = siblings.find(candidate => candidate.name === currentName);
       }
     }
     return symbol?.documentation
-      ? { range: { from: cursor.from, to: cursor.to }, documentation: { markdown: symbol.documentation } }
+      ? {
+          range: { from: cursor.from, to: cursor.to },
+          documentation: { markdown: memberPath ? `${escapeMarkdownLabel(symbol.name)}\n\n${symbol.documentation}` : symbol.documentation }
+        }
       : null;
   };
 
@@ -134,31 +137,35 @@ export function createLiquidToolingProjection(options: LiquidToolingProjectionOp
   };
 
   async function membersForPath(path: readonly string[], symbols: readonly StudioCodeToolingSymbol[], source: string, signal: AbortSignal) {
-    if (path.length === 0 || signal.aborted) return [];
-    let current = symbols.find(symbol => symbol.name === path[0]);
-    let members = await loadMembers(current, source, signal);
-    for (const segment of path.slice(1)) {
+    if (path.length === 0 || path.length >= maximumLiquidValuePathSegments || signal.aborted) return [];
+    let current = symbols.find(symbol => symbol.name === path[0] && canOwnMembers(symbol));
+    let members = await loadMembers(current, source, signal, 1);
+    for (const [index, segment] of path.slice(1).entries()) {
       if (signal.aborted) return [];
-      current = members.find(member => member.name === segment);
-      members = await loadMembers(current, source, signal);
+      current = members.find(member => member.name === segment && canOwnMembers(member));
+      members = await loadMembers(current, source, signal, index + 2);
     }
     return members;
   }
 
-  async function loadMembers(symbol: StudioCodeToolingSymbol | undefined, source: string, signal: AbortSignal) {
+  async function loadMembers(symbol: StudioCodeToolingSymbol | undefined, source: string, signal: AbortSignal, symbolDepth: number) {
+    if (!symbol || signal.aborted) return [];
+    const projectedChildren = normalizeDottedSymbols(symbol.children ?? [], symbolDepth + 1);
+    if (!symbol.shapeId) return projectedChildren;
     const context = options.authoringContext;
-    if (!symbol?.shapeId || !options.document || !context || !options.tooling?.getValueShape || signal.aborted) return [];
+    if (!options.document || !context || !options.tooling?.getValueShape) return projectedChildren;
     const document = currentDocument(source);
     if (!document) return [];
     const response = await options.tooling.getValueShape(document, context, symbol.shapeId, signal);
     if (signal.aborted || (response.state !== "ready" && response.state !== "supported-empty")) return [];
-    return (response.data?.members ?? []).map(member => ({
+    const shapeMembers = normalizeDottedSymbols((response.data?.members ?? []).map(member => ({
       id: `${symbol.shapeId}:${member.name}`,
       name: member.name,
       kind: "member",
       documentation: member.documentation,
       shapeId: member.shapeId
-    }));
+    })), symbolDepth + 1);
+    return mergeMembersByName(shapeMembers, projectedChildren, symbolDepth + 1);
   }
 
   return { completionProvider, hoverProvider, signatureProvider };
@@ -171,13 +178,127 @@ function contextSymbols(context?: StudioCodeToolingAuthoringContext): StudioCode
     ...(context?.workflowInputs ?? []),
     ...(context?.visibleVariables ?? []),
     ...(context?.visibleActivityOutputs ?? [])
-  ];
+  ].filter(canOwnMembers);
+}
+
+function projectedValueSymbols(catalogSymbols: readonly StudioCodeToolingSymbol[], context?: StudioCodeToolingAuthoringContext) {
+  return normalizeDottedSymbols(mergeSymbols(
+    catalogSymbols.filter(symbol => valueKinds.has(symbol.kind ?? "")),
+    contextSymbols(context)
+  ));
 }
 
 function mergeSymbols(...groups: readonly (readonly StudioCodeToolingSymbol[])[]) {
   const symbols = new Map<string, StudioCodeToolingSymbol>();
   for (const symbol of groups.flat()) symbols.set(symbol.id ?? symbol.name, symbol);
   return [...symbols.values()];
+}
+
+/** Project bounded dotted authoring metadata into tree members without changing its source identity. */
+function normalizeDottedSymbols(symbols: readonly StudioCodeToolingSymbol[], depth = 1): StudioCodeToolingSymbol[] {
+  if (depth > maximumLiquidValuePathSegments) return [];
+  const groups = new Map<string, {
+    direct?: StudioCodeToolingSymbol;
+    nested: StudioCodeToolingSymbol[];
+  }>();
+
+  for (const symbol of symbols) {
+    if (!canOwnMembers(symbol)) continue;
+    const segments = boundedPathSegments(symbol.name, maximumLiquidValuePathSegments - depth + 1);
+    if (!segments || (segments.length > 1 && !valueKinds.has(symbol.kind ?? ""))) continue;
+    const [name, ...remaining] = segments;
+    if (!name) continue;
+    let group = groups.get(name);
+    if (!group) {
+      group = { nested: [] };
+      groups.set(name, group);
+    }
+    if (remaining.length === 0) {
+      group.direct = group.direct ? preferSymbolMetadata(group.direct, symbol) : symbol;
+    } else {
+      group.nested.push({
+        ...symbol,
+        name: remaining.join("."),
+        kind: symbol.kind === "value" ? "member" : symbol.kind
+      });
+    }
+  }
+
+  return [...groups].map(([name, group]) => {
+    const directChildren = group.direct?.children ?? [];
+    const children = normalizeDottedSymbols([...directChildren, ...group.nested], depth + 1);
+    const node = group.direct ?? {
+      id: `liquid:dotted:${depth}:${name}`,
+      name,
+      kind: depth === 1 ? "namespace" : "member"
+    };
+    return { ...node, name, children };
+  });
+}
+
+function boundedPathSegments(name: string, maximumSegments: number) {
+  if (!name || name.length > 100_000 || maximumSegments < 1) return undefined;
+  const segments: string[] = [];
+  let start = 0;
+  while (start <= name.length && segments.length < maximumSegments) {
+    const separator = name.indexOf(".", start);
+    const end = separator < 0 ? name.length : separator;
+    const segment = name.slice(start, end);
+    if (!segment) return undefined;
+    segments.push(segment);
+    if (separator < 0) return segments;
+    start = separator + 1;
+  }
+  return undefined;
+}
+
+function canOwnMembers(symbol: StudioCodeToolingSymbol) {
+  return symbol.kind !== "filter" && symbol.kind !== "tag";
+}
+
+function escapeMarkdownLabel(value: string) {
+  return value.replace(/[\\`*_{}[\]()#+\-.!|>]/g, "\\$&");
+}
+
+/** Existing runtime shape facts win; flattened context metadata fills only missing fields. */
+function mergeMembersByName(
+  preferred: readonly StudioCodeToolingSymbol[],
+  fallback: readonly StudioCodeToolingSymbol[],
+  depth: number
+) {
+  const merged = new Map<string, StudioCodeToolingSymbol>();
+  for (const symbol of preferred) merged.set(symbol.name, symbol);
+  for (const symbol of fallback) {
+    const existing = merged.get(symbol.name);
+    if (!existing) {
+      merged.set(symbol.name, symbol);
+      continue;
+    }
+    const children = depth < maximumLiquidValuePathSegments
+      ? mergeMembersByName(existing.children ?? [], symbol.children ?? [], depth + 1)
+      : [];
+    merged.set(symbol.name, preferSymbolMetadata(existing, symbol, children));
+  }
+  return [...merged.values()];
+}
+
+function preferSymbolMetadata(
+  preferred: StudioCodeToolingSymbol,
+  fallback: StudioCodeToolingSymbol,
+  children: readonly StudioCodeToolingSymbol[] = [...(preferred.children ?? []), ...(fallback.children ?? [])]
+) {
+  return {
+    ...fallback,
+    ...preferred,
+    id: preferred.id ?? fallback.id,
+    name: preferred.name,
+    kind: preferred.kind ?? fallback.kind,
+    documentation: preferred.documentation ?? fallback.documentation,
+    shapeId: preferred.shapeId ?? fallback.shapeId,
+    signatures: preferred.signatures ?? fallback.signatures,
+    sortText: preferred.sortText ?? fallback.sortText,
+    children
+  };
 }
 
 function completionFor(symbol: StudioCodeToolingSymbol, from: number, to: number): StudioCodeCompletion {
