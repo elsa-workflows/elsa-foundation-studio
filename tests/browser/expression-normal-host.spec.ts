@@ -47,11 +47,13 @@ completeTest("persisted workflow drafts use live JavaScript and Liquid assistanc
   const compactLiquid = page.locator(".studio-code-editor-rich-compact .cm-content");
   await expect(compactLiquid).toBeVisible();
   await exerciseWorkflowAssistance(page, hostPair, compactLiquid, draft, traffic, "Liquid");
+  await exerciseLiquidDepth(page, hostPair, compactLiquid, draft, traffic);
   await replaceEditorSource(page, compactLiquid, `{{ customerName }} {{ predecessor.${draft.outputName} }}`);
   await page.getByRole("button", { name: `Open expanded ${draft.inputName} editor` }).click();
   const expandedLiquid = page.getByRole("dialog").locator(".studio-code-editor-rich-expanded .cm-content");
   await expect(expandedLiquid).toContainText("customerName");
   await exerciseWorkflowAssistance(page, hostPair, expandedLiquid, draft, traffic, "Liquid");
+  await exerciseLiquidDepth(page, hostPair, expandedLiquid, draft, traffic, true);
   await replaceEditorSource(page, expandedLiquid, `{{ customerName }} {{ predecessor.${draft.outputName} | string }}`);
   await page.getByRole("dialog").getByRole("button", { name: `Close ${draft.inputName} editor` }).click();
   await expect(page.getByRole("button", { name: "Liquid expression. Activate to edit." })).toContainText("string");
@@ -59,8 +61,11 @@ completeTest("persisted workflow drafts use live JavaScript and Liquid assistanc
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect.poll(() => readPersistedSource(page, hostPair, draft)).toEqual(`{{ customerName }} {{ predecessor.${draft.outputName} | string }}`);
 
-  for (const relation of ["/expression-tooling/context", "/expression-tooling/completions", "/expression-tooling/hover", "/expression-tooling/validate"]) {
+  for (const relation of ["/expression-tooling/context", "/expression-tooling/validate"]) {
     await expect.poll(() => hasSuccessfulRequest(traffic, relation, "Liquid")).toBe(true);
+  }
+  for (const relation of ["/expression-tooling/completions", "/expression-tooling/hover"]) {
+    await expect.poll(() => hasSuccessfulRequest(traffic, relation, "JavaScript")).toBe(true);
   }
   await expect.poll(() => hasSuccessfulRequest(traffic, "/capabilities")).toBe(true);
   await expect.poll(() => hasSuccessfulRequest(traffic, "/expression-tooling/descriptors")).toBe(true);
@@ -265,7 +270,9 @@ async function exerciseWorkflowAssistance(
     await editor.press("Control+Space");
     const menu = page.locator(".cm-tooltip-autocomplete");
     await expect(menu).toContainText(draft.outputName, { timeout: 1_000 });
-    expect(hasFreshAssistance(traffic.slice(phase.start), draft, syntax, "/expression-tooling/completions", phase.previousRevision)).toBe(true);
+    expect(syntax === "Liquid"
+      ? hasFreshCatalog(traffic.slice(phase.start), draft, syntax, phase.previousRevision)
+      : hasFreshAssistance(traffic.slice(phase.start), draft, syntax, "/expression-tooling/completions", phase.previousRevision)).toBe(true);
     // The runtime output need not sort first among provider functions. Navigate the
     // actual completion collection before testing Enter, rather than accepting any row.
     const selected = menu.locator('[aria-selected="true"]');
@@ -292,7 +299,9 @@ async function exerciseWorkflowAssistance(
     }
     await editor.press("Alt+i");
     await expect(page.getByRole("status", { name: "Hover information" })).toContainText(draft.outputName, { timeout: 1_000 });
-    expect(hasFreshAssistance(traffic.slice(phase.start), draft, syntax, "/expression-tooling/hover", phase.previousRevision)).toBe(true);
+    expect(syntax === "Liquid"
+      ? hasFreshCatalog(traffic.slice(phase.start), draft, syntax, phase.previousRevision)
+      : hasFreshAssistance(traffic.slice(phase.start), draft, syntax, "/expression-tooling/hover", phase.previousRevision)).toBe(true);
   }).toPass({ timeout: 15_000 });
   await editor.press("Escape");
   await expect(page.getByRole("status", { name: "Hover information" })).not.toBeVisible();
@@ -360,6 +369,87 @@ async function exerciseJavaScriptDepth(page: Page, pair: NormalHostPair, editor:
   await expect(editor).toContainText(source);
 }
 
+async function exerciseLiquidDepth(page: Page, pair: NormalHostPair, editor: Locator,
+  draft: PersistedExpressionDraft, traffic: SafeBackendTraffic[], expanded = false) {
+  for (const { marked, label } of [
+    // Inserting a newline in compact mode intentionally expands the editor.
+    { marked: `{{ customerName${expanded ? "\n" : " "} | up¦XX }}`, label: "upcase" },
+    { marked: "{% i¦XX customerName %}ok{% endif %}", label: "if" }
+  ]) {
+    const position = marked.indexOf("¦");
+    const source = marked.replace("¦", "");
+    const accepted = source.replace(label === "if" ? "iXX" : "upXX", label);
+    const phase = await replacePersistedWorkflowSource(page, pair, editor, draft, traffic, "Liquid", source);
+    const interactionStart = traffic.length;
+    await expect(async () => {
+      await moveEditorCursor(editor, source, position);
+      await editor.press("Control+Space");
+      const menu = page.locator(".cm-tooltip-autocomplete");
+      const option = menu.getByRole("option").filter({ has: page.locator(".cm-completionLabel", { hasText: new RegExp(`^${label}$`) }) });
+      await expect(option).toHaveCount(1, { timeout: 1_000 });
+      for (const denied of ["date", "include", "render"]) {
+        await expect(menu.getByRole("option").locator(".cm-completionLabel", { hasText: new RegExp(`^${denied}$`) }))
+          .toHaveCount(0);
+      }
+      expect(hasFreshCatalog(traffic.slice(interactionStart), draft, "Liquid", phase.previousRevision)).toBe(true);
+      const selected = menu.locator('[aria-selected="true"]');
+      for (let step = 0; step < await menu.getByRole("option").count(); step++) {
+        if ((await selected.locator(".cm-completionLabel").textContent()) === label) break;
+        await editor.press("ArrowDown");
+      }
+      await expect(selected.locator(".cm-completionLabel")).toHaveText(label);
+    }).toPass({ timeout: 15_000 });
+    await expect(async () => {
+      await editor.press("Enter");
+      await expect.poll(() => readEditorSource(editor), { timeout: 1_000 }).toBe(accepted);
+    }).toPass({ timeout: 5_000 });
+    await expect.poll(() => readPersistedSource(page, pair, draft)).toBe(accepted);
+    await editor.press("ControlOrMeta+Z");
+    await expect.poll(() => readEditorSource(editor)).toBe(source);
+    await expect.poll(() => readPersistedSource(page, pair, draft)).toBe(source);
+  }
+
+  const marked = "{{ customerName | append¦: 'x' }}";
+  const source = marked.replace("¦", "");
+  const phase = await replacePersistedWorkflowSource(page, pair, editor, draft, traffic, "Liquid", source);
+  const interactionStart = traffic.length;
+  await moveEditorCursor(editor, source, marked.indexOf("¦"));
+  const section = editor.locator("xpath=ancestor::section[@data-studio-code-editor='true'][1]");
+  await expect(section.locator(".studio-code-editor-signature")).toContainText("append(value): String");
+  await editor.press("Alt+i");
+  await expect(page.getByRole("status", { name: "Hover information" }))
+    .toContainText("Appends the argument to the input text.");
+  await expect.poll(() => hasFreshCatalog(traffic.slice(interactionStart), draft, "Liquid", phase.previousRevision)).toBe(true);
+  await editor.press("Escape");
+
+  const template = "Hello !";
+  await replacePersistedWorkflowSource(page, pair, editor, draft, traffic, "Liquid", template);
+  await expect(async () => {
+    await moveEditorCursor(editor, template, template.length - 1);
+    await editor.press("Control+Space");
+    await expect(page.locator(".cm-tooltip-autocomplete").getByRole("option").locator(".cm-completionLabel"))
+      .toHaveText(["{{ }}"], { timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
+  await expect(async () => {
+    await editor.press("Enter");
+    await expect.poll(() => readEditorSource(editor), { timeout: 1_000 }).toBe("Hello {{ value }}!");
+  }).toPass({ timeout: 5_000 });
+  await expect.poll(() => readPersistedSource(page, pair, draft)).toBe("Hello {{ value }}!");
+  await editor.press("ControlOrMeta+Z");
+  await expect.poll(() => readEditorSource(editor)).toBe(template);
+  await expect.poll(() => readPersistedSource(page, pair, draft)).toBe(template);
+}
+
+async function readEditorSource(editor: Locator) {
+  // CodeMirror renders each logical line separately; preserve literal whitespace.
+  return editor.locator(".cm-line").evaluateAll(lines => lines.map(line => line.textContent ?? "").join("\n"));
+}
+
+async function moveEditorCursor(editor: Locator, source: string, position: number) {
+  await editor.press("ControlOrMeta+End");
+  for (let step = position; step < source.length; step++) await editor.press("ArrowLeft");
+}
+
 async function exerciseJavaScriptConformance(page: Page, pair: NormalHostPair, editor: Locator,
   draft: PersistedExpressionDraft, traffic: SafeBackendTraffic[], cases: { source: string; code: string }[]) {
   const diagnostics = editor.locator("xpath=ancestor::section[@data-studio-code-editor='true'][1]")
@@ -389,6 +479,15 @@ async function exerciseJavaScriptConformance(page: Page, pair: NormalHostPair, e
 function matchesDraftLocation(request: SafeBackendTraffic, draft: PersistedExpressionDraft, syntax: string) {
   return request.workflowDraftId === draft.draftId && request.expressionType === syntax &&
     request.nodeId === draft.targetNodeId && request.propertyKey === draft.propertyKey;
+}
+
+function hasFreshCatalog(traffic: SafeBackendTraffic[], draft: PersistedExpressionDraft, syntax: string, previousRevision: number) {
+  const context = traffic.filter(request => request.path.endsWith("/expression-tooling/context") && request.isCatalogSearch &&
+    matchesDraftLocation(request, draft, syntax)).at(-1);
+  return context?.status === 200 && context.outcomeState === 0 &&
+    context.documentRevision !== undefined && Number(context.documentRevision) > previousRevision &&
+    context.responseDocumentRevision === context.documentRevision && context.responseContextRevision !== undefined &&
+    (context.contextRevision === undefined || context.contextRevision === context.responseContextRevision);
 }
 
 function captureAssistancePhase(traffic: SafeBackendTraffic[], draft: PersistedExpressionDraft, syntax: string) {

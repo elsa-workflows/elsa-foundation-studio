@@ -1,12 +1,40 @@
 # Expression Code Intelligence — Verification
 
-Last reconciled: 2026-10-05 for Program #2310 M3 accessor correction after restart; corrected-head CI/review and paired-host gate, delivery and human acceptance pending
+Last reconciled: 2026-10-05 for Program #2310 M3 accessor correction and Liquid integration candidate; corrected-head CI/review and paired-host gate, delivery and human acceptance pending
 
 ## Program #2310 status
 
 T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head automated M2 gate under the documented unavailable-external-review fallback. Studio spike #553 / T035 settles the technical decision: reject the current deeper-service candidate and retain the baseline path. No dependency or production integration is adopted. Deeper language help, three-theme presentation, formatting and current-head manual accessibility/continuity acceptance (T032-T034, T036-T038) remain open. The 2026-07-28 evidence remains historical. All program PRs remain draft and unmerged; final human acceptance is outstanding.
 
 ## Passing evidence
+
+### M3 Liquid integration candidate — Studio #561, 2026-10-05
+
+Root integrates bounded worker `855e7b115177e8dcc45de8acfc11a4ee6f271f78` on the corrected
+Studio#560 branch, retaining immutable producer `5cd44d6312d9de85b13f4619fc7aa972a557d033`.
+The worker changes only Liquid projection/module/tests and internal CodeEditor lazy parser,
+plain cursor/range/snippet mapping/tests/exports. No SDK, wire, dependency, theme or formatter
+change. Independent exact-commit source review finds no actionable remaining issue; root reviews
+the implementation and integration delta separately.
+
+Worker focused cursor/CodeMirror mapping tests pass10/10 and Liquid projection passes12/12;
+CodeEditor typecheck/build and Liquid Vite build pass. Real CodeMirror tests prove full mid-token
+replacement, snippet tab stops and exact source/selection undo. Bounded/deep/computed paths,
+quiet strings/raw/comments, unavailable shapes, real delayed cancellation and source-version
+non-mutation, failed rich outcomes and supported-empty filter/tag help have retained controls.
+The builtin `if` operand regression fails before the parsed-child correction: `customer` is
+misclassified as a tag range including the trim marker. The restored parser-based fix keeps
+tag-name bounds and value arguments distinct. That red output is retained in the worker transcript,
+not an on-disk log file. An earlier undo-test import error is corrected, not a product-failure claim.
+
+Root extends the normal-host browser with compact single-line and expanded multiline Liquid
+filter/tag replacement, exact literal source plus authenticated accepted/undo readback, explicit
+interpolation snippets, exact append documentation/signature and interaction-local catalog-request
+revision evidence. Safe traffic stores only a paging classification, not search text or source.
+Independent harness review finds no material blocker. These new browser assertions have not yet
+passed; complete affected suites, unchanged bundles and exact integrated-head CI/review remain
+pending. Worker/scoped/predecessor checks do not accept the integrated candidate. All PRs remain
+draft/unmerged; M3, M4, manual AT and human acceptance stay open.
 
 ### M3 accessor policy correction — Studio #560, 2026-10-05
 

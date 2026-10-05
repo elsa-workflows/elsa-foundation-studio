@@ -24,6 +24,7 @@ export type SafeBackendTraffic = {
   workflowDraftId?: string;
   nodeId?: string;
   propertyKey?: string;
+  isCatalogSearch?: boolean;
   outcomeState?: number;
   responseDocumentRevision?: string;
   responseContextRevision?: string;
@@ -102,7 +103,7 @@ export const test = base.extend<NormalHostFixtures>({
         if (origin === pair.foundationUrl || origin === pair.studioUrl) {
           const path = new URL(request.url()).pathname;
           const postData = path.includes("/expression-tooling/")
-            ? request.postDataJSON() as { expressionType?: unknown; documentRevision?: unknown; contextRevision?: unknown; workflowDraftId?: unknown; nodeId?: unknown; propertyKey?: unknown } | null
+            ? request.postDataJSON() as { expressionType?: unknown; documentRevision?: unknown; contextRevision?: unknown; workflowDraftId?: unknown; nodeId?: unknown; propertyKey?: unknown; skip?: unknown; take?: unknown } | null
             : null;
           const syntax = postData?.expressionType;
           const documentRevision = postData?.documentRevision;
@@ -114,6 +115,8 @@ export const test = base.extend<NormalHostFixtures>({
             path,
             method: request.method(),
             host: origin === pair.foundationUrl ? "foundation" as const : "studio" as const,
+            // Classify catalog paging without retaining search text or authored source.
+            ...(path.endsWith("/expression-tooling/context") ? { isCatalogSearch: postData?.take === 100 && typeof postData?.skip === "number" } : {}),
             ...(syntax === "JavaScript" || syntax === "Liquid" ? { expressionType: syntax } : {}),
             ...(typeof documentRevision === "string" || typeof documentRevision === "number" ? { documentRevision: String(documentRevision) } : {}),
             ...(isSafeContextRevision(contextRevision) ? { contextRevision } : {}),
