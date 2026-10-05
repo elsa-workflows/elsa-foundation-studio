@@ -15,10 +15,11 @@ export const javaScriptToolingProjection: StudioCodeToolingLanguageProjection = 
   projectContext: context => {
     const contextual = contextualSymbols(context);
     const contextualKeys = symbolKeys(contextual);
-    const engineRoots = (context?.rootSymbols ?? []).filter(symbol => !contextualKeys.has(symbol.id) && !contextualKeys.has(symbol.name));
+    const engineRoots = (context?.rootSymbols ?? []).filter(symbol =>
+      !contextualKeys.has(symbol.id) && !contextualKeys.has(symbol.name) && hasVariableBindings(symbol, context));
     const values = mergeSymbols(context?.workflowInputs ?? [], context?.visibleActivityOutputs ?? []);
     const variables = [...(context?.visibleVariables ?? [])];
-    const getterSymbols = variables.filter(symbol => isIdentifier(symbol.name)).map(symbol => ({
+    const getterSymbols = variables.filter(symbol => isIdentifier(symbol.name) && getterName(symbol.name) !== "getVariable").map(symbol => ({
       id: `javascript:getter:${symbol.id ?? symbol.name}`,
       name: getterName(symbol.name),
       kind: "function",
@@ -42,18 +43,13 @@ export const javaScriptToolingProjection: StudioCodeToolingLanguageProjection = 
         kind: "variable",
         documentation: "Visible workflow variables.",
         children: variables
-      }, {
-        id: "javascript:getVariable",
-        name: "getVariable",
-        kind: "function",
-        documentation: "Gets a visible workflow variable by name.",
-        signatures: [{ label: "getVariable(name)" }]
       }, ...getterSymbols] : []
     );
   },
   projectCatalog: (symbols, context) => {
     const contextualKeys = symbolKeys(contextualSymbols(context));
-    return symbols.filter(symbol => !contextualKeys.has(symbol.id) && !contextualKeys.has(symbol.name));
+    return symbols.filter(symbol =>
+      !contextualKeys.has(symbol.id) && !contextualKeys.has(symbol.name) && hasVariableBindings(symbol, context));
   },
   callableNameAt,
   memberPathAt: (source, position, includeCurrentWord) => {
@@ -66,6 +62,10 @@ export const javaScriptToolingProjection: StudioCodeToolingLanguageProjection = 
     return segments;
   }
 };
+
+function hasVariableBindings(symbol: StudioCodeToolingSymbol, context?: StudioCodeToolingAuthoringContext) {
+  return symbol.id !== "javascript:getVariable" || (context?.visibleVariables?.length ?? 0) > 0;
+}
 
 /** Bounded lexical call-path help, not type checking or execution. Unknown syntax stays unknown. */
 function callableNameAt(source: string, position: number) {

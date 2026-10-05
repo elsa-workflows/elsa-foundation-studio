@@ -1,12 +1,35 @@
 # Expression Code Intelligence — Verification
 
-Last reconciled: 2026-10-03 for Program #2310 exact-head M2 automated gate and M3 baseline paired-host checkpoint; final-head CI/review, delivery and human acceptance pending
+Last reconciled: 2026-10-05 for Program #2310 M3 accessor correction after restart; corrected-head CI/review and paired-host gate, delivery and human acceptance pending
 
 ## Program #2310 status
 
 T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head automated M2 gate under the documented unavailable-external-review fallback. Studio spike #553 / T035 settles the technical decision: reject the current deeper-service candidate and retain the baseline path. No dependency or production integration is adopted. Deeper language help, three-theme presentation, formatting and current-head manual accessibility/continuity acceptance (T032-T034, T036-T038) remain open. The 2026-07-28 evidence remains historical. All program PRs remain draft and unmerged; final human acceptance is outstanding.
 
 ## Passing evidence
+
+### M3 accessor policy correction — Studio #560, 2026-10-05
+
+Independent review finds the fixed `getVariable` accessor was synthesized after common profile
+policy filtering in both producer and consumer. Retained failing controls reproduce denied
+reinsertion, missing-binding leakage and lost approved metadata. The correction keeps only the
+authorized declared candidate and omits it without visible bindings. A variable literally named
+`variable` cannot restore a denied accessor under a generated getter ID or duplicate an approved
+one; the reserved-name controls fail before correction. Complete JavaScript tests pass 15/15,
+and independent exact-delta review finds no actionable remaining issue.
+
+The immutable CI producer pin advances to Foundation `5cd44d6312d9de85b13f4619fc7aa972a557d033`.
+Its corrected-tree catalog27/27, Expressions236/236, Design534/534, DesignAPI143/143,
+PublishingAPI714/714, Jint126/126, scopedArchitecture17/17 and unchanged map freshness pass.
+Runtime grants, SDK, wire and dependencies are unchanged. Corrected paired browser, configured
+Studio gates and exact committed-head CI/review remain pending at this checkpoint.
+
+Predecessor Studio `8ab8fced71095b085e592442c65d01c143649f37` passes all three jobs in
+[CI 37147792665](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37147792665),
+including paired normal-host Chromium against predecessor Foundation58238b86. That producer
+passes fullCI37147080477 on one failed-job retry and Maps37147082366. These historical green
+heads do not accept the correction or Liquid Task#561. Copilot has no actual M3 review at the
+restart checkpoint. All PRs remain draft/unmerged; M3, human and manual AT acceptance stay open.
 
 ### M3 baseline implementation checkpoint — Studio #560, 2026-10-03
 
