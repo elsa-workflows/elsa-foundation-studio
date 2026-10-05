@@ -168,7 +168,7 @@ describe("accepted test runs with incidents", () => {
     flushSync(() => root.render(<WorkflowRuntimePanel testRun={testRun} onOpenRun={onOpenRun} />));
 
     expect(container.querySelector(".wf-runtime-card")?.getAttribute("data-state")).toBe("accepted-with-incidents");
-    expect(container.textContent).toContain("The test run was accepted and recorded 1 incident");
+    expect(container.textContent).toContain("1 incident recorded.");
     const review = [...container.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Review incidents");
     expect(review).toBeTruthy();
     flushSync(() => review?.click());
@@ -188,14 +188,14 @@ describe("accepted test runs with incidents", () => {
     flushSync(() => root.render(<WorkflowRuntimePanel testRun={testRun} onOpenRun={onOpenRun} />));
 
     expect(container.querySelector(".wf-runtime-card")?.getAttribute("data-state")).toBe("accepted-with-incidents");
-    expect(container.textContent).toContain("accepted with a runtime issue");
+    expect(container.textContent).toContain("Accepted with a runtime issue");
     expect(container.textContent).toContain("Incident details may be unavailable");
     const review = [...container.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Review incidents");
     flushSync(() => review?.click());
     expect(onOpenRun).toHaveBeenCalledWith("run-legacy", "issues");
   });
 
-  it("keeps the Run ID link on the default timeline destination", () => {
+  it("opens the run timeline and keeps metadata behind Details", () => {
     const onOpenRun = vi.fn();
     const testRun: WorkflowTestRunView = {
       testRunId: "test-run-generic",
@@ -208,10 +208,30 @@ describe("accepted test runs with incidents", () => {
     flushSync(() => root.render(<WorkflowRuntimePanel testRun={testRun} onOpenRun={onOpenRun} />));
 
     const runLink = [...container.querySelectorAll<HTMLButtonElement>("button")]
-      .find(button => button.textContent === "run-generic");
+      .find(button => button.textContent?.trim() === "Open run");
     flushSync(() => runLink?.click());
 
     expect(onOpenRun).toHaveBeenCalledWith("run-generic");
+    expect(container.querySelector("details")?.open).toBe(false);
+    expect(container.querySelector("details")?.textContent).toContain("test-run-generic");
+    expect(container.textContent).not.toContain("Available on linked Run");
+    expect(container.querySelector("h3")?.textContent).toBe("Run dispatched");
+  });
+
+  it("keeps rejection reasons visible without a misleading run action", () => {
+    const testRun: WorkflowTestRunView = {
+      testRunId: "test-run-rejected",
+      definitionId: "definition-1",
+      definitionVersionId: "draft:1",
+      status: "Rejected",
+      reason: "Activity version is unavailable."
+    };
+    flushSync(() => root.render(<WorkflowRuntimePanel testRun={testRun} onOpenRun={() => {}} />));
+
+    expect(container.querySelector(".wf-runtime-card")?.getAttribute("data-state")).toBe("rejected");
+    expect(container.querySelector(".wf-runtime-reason")?.textContent).toContain(testRun.reason);
+    expect(container.querySelector(".wf-runtime-open")).toBeNull();
+    expect(container.querySelector("details")?.open).toBe(false);
   });
 
   it("keeps an ordinary accepted legacy receipt green when no fault evidence is present", () => {

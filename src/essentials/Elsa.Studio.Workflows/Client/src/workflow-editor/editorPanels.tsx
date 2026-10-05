@@ -1,4 +1,4 @@
-import { AlertCircle, Check, Flag, MapPin, Wrench } from "lucide-react";
+import { AlertCircle, ArrowUpRight, Check, Flag, MapPin, Wrench } from "lucide-react";
 import type { ValidationError, WorkflowDraft, WorkflowExecutableSummary, WorkflowTestRunView } from "../workflowTypes";
 import {
   STRUCTURAL_NO_START_TYPE,
@@ -8,7 +8,6 @@ import {
 } from "../validationDiagnostics";
 import { formatDate } from "../workflowFormatting";
 import { isRejectedTestRun } from "./editorHelpers";
-import { WorkflowStatusBadge } from "./WorkflowStatusBadge";
 
 /**
  * Renders the unified draft-validation surface (issue #453). `errors` (server-derived + reconciled +
@@ -143,18 +142,23 @@ export function WorkflowRuntimePanel({ testRun, publishedEquivalent, onOpenRun }
         <header>
           <div>
             <span>Latest Test Run</span>
-            <h3>{rejected ? "Rejected by the server" : "Transient run accepted"}</h3>
+            <h3>{rejected ? "Test run rejected" : acceptedWithIncidents ? "Run has a runtime issue" : "Run dispatched"}</h3>
           </div>
-          <WorkflowStatusBadge status={testRun.status} subStatus={testRun.commandDispatchStatus ?? undefined} />
         </header>
-        <p>Ephemeral - not saved, promoted, or published.</p>
+        <p>Draft test · not published.</p>
+        {workflowExecutionId ? (
+          <div className="wf-runtime-open">
+            <button type="button" onClick={() => onOpenRun(workflowExecutionId)}>Open run <ArrowUpRight size={14} aria-hidden="true" /></button>
+            <span>View activity execution and incidents.</span>
+          </div>
+        ) : null}
         {rejected && testRun.reason ? <div className="wf-runtime-reason"><AlertCircle size={14} /> {testRun.reason}</div> : null}
         {acceptedWithIncidents ? (
           <div className="wf-runtime-incident-warning" role="status">
             <AlertCircle size={14} aria-hidden="true" />
             <span>{testRun.incidentCount != null && testRun.incidentCount > 0
-              ? `The test run was accepted and recorded ${testRun.incidentCount} incident${testRun.incidentCount === 1 ? "" : "s"}. Review the incident details on the linked Run.`
-              : "The test run was accepted with a runtime issue. Incident details may be unavailable in this response; review the linked Run."}</span>
+              ? `${testRun.incidentCount} incident${testRun.incidentCount === 1 ? "" : "s"} recorded.`
+              : "Accepted with a runtime issue. Incident details may be unavailable."}</span>
             {workflowExecutionId ? <button type="button" onClick={() => onOpenRun(workflowExecutionId, "issues")}>Review incidents</button> : null}
           </div>
         ) : null}
@@ -163,22 +167,19 @@ export function WorkflowRuntimePanel({ testRun, publishedEquivalent, onOpenRun }
             <Check size={14} /> Current draft is behaviorally identical to published v{equivalent.artifactVersion}.
           </div>
         ) : null}
-        <dl className="wf-runtime-meta">
-          <div><dt>Dispatch</dt><dd title={testRun.commandDispatchStatus ?? testRun.status}>{testRun.commandDispatchStatus ?? testRun.status}</dd></div>
-          <div><dt>Test Run</dt><dd title={testRun.testRunId}>{testRun.testRunId}</dd></div>
-          <div><dt>Artifact</dt><dd title={testRun.artifactId ?? "None"}>{testRun.artifactId ?? "None"}</dd></div>
-          <div>
-            <dt>Run / Instance</dt>
-            <dd title={workflowExecutionId ?? "None"}>
-              {workflowExecutionId ? (
-                <button type="button" onClick={() => onOpenRun(workflowExecutionId)}>{workflowExecutionId}</button>
-              ) : "None"}
-            </dd>
-          </div>
-          <div><dt>Activities</dt><dd>{formatEvidenceCount(testRun.activityCount, "activity")}</dd></div>
-          <div><dt>Incidents</dt><dd>{formatEvidenceCount(testRun.incidentCount, "incident")}</dd></div>
-          <div><dt>Expires</dt><dd title={testRun.expiresAt ? formatDate(testRun.expiresAt) : "None"}>{testRun.expiresAt ? formatDate(testRun.expiresAt) : "None"}</dd></div>
-        </dl>
+        <details className="wf-runtime-details">
+          <summary>Details</summary>
+          <p>Ephemeral - not saved, promoted, or published.</p>
+          <dl className="wf-runtime-meta">
+            <div><dt>Dispatch</dt><dd>{testRun.commandDispatchStatus ?? testRun.status}</dd></div>
+            <div><dt>Test run ID</dt><dd>{testRun.testRunId}</dd></div>
+            {testRun.artifactId ? <div><dt>Artifact ID</dt><dd>{testRun.artifactId}</dd></div> : null}
+            {workflowExecutionId ? <div><dt>Run ID</dt><dd>{workflowExecutionId}</dd></div> : null}
+            {typeof testRun.activityCount === "number" ? <div><dt>Activities</dt><dd>{testRun.activityCount}</dd></div> : null}
+            {typeof testRun.incidentCount === "number" ? <div><dt>Incidents</dt><dd>{testRun.incidentCount}</dd></div> : null}
+            {testRun.expiresAt ? <div><dt>Expires</dt><dd>{formatDate(testRun.expiresAt)}</dd></div> : null}
+          </dl>
+        </details>
       </section>
     </div>
   );
@@ -192,9 +193,4 @@ function acceptedRuntimeIssueLabel(testRun: WorkflowTestRunView) {
   return typeof testRun.incidentCount === "number" && testRun.incidentCount > 0
     ? "Test run accepted with incidents"
     : "Test run accepted with a runtime issue";
-}
-
-function formatEvidenceCount(count: number | null | undefined, label: string) {
-  if (typeof count !== "number") return "Available on linked Run";
-  return `${count} ${label}${count === 1 ? "" : "s"}`;
 }

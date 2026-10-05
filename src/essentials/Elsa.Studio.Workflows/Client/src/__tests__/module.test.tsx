@@ -2579,8 +2579,12 @@ describe("workflows module", () => {
     expect(container.textContent).toContain("Ephemeral - not saved, promoted, or published.");
     expect(container.textContent).toContain("artifact-transient-1");
     expect(container.textContent).toContain("wfexec-1");
-    expect(container.textContent).toContain("1 activity");
-    expect(container.textContent).toContain("0 incidents");
+    const details = container.querySelector<HTMLDetailsElement>(".wf-runtime-details");
+    expect(details?.open).toBe(false);
+    const metadata = [...details!.querySelectorAll("dl > div")]
+      .map(row => [row.querySelector("dt")?.textContent, row.querySelector("dd")?.textContent]);
+    expect(metadata).toContainEqual(["Activities", "1"]);
+    expect(metadata).toContainEqual(["Incidents", "0"]);
 
     await unmount();
   });

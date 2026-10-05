@@ -4551,6 +4551,57 @@ button.wf-node-slot-badge:focus-visible {
   padding: 6px 8px;
 }
 
+.wf-runtime-open {
+  display: grid;
+  gap: 6px;
+}
+
+.wf-runtime-open button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  border: 1px solid var(--studio-accent);
+  border-radius: var(--studio-radius-sm);
+  background: var(--studio-accent);
+  color: var(--studio-accent-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.wf-runtime-open button:hover {
+  filter: brightness(1.08);
+}
+
+.wf-runtime-open button:focus-visible,
+.wf-runtime-details summary:focus-visible {
+  outline: 2px solid var(--studio-accent);
+  outline-offset: 3px;
+}
+
+.wf-runtime-open span {
+  color: var(--studio-text-muted);
+  font-size: 11px;
+}
+
+.wf-runtime-details {
+  border-top: 1px solid var(--studio-border);
+  padding-top: 10px;
+}
+
+.wf-runtime-details summary {
+  color: var(--studio-text-muted);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.wf-runtime-details[open] > p {
+  margin: 10px 0;
+}
+
 .wf-runtime-meta {
   display: grid;
   gap: 10px;
@@ -4563,22 +4614,10 @@ button.wf-node-slot-badge:focus-visible {
 
 .wf-runtime-meta dd {
   margin: 2px 0 0;
-  overflow: hidden;
+  overflow-wrap: anywhere;
   color: var(--wf-text);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.wf-runtime-meta button {
-  border: 0;
-  background: transparent;
-  color: var(--wf-accent);
-  cursor: pointer;
-  font: inherit;
-  padding: 0;
-  text-decoration: underline;
 }
 
 .wf-artifacts-panel {
