@@ -168,14 +168,15 @@ describe("input shape construction", () => {
 });
 
 describe("output shape construction", () => {
-  it("creates a canonical output with a reference key and the smaller field set", () => {
+  it("creates a canonical output with a reference key and required nullability", () => {
     const output = createOutput({ name: "Result", alias: "Boolean" });
     expect(output).toMatchObject({
       name: "Result",
       type: { alias: "Boolean", collectionKind: "Single" },
       displayName: "Result",
       description: "",
-      category: ""
+      category: "",
+      isNullable: false
     });
     expect(output.referenceKey).toBeTypeOf("string");
     expect(output.referenceKey.length).toBeGreaterThan(0);

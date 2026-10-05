@@ -66,13 +66,13 @@ function mapState(
   if (!state) return state;
   const next: WorkflowDefinitionState = { ...state };
   if (state.rootActivity) next.rootActivity = mapActivityTree(state.rootActivity, transform);
-  // Variables and inputs both carry a storage driver; workflow inputs additionally require an explicit
-  // nullability flag. Outputs are minimal (produced, not consumed).
+  // Variables and inputs carry a storage driver; both input and output definitions require an explicit
+  // nullability flag.
   // The normalizer is deliberately shape-loose (it repairs legacy/wire records), so its unknown[]
   // result is asserted back to the declared variables type rather than validated per-field.
   if (Array.isArray(state.variables)) next.variables = mapArgumentRecords(state.variables, normalizeStoredArgument) as VariableDefinition[];
-  if (Array.isArray(state.inputs)) next.inputs = mapArgumentRecords(state.inputs, normalizeInputDefinition);
-  if (Array.isArray(state.outputs)) next.outputs = mapArgumentRecords(state.outputs, record => normalizeArgumentRecord(record, false));
+  if (Array.isArray(state.inputs)) next.inputs = mapArgumentRecords(state.inputs, record => normalizeArgumentDefinition(record, true));
+  if (Array.isArray(state.outputs)) next.outputs = mapArgumentRecords(state.outputs, record => normalizeArgumentDefinition(record, false));
   return next;
 }
 
@@ -116,8 +116,8 @@ function normalizeStoredArgument(record: Record<string, unknown>): Record<string
   return normalizeArgumentRecord(record, true);
 }
 
-function normalizeInputDefinition(record: Record<string, unknown>): Record<string, unknown> {
-  const next = normalizeStoredArgument(record);
+function normalizeArgumentDefinition(record: Record<string, unknown>, keepStorage: boolean): Record<string, unknown> {
+  const next = normalizeArgumentRecord(record, keepStorage);
   const isNullable = record.isNullable ?? record.IsNullable;
   delete next.IsNullable;
   next.isNullable = typeof isNullable === "boolean" ? isNullable : false;

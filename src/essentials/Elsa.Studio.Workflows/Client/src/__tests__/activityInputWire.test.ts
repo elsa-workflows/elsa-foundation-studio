@@ -399,9 +399,9 @@ describe("argument collection wire adapter", () => {
     expect("isReadOnly" in input).toBe(false);
   });
 
-  it("defaults missing input nullability without overriding explicit booleans", () => {
+  it.each(["inputs", "outputs"] as const)("defaults missing %s nullability without overriding explicit booleans", collection => {
     const state: WorkflowDefinitionState = {
-      inputs: [
+      [collection]: [
         { referenceKey: "missing", name: "Missing", type: { alias: "String", collectionKind: "Single" } },
         { referenceKey: "nullable", name: "Nullable", type: { alias: "String", collectionKind: "Single" }, isNullable: true },
         { referenceKey: "required", name: "Required", type: { alias: "String", collectionKind: "Single" }, isNullable: false },
@@ -409,10 +409,12 @@ describe("argument collection wire adapter", () => {
       ] as unknown[]
     };
 
-    const inputs = canonicalizeStateForWire(state).inputs as Record<string, unknown>[];
+    const inputs = canonicalizeStateForWire(state)[collection] as Record<string, unknown>[];
 
     expect(inputs.map(input => input.isNullable)).toEqual([false, true, false, true]);
     expect(inputs.every(input => !("IsNullable" in input))).toBe(true);
+    expect(expandStateFromWire(canonicalizeStateForWire(state))[collection]).toEqual(inputs);
+    expect(state[collection]![0]).not.toHaveProperty("isNullable");
   });
 
   it("preserves an existing referenceKey instead of regenerating it (idempotent)", () => {

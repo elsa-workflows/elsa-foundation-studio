@@ -183,6 +183,25 @@ describe("properties view", () => {
     versions: []
   });
 
+  it("includes required nullability in the draft payload when adding an output", () => {
+    const workflow = draft();
+    workflow.state.outputs = [];
+    const onStateChange = vi.fn();
+    const container = render(
+      <WorkflowPropertiesView details={details()} draft={workflow} context={rejectingContext} onStateChange={onStateChange} />
+    );
+
+    click([...container.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.includes("Add output"))!);
+
+    const producer = onStateChange.mock.calls[0][0] as (state: WorkflowDraft["state"]) => WorkflowDraft["state"];
+    const payload = JSON.parse(JSON.stringify(producer(workflow.state)));
+    expect(payload.outputs).toEqual([expect.objectContaining({
+      name: "Output1",
+      type: { alias: "String", collectionKind: "Single" },
+      isNullable: false
+    })]);
+  });
+
   it("shows a collection-kind dropdown on inputs and outputs too", () => {
     const container = render(
       <WorkflowPropertiesView details={details()} draft={draft()} context={rejectingContext} onStateChange={vi.fn()} onDefinitionMetaChange={vi.fn()} />

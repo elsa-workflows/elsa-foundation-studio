@@ -468,6 +468,7 @@ export interface WorkflowOutput {
   displayName: string;
   description: string;
   category: string;
+  isNullable: boolean;
   [key: string]: unknown;
 }
 

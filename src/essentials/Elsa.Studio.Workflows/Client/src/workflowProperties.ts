@@ -168,7 +168,8 @@ export function createOutput(options: { name: string; alias?: string }): Workflo
     type: makeArgumentType(options.alias),
     displayName: options.name,
     description: "",
-    category: ""
+    category: "",
+    isNullable: false
   };
 }
 

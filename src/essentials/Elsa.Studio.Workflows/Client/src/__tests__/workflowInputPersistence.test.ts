@@ -2,13 +2,16 @@ import type { StudioEndpointContext } from "@elsa-workflows/studio-sdk";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { clearApiCapabilityCache } from "../api/capabilities";
 import { updateDraft } from "../api/workflowDesign";
-import { createInput } from "../workflowProperties";
+import { createInput, createOutput } from "../workflowProperties";
 import type { WorkflowDraft } from "../workflowTypes";
 
 afterEach(() => clearApiCapabilityCache());
 
-describe("workflow input persistence", () => {
-  it("sends the required nullability flag for newly created and legacy inputs", async () => {
+describe("workflow argument persistence", () => {
+  it.each([
+    { collection: "inputs" as const, create: createInput },
+    { collection: "outputs" as const, create: createOutput }
+  ])("sends required nullability for newly created and legacy $collection", async ({ collection, create }) => {
     const putJson = vi.fn(async (_path: string, body: {
       state: WorkflowDraft["state"];
       layout: WorkflowDraft["layout"];
@@ -34,8 +37,8 @@ describe("workflow input persistence", () => {
       id: "workflow-draft-1",
       definitionId: "workflow-definition-1",
       state: {
-        inputs: [
-          createInput({ name: "OrderId" }),
+        [collection]: [
+          create({ name: "OrderId" }),
           {
             referenceKey: "legacy-input",
             name: "LegacyInput",
@@ -48,7 +51,7 @@ describe("workflow input persistence", () => {
     });
 
     const request = putJson.mock.calls[0][1];
-    expect(request.state.inputs).toEqual([
+    expect(request.state[collection]).toEqual([
       expect.objectContaining({ name: "OrderId", isNullable: false }),
       expect.objectContaining({ name: "LegacyInput", isNullable: false })
     ]);
