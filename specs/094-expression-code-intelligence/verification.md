@@ -1,12 +1,50 @@
 # Expression Code Intelligence — Verification
 
-Last reconciled: 2026-10-05 for Program #2310 M3 accessor correction and Liquid integration candidate; corrected-head CI/review and paired-host gate, delivery and human acceptance pending
+Last reconciled: 2026-10-06 for Program #2310 M3 accessor correction and Liquid integration candidate; baseline pair green, Liquid paired-host failure under correction, delivery and human acceptance pending
 
 ## Program #2310 status
 
 T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head automated M2 gate under the documented unavailable-external-review fallback. Studio spike #553 / T035 settles the technical decision: reject the current deeper-service candidate and retain the baseline path. No dependency or production integration is adopted. Deeper language help, three-theme presentation, formatting and current-head manual accessibility/continuity acceptance (T032-T034, T036-T038) remain open. The 2026-07-28 evidence remains historical. All program PRs remain draft and unmerged; final human acceptance is outstanding.
 
 ## Passing evidence
+
+### M3 Liquid member-projection correction — Studio #561, 2026-10-06
+
+The previous integrated head's missing `Line` completion reproduces locally in the rebuilt
+normal-host suite: the same two Liquid cases fail and the two controls pass in 19.3 minutes under
+high shared-machine load. Its value-free traffic confirms a successful, document/context-matched
+rich catalog response. Independent source review confirms that Foundation emits authorized
+activity outputs as dotted names such as `predecessor.Line`; the rich transport preserves those
+names, but the new Liquid path did not normalize their hierarchy. Trailing-dot classification was
+already correct. A retained tests-first projection run fails on the real flattened output shape.
+
+Root completes the dirty correction after the delegated writer stops on a model-capacity error;
+there is no accepted final worker handoff. The bounded correction normalizes catalog and context
+value names and shape members into at most four path segments, keeps filters/tags out of the value
+tree, merges queried shape facts ahead of missing flattened metadata, and retains the actual member
+name plus runtime documentation for hover. Duplicate context/output entries, catalog-only values,
+same-name variable/filter separation, exact hover ranges, runtime shape-ID precedence and bounded
+dotted shapes have controls. Root shares output fixtures and removes an unnecessary reverse-copy.
+No producer, SDK, wire, dependency, runtime, theme or formatter change is introduced.
+
+Root complete CodeEditor passes88/88, complete Liquid passes25/25 (projection21 and module4),
+CodeEditor typecheck/build and scoped ESLint pass. Returning flattened children after a failed
+parent-shape lookup makes exactly five authority controls fail; the guard is restored and the
+complete Liquid suite passes again. The initial unnecessary-escape lint error is corrected, not
+counted as a pass. Independent restored-production-delta review finds no actionable correctness
+or security issue; this is source review, not external approval.
+
+Root commits the correction at worker `f162c0a6a98cc6d28171b972d14e1f8f565f1df8` and integrates it
+as `29e6adeb1916198bba7488b6e36cf91c7c79b796`. A complete CodeEditor/Liquid source comparison is
+byte-identical after integration. Logs: `/private/tmp/elsa-565-liquid-projection-red.log`,
+`/private/tmp/elsa-565-root-editor-correction-final.log`,
+`/private/tmp/elsa-565-root-liquid-correction-final.log`,
+`/private/tmp/elsa-565-root-shape-guard-red.log` and
+`/private/tmp/elsa-561-root-normal-host-first.log`.
+
+The corrected integrated paired browser and exact committed-head configured/full CI/review remain
+pending. The previous failure is not closed by scoped units or source review. M3, M4, manual AT,
+human acceptance and delivery remain open; all PRs stay draft and unmerged.
 
 ### M3 Liquid integration candidate — Studio #561, 2026-10-05
 
@@ -31,10 +69,18 @@ Root extends the normal-host browser with compact single-line and expanded multi
 filter/tag replacement, exact literal source plus authenticated accepted/undo readback, explicit
 interpolation snippets, exact append documentation/signature and interaction-local catalog-request
 revision evidence. Safe traffic stores only a paging classification, not search text or source.
-Independent harness review finds no material blocker. These new browser assertions have not yet
-passed; complete affected suites, unchanged bundles and exact integrated-head CI/review remain
-pending. Worker/scoped/predecessor checks do not accept the integrated candidate. All PRs remain
-draft/unmerged; M3, M4, manual AT and human acceptance stay open.
+Independent harness review finds no material blocker. At exact Studio
+`b58d55c0ceaac425e0b3e32d84db6ce93c477e59`,
+[CI37378068886](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37378068886)
+passes configured lint/typecheck, full/shuffled units, all client builds, unchanged bundle budgets
+and generic Chromium. Paired normal hosts fail 2/4: existing Liquid `predecessor.` member completion
+does not show the discovered runtime output. Activity Definition and missing-Liquid-provider cases
+pass. Root local integrated CodeEditor passes87/87 and rebuilt authenticated Foundation host
+passes3/3; those do not supersede the browser failure. Root is reproducing with rebuilt hosts while
+the bounded worker adds parser/projection regressions. No assertion, authority boundary or timing
+limit is relaxed. The new Liquid depth assertions remain unaccepted. Worker/scoped/predecessor
+checks do not accept the candidate. All PRs remain draft/unmerged; M3, M4, manual AT and human
+acceptance stay open.
 
 ### M3 accessor policy correction — Studio #560, 2026-10-05
 
@@ -49,8 +95,17 @@ and independent exact-delta review finds no actionable remaining issue.
 The immutable CI producer pin advances to Foundation `5cd44d6312d9de85b13f4619fc7aa972a557d033`.
 Its corrected-tree catalog27/27, Expressions236/236, Design534/534, DesignAPI143/143,
 PublishingAPI714/714, Jint126/126, scopedArchitecture17/17 and unchanged map freshness pass.
-Runtime grants, SDK, wire and dependencies are unchanged. Corrected paired browser, configured
-Studio gates and exact committed-head CI/review remain pending at this checkpoint.
+Runtime grants, SDK, wire and dependencies are unchanged. Exact Foundation5cd44d63 passes full
+[CI37376029424](https://github.com/elsa-workflows/elsa-foundation/actions/runs/37376029424),
+[Maps37376054285](https://github.com/elsa-workflows/elsa-foundation/actions/runs/37376054285)
+and root rebuilt authenticated Workbench3/3. Root also rebuilds Debug with locked restore and
+passes fresh isolated SQLite JavaScript REST10/10, stopping only its owned server. Evidence:
+`/private/tmp/elsa-2379-root-debug-accessor-final.log` and
+`/private/tmp/elsa-2379-root-rest-accessor-final.log`. Corrected Studio
+`5ac5d71de80aa27ef6ed71bb0c3bae6fe003b6fd` passes all three jobs in
+[CI37377085581](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37377085581),
+including rebuilt paired normal hosts against Foundation5cd. This green baseline pair does not
+accept the subsequent Liquid candidate; its paired-host failure is recorded above.
 
 Predecessor Studio `8ab8fced71095b085e592442c65d01c143649f37` passes all three jobs in
 [CI 37147792665](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37147792665),
