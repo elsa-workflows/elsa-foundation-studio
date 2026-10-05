@@ -8,7 +8,7 @@ import {
   temporarilySetTabFocusMode,
   toggleTabFocusMode
 } from "@codemirror/commands";
-import { bracketMatching, defaultHighlightStyle, foldGutter, indentOnInput, syntaxHighlighting } from "@codemirror/language";
+import { bracketMatching, foldGutter, indentOnInput, syntaxHighlighting } from "@codemirror/language";
 import { Compartment, EditorState, Prec, Transaction } from "@codemirror/state";
 import { EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type KeyBinding } from "@codemirror/view";
 import { useEffect, useRef } from "react";
@@ -27,6 +27,7 @@ import {
   subscribeToStudioCodeEditorSessionRevocation
 } from "../sessions/studioCodeEditorSessions";
 import type { StudioCodeDiagnostic, StudioCodeEditorEngineProps } from "../types";
+import { studioCodeHighlightStyle } from "./syntaxHighlightStyle";
 
 interface CodeMirrorSessionEntry {
   state: EditorState;
@@ -216,7 +217,7 @@ function resolveEntry(props: StudioCodeEditorEngineProps): CodeMirrorSessionEntr
         language.of([]),
         indentOnInput(),
         bracketMatching(),
-        syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+        syntaxHighlighting(studioCodeHighlightStyle, { fallback: true }),
         Prec.highest(keymap.of(editorKeymap(runtime))),
         createCodeMirrorCodeIntelligenceExtensions({
           document: props.document,

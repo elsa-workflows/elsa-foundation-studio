@@ -1,11 +1,14 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { FallbackCodeEditor } from "./engines/FallbackCodeEditor";
 import {
   getStudioCodeEditorSession,
   isStudioCodeEditorSessionRevoked,
   subscribeToStudioCodeEditorSessionRevocation
 } from "./sessions/studioCodeEditorSessions";
-import type { StudioCodeDiagnostic, StudioCodeEditorEngineProps, StudioCodeEditorProps } from "./types";
+import type { StudioCodeDiagnostic, StudioCodeEditorEngineProps, StudioCodeEditorProps, StudioCodeSyntaxSpan } from "./types";
+import { studioCodeSyntaxClass } from "./engines/syntaxTokens";
+import { useStudioCodePreviewSyntax } from "./useStudioCodePreviewSyntax";
 
 let activeCompactSession: string | undefined;
 const compactEditorSubscribers = new Set<(activeSession: string | undefined) => void>();
@@ -59,6 +62,7 @@ export function StudioCodeEditor({
     () => isStudioCodeEditorSessionRevoked(compactSession)
   );
   const [authorizationGeneration, setAuthorizationGeneration] = useState(0);
+  const previewRef = useRef<HTMLButtonElement | null>(null);
   useEffect(
     () => subscribeToStudioCodeEditorSessionRevocation(scope => {
       if (!scope || compactSession.startsWith(`${scope}\u001f`)) setAuthorizationRevoked(true);
@@ -91,6 +95,19 @@ export function StudioCodeEditor({
   void authorizationGeneration;
   const session = suppliedSession ?? getStudioCodeEditorSession(sessionKey ?? document.uri);
   const isCompactPreview = profile === "compact" && !compactActive;
+  const loadPreviewHighlighter = languageAdapter?.loadPreviewHighlighter;
+  const grammarProfile = languageAdapter?.grammarProfile;
+  const previewSpans = useStudioCodePreviewSyntax(previewRef, {
+    enabled: isCompactPreview,
+    authorized: !authorizationRevoked,
+    source: document.value,
+    language: document.language,
+    uri: document.uri,
+    version: document.version,
+    session: compactSession,
+    grammarProfile,
+    loadHighlighter: loadPreviewHighlighter
+  });
   const engineProps: StudioCodeEditorEngineProps = {
     document,
     profile,
@@ -158,6 +175,7 @@ export function StudioCodeEditor({
         </div>
       ) : isCompactPreview ? (
         <button
+          ref={previewRef}
           type="button"
           className="studio-code-editor-preview"
           aria-label={`${ariaLabel}. Activate to edit.`}
@@ -166,7 +184,7 @@ export function StudioCodeEditor({
             if (!isMultilinePreview) activateCompactSession(compactSession);
           }}
         >
-          <code>{previewValue(document.value)}</code>
+          <code>{renderPreviewValue(document.value, previewSpans)}</code>
           {document.value.includes("\n") ? <span aria-hidden="true">↗</span> : null}
         </button>
       ) : RichCodeEditor ? (
@@ -210,7 +228,28 @@ function StudioCodeDiagnostics({ diagnostics, profile }: { diagnostics: StudioCo
 }
 
 function previewValue(value: string) {
-  return value.replace(/\n/g, " ↵ ") || "Expression";
+  return formatPreviewText(value) || "Expression";
+}
+
+function renderPreviewValue(value: string, spans: readonly StudioCodeSyntaxSpan[]) {
+  if (!value || spans.length === 0) return previewValue(value);
+  const content: ReactNode[] = [];
+  let position = 0;
+  for (const span of spans) {
+    if (span.from > position) content.push(formatPreviewText(value.slice(position, span.from)));
+    content.push(
+      <span className={studioCodeSyntaxClass(span.kind)} key={`${span.from}-${span.to}`}>
+        {formatPreviewText(value.slice(span.from, span.to))}
+      </span>
+    );
+    position = span.to;
+  }
+  if (position < value.length) content.push(formatPreviewText(value.slice(position)));
+  return content;
+}
+
+function formatPreviewText(value: string) {
+  return value.replace(/\n/g, " ↵ ");
 }
 
 function highestPriorityDiagnostic(diagnostics: StudioCodeDiagnostic[]) {

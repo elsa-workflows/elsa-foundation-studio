@@ -12,6 +12,31 @@ export interface StudioCodeDocument {
 export type StudioCodeEditorProfile = "compact" | "expanded";
 /** Internal parser/completion mode selected by a language adapter, not source metadata. */
 export type StudioCodeGrammarProfile = "program" | "expression";
+/** Closed semantic foreground vocabulary shared by rich and static code surfaces. */
+export type StudioCodeSyntaxKind =
+  | "keyword"
+  | "operator"
+  | "literal"
+  | "number"
+  | "string"
+  | "comment"
+  | "variable"
+  | "property"
+  | "function"
+  | "type"
+  | "tag";
+
+/** A source range and semantic style only; parser nodes and source text stay inside CodeEditor. */
+export interface StudioCodeSyntaxSpan {
+  readonly from: number;
+  readonly to: number;
+  readonly kind: StudioCodeSyntaxKind;
+}
+
+export type StudioCodePreviewHighlighter = (
+  source: string,
+  signal: AbortSignal
+) => readonly StudioCodeSyntaxSpan[] | Promise<readonly StudioCodeSyntaxSpan[]>;
 export type StudioCodeDiagnosticSeverity = "info" | "warning" | "error";
 
 export interface StudioCodeDiagnostic {
@@ -127,6 +152,8 @@ export interface StudioCodeLanguageAdapter {
   displayName: string;
   grammarProfile?: StudioCodeGrammarProfile;
   loadSupport?(): Promise<StudioCodeLanguageSupport>;
+  /** Loads parser-only support for an unfocused preview without creating an editor state or view. */
+  loadPreviewHighlighter?(grammarProfile?: StudioCodeGrammarProfile): Promise<StudioCodePreviewHighlighter>;
   loadEditor?: StudioCodeEditorLoader;
 }
 

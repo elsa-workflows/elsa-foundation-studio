@@ -56,6 +56,19 @@
   --studio-warning-fg: oklch(0.52 0.15 60);
   --studio-danger-fg: oklch(0.505 0.22 27);
 
+  /* Syntax foregrounds default to primary text for hosts without a recognized appearance. */
+  --studio-syntax-keyword: var(--studio-text);
+  --studio-syntax-operator: var(--studio-text);
+  --studio-syntax-literal: var(--studio-text);
+  --studio-syntax-number: var(--studio-text);
+  --studio-syntax-string: var(--studio-text);
+  --studio-syntax-comment: var(--studio-text);
+  --studio-syntax-variable: var(--studio-text);
+  --studio-syntax-property: var(--studio-text);
+  --studio-syntax-function: var(--studio-text);
+  --studio-syntax-type: var(--studio-text);
+  --studio-syntax-tag: var(--studio-text);
+
   --studio-radius-sm: var(--radius-sm);
   --studio-radius: var(--radius);
   --studio-radius-md: var(--radius-md);
@@ -72,6 +85,63 @@
   --text: var(--studio-text);
   --muted: var(--studio-text-muted);
   --accent: var(--studio-accent);
+}
+
+/* Foreground-only code roles: exact appearance selectors let every theme keep its own surface palette. */
+html[data-theme-appearance="light"] {
+  --studio-syntax-keyword: oklch(0.43 0.15 300);
+  --studio-syntax-operator: var(--studio-text);
+  --studio-syntax-literal: oklch(0.45 0.16 25);
+  --studio-syntax-number: oklch(0.44 0.13 245);
+  --studio-syntax-string: oklch(0.43 0.12 145);
+  --studio-syntax-comment: oklch(0.47 0.035 250);
+  --studio-syntax-variable: var(--studio-text);
+  --studio-syntax-property: oklch(0.44 0.11 215);
+  --studio-syntax-function: oklch(0.43 0.14 270);
+  --studio-syntax-type: oklch(0.44 0.11 70);
+  --studio-syntax-tag: oklch(0.44 0.14 15);
+}
+
+html[data-theme-appearance="dark"] {
+  --studio-syntax-keyword: oklch(0.82 0.11 300);
+  --studio-syntax-operator: var(--studio-text);
+  --studio-syntax-literal: oklch(0.82 0.12 25);
+  --studio-syntax-number: oklch(0.82 0.11 245);
+  --studio-syntax-string: oklch(0.82 0.11 145);
+  --studio-syntax-comment: oklch(0.76 0.035 250);
+  --studio-syntax-variable: var(--studio-text);
+  --studio-syntax-property: oklch(0.82 0.09 215);
+  --studio-syntax-function: oklch(0.82 0.11 270);
+  --studio-syntax-type: oklch(0.82 0.09 70);
+  --studio-syntax-tag: oklch(0.82 0.11 15);
+}
+
+html[data-theme-appearance="dim"] {
+  --studio-syntax-keyword: oklch(0.78 0.10 300);
+  --studio-syntax-operator: var(--studio-text);
+  --studio-syntax-literal: oklch(0.78 0.11 25);
+  --studio-syntax-number: oklch(0.78 0.10 245);
+  --studio-syntax-string: oklch(0.78 0.10 145);
+  --studio-syntax-comment: oklch(0.72 0.03 250);
+  --studio-syntax-variable: var(--studio-text);
+  --studio-syntax-property: oklch(0.78 0.08 215);
+  --studio-syntax-function: oklch(0.78 0.10 270);
+  --studio-syntax-type: oklch(0.78 0.08 70);
+  --studio-syntax-tag: oklch(0.78 0.10 15);
+}
+
+html[data-theme-appearance="high-contrast"] {
+  --studio-syntax-keyword: var(--studio-text);
+  --studio-syntax-operator: var(--studio-text);
+  --studio-syntax-literal: var(--studio-text);
+  --studio-syntax-number: var(--studio-text);
+  --studio-syntax-string: var(--studio-text);
+  --studio-syntax-comment: var(--studio-text);
+  --studio-syntax-variable: var(--studio-text);
+  --studio-syntax-property: var(--studio-text);
+  --studio-syntax-function: var(--studio-text);
+  --studio-syntax-type: var(--studio-text);
+  --studio-syntax-tag: var(--studio-text);
 }
 
 /*
@@ -280,4 +350,3 @@ html[data-theme-material] {
   --studio-material-well-bg-size: var(--studio-material-panel-bg-size);
   --studio-material-well-shadow: inset 0 1px 3px color-mix(in srgb, black 24%, transparent);
 }
-

@@ -5,14 +5,19 @@ import type { Extension } from "@codemirror/state";
 import type { StudioCodeGrammarProfile } from "../types";
 
 export function createJavaScriptCodeMirrorExtensions(grammarProfile?: StudioCodeGrammarProfile): Extension[] {
+  return [createJavaScriptCodeMirrorLanguageSupport(grammarProfile)];
+}
+
+/** Shared parser construction for rich editing and parser-only previews. */
+export function createJavaScriptCodeMirrorLanguageSupport(grammarProfile?: StudioCodeGrammarProfile): LanguageSupport {
   if (grammarProfile === "expression") {
     // Avoid javascript() here: it adds statement-oriented completion snippets as well as
     // the broad Script grammar. Expression tooling remains an opt-in adapter profile.
     const language = javascriptLanguage.configure({ top: "SingleExpression" });
-    return [new LanguageSupport(language), language.data.of({ studioExpressionCompletion: expressionLocalCompletion })];
+    return new LanguageSupport(language, [language.data.of({ studioExpressionCompletion: expressionLocalCompletion })]);
   }
 
-  return [javascript({ jsx: true, typescript: true })];
+  return javascript({ jsx: true, typescript: true });
 }
 
 type SyntaxNode = ReturnType<typeof syntaxTree>["topNode"];
