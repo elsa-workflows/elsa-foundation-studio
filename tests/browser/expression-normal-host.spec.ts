@@ -386,10 +386,19 @@ async function expectReadableCodeSurface(surface: Locator, options: { focused?: 
     }
     const ratios = [...nodes].map(node => {
       const style = getComputedStyle(node, selected ? "::selection" : null);
+      const tokenStyle = selected ? getComputedStyle(node) : undefined;
+      const accent = tokenStyle?.getPropertyValue("--studio-accent").trim();
+      const onAccent = tokenStyle?.getPropertyValue("--studio-accent-text").trim();
+      const accentRgba = accent ? rgba(accent) : undefined;
+      const onAccentRgba = onAccent ? rgba(onAccent) : undefined;
       const selectionBackground = selected ? rgba(style.backgroundColor) : undefined;
+      const foreground = rgba(style.color);
       const background = selectionBackground ? blend(selectionBackground, backgroundOf(node)) : backgroundOf(node);
-      return { className: node.className, contrast: contrast(rgba(style.color), background),
-        selectionAlpha: selectionBackground?.[3] };
+      return { className: node.className, contrast: contrast(foreground, background),
+        selectionAlpha: selectionBackground?.[3],
+        selectionTokenOwned: selected && !!accentRgba && !!onAccentRgba &&
+          selectionBackground?.every((channel, index) => channel === accentRgba[index]) &&
+          foreground.every((channel, index) => channel === onAccentRgba[index]) };
     });
     const bounds = element.getBoundingClientRect();
     const pane = element.closest(".wf-properties");
@@ -407,7 +416,10 @@ async function expectReadableCodeSurface(surface: Locator, options: { focused?: 
   expect(measurements.ratios.length).toBeGreaterThan(0);
   for (const measurement of measurements.ratios) {
     expect(measurement.contrast, `Text contrast for ${measurement.className}`).toBeGreaterThanOrEqual(4.5);
-    if (options.selected) expect(measurement.selectionAlpha).toBeGreaterThan(0);
+    if (options.selected) {
+      expect(measurement.selectionAlpha).toBeGreaterThan(0);
+      expect(measurement.selectionTokenOwned, `Selection tokens for ${measurement.className}`).toBe(true);
+    }
   }
   expect(measurements.left).toBeGreaterThanOrEqual(-1);
   expect(measurements.right).toBeLessThanOrEqual(measurements.viewportWidth + 1);
