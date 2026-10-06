@@ -1,5 +1,11 @@
 # Tasks: Expression Code Intelligence
 
+## Current synchronized-head snapshot — 2026-10-06
+
+The existing Studio expression stack is synchronized with main `2bd5c076`. Exact-head CI/review and fresh final Studio/Foundation producer pairing remain pending; no synchronized-pair pass is claimed. Retained M1/M2 automated passes apply only to their recorded revisions. The M1 `c9479fba` / `f81be4be` pair passed normal-host4/4 and unblocked M2 at that checkpoint. The dated implementation notes and checkbox states below remain historical; they do not revise earlier blocked states or prove later integrated heads. Copilot requests do not establish a completed current-head review. All PRs remain draft/unmerged; final owner acceptance and delivery are open. Native Chrome/Safari VoiceOver is **SKIPPED BY OWNER DECISION — NEVER PASSED**.
+
+## Retained task ledger
+
 Baseline implementation tasks are complete. File names below reflect the landed design rather than provisional planning names.
 
 The baseline tasks T001-T025 are historical. Program #2310 reopens this feature for dependency-ordered tasks T026-T038. T026-T029 have exact-head normal-host evidence. T030-T031 are implemented with reviewed local conformance evidence; their committed-head CI/review gate is pending. T032-T038 remain open.
