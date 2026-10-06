@@ -1,10 +1,26 @@
 # Expression Code Intelligence — Verification
 
-Last reconciled: 2026-10-06 for the owner's native-AT scope amendment and remaining T038 / Studio Task#577 delivery; all PRs draft/unmerged, final human acceptance pending
+Last reconciled: 2026-10-06 for preview-publication authorization and renewed main integration; all PRs draft/unmerged, final human acceptance pending
 
 ## Program #2310 status
 
 T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head automated M2 gate under the documented unavailable-external-review fallback. Studio spike #553 / T035 settles the technical decision: reject the current deeper-service candidate and retain the baseline path. No deeper-service dependency is adopted. T032-T034 pass their final exact-head automated M3 gate below. T036 passes its immutable bc305150/5cd44d63 automated gate; Task#572 / T037 passes at immutable ef523911/5cd44d63. Task#577 owns T038. Actual current-head Chrome/Safari VoiceOver is now skipped by owner decision and never passed; final human acceptance and delivery remain open. The 2026-07-28 evidence remains historical. All program PRs remain draft and unmerged.
+
+## Renewed main synchronization and publication scope — 2026-10-06
+
+The owner explicitly authorizes preview NuGet/npm publication **only to feedz.io**, and subsequently authorizes Docker image publication to any endpoint. This delivery retains the existing Docker Hub workflows; it does not migrate registries, provision Azure resources, publish stable releases or deploy. This clears the publication-scope blocker, not the final acceptance gate. Earlier publication restrictions below describe their historical checkpoints.
+
+Root resumes the existing nine-layer Studio stack against qualified main `2bd5c0763e6091ad4995839c4bc61358da585ede`. The responsive stylesheet conflict is resolved by preserving main's compact horizontal navigation, 150px search and phone layout, adding only the existing expression scroll-padding and direct-child flex/transition safeguards. Sign-in styles remain byte-identical to main. Independent review finds no regression. T030 now explicitly scopes grammar alignment to the expression profile and preserves script/TypeScript/JSX project-file grammar; completed historical task checkboxes are retained.
+
+Local synchronized-source gates pass: normal-host layer Workflows161/161; conformance CodeEditor65/65 and JavaScript4/4; JavaScript-help CodeEditor77/77, JavaScript15/15 and Workflows expression-tooling37/37; Liquid-help Liquid25/25 and CodeEditor93/93; theme CodeEditor119/119 and shell/navigation31/31; formatting CodeEditor196/196, JavaScript16/16 and Liquid28/28. Workspace typechecks pass through the formatting layer; its executable source is unchanged by the final acceptance-layer main merge. Owning CodeEditor tsc, CSS lint, layout check and diff checks also pass at the theme resolution. These are local integration-tree checkpoints, not final paired-host, CI or review acceptance.
+
+The Liquid-help full editor run initially passes92/93 and an isolated retry fails the declared-local completion assertion under shared-machine load221. The isolated case then passes and the unchanged complete suite passes93/93 as load falls near30. No code, timeout or assertion is relaxed. Both failures remain recorded; CPU contention is a hypothesis, not a proved cause.
+
+The prior clean producer `946a237d2a5827ae58de569a081f9719be83ee33` has now completed full [CI37488305508](https://github.com/elsa-workflows/elsa-foundation/actions/runs/37488305508), including Architecture and Core-only, and [Maps37488310415](https://github.com/elsa-workflows/elsa-foundation/actions/runs/37488310415). Root's fresh rebuilt Debug JavaScript REST suite at that producer passes10/10 with an explicit failure-propagating wrapper and owned teardown (`/private/tmp/elsa-2310-root-946a-js-rest.log`). Studio documentation head `2dd71104cf6014069abb0a5303c6d81da2e80cd1` completes [CI37491378398](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37491378398); actual CodeRabbit coverage includes that head with no actionable finding. These results remain exact historical checkpoints, not proof of newly synchronized heads.
+
+Foundation main `93fba1c1f9cf97320d719a5acbd923fb9f9295e5` remains under the Contributor Experience owner's qualification/reservation at this checkpoint. Producer synchronization, strict immutable-pin refresh, rebuilt paired normal hosts, registered-runtime parity, synthetic browser matrix, affected producer/REST checks and exact-head CI/review remain pending. All expression PRs remain draft/open/unmerged. Native Chrome/Safari VoiceOver remains **SKIPPED BY OWNER DECISION — NEVER PASSED**. T038, final owner acceptance, dependency-ordered merging, resulting-main qualification and public closure remain open.
+
+The final acceptance-layer merged tree additionally passes the focused Workflows input-wire, expression-tooling, orchestration and property suites198/198, plus full repository lint with0errors/47existingwarnings, CSS lint and layout validation. This does not satisfy its pending browser/runtime, CI or review gates.
 
 ## Owner acceptance-scope amendment — 2026-10-06
 
