@@ -6,7 +6,52 @@ Last reconciled: 2026-10-06 for Program #2310 final automated M3 proof and M4 Ta
 
 T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head automated M2 gate under the documented unavailable-external-review fallback. Studio spike #553 / T035 settles the technical decision: reject the current deeper-service candidate and retain the baseline path. No deeper-service dependency is adopted. T032-T034 pass their final exact-head automated M3 gate below, permitting assigned M4 Task#568 / T036. Three-theme presentation, active parameters/overloads, formatting and current-head manual accessibility/continuity acceptance (T036-T038) remain open. The 2026-07-28 evidence remains historical. All program PRs remain draft and unmerged; final human acceptance is outstanding.
 
-## Passing evidence
+## Verification evidence
+
+### M4 T036 committed9041ad35 — completion visibility failure (not accepted)
+
+Root commits/pushes `9041ad355dae29acafefa892d1dc5707e5471273`, including the scoped atomic
+preview-color correction and independently reviewed long-source/scroller measurement fixes.
+Complete CodeEditor112/112, changed CSS Stylelint, harness ESLint and diff check pass. A fresh
+canonical coherent rebuild passes primary127.44/127.50kB, stylesheet145.19/185kB,
+definitions379.97/384.50kB, upgrades369.97/375.50kB, largest263.18/500kB; eight heavy surfaces
+remain deferred. Foundation stays immutable5cd44d63. Temporary diagnostics are removed before
+this commit; Copilot is explicitly re-requested but actual review requests/reviews remain empty.
+
+Canonical all-five finishes4pass/1fail in5.3m. The new theme case progresses through JavaScript
+Light/Dark/Dim and Liquid Light preview, long-source native caret/scroll, signature and keyboard
+hover checks. Liquid's selected completion is present but has native viewport-intersection
+ratio0 for the full unchanged30s assertion. Root diagnoses actual popup bounds/clipping in a
+fresh owned host pair reusing only this immediately preceding coherent build; diagnosis is
+not acceptance. No visibility assertion is weakened or replaced with forced scrolling.
+Log: `/private/tmp/elsa-568-root-all-five-9041ad35.log`. Exact-head CI37404019028 is terminal
+failed with the same selected-completion ratio0 and original4passing (6.3m). Full workspace
+units/three Workflows shuffle seeds/lint/typecheck/bundles and generic Chromium pass; these
+do not accept the failed theme gate. CI log: `/private/tmp/elsa-568-root-ci-9041ad35-failure.log`.
+T036 is open; T037 is unassigned; manual AT/human/delivery gates remain open, all PRs draft.
+
+Fresh-host geometry confirms the selected popup is intentionally parked at top-10000, not
+mispositioned by an ancestor transform (all are none). Actual editor y765.391..825.578;
+inspector-tab-panel y780.391..804.391/clientHeight24/scrollTop56; its flex tab-panels height0;
+inspector-content height73, inspector113, main frame318. The nominal horizontal navigation
+strip still occupies486px because its nested navigation sections/children retain vertical
+grid layouts. The input/anchor is clipped by the tiny nested scrollport. A tests-first actual
+one-row navigation assertion fails430px vertical link span against the largest actual link
+height90.813 (+1px tolerance), preserving every existing real-Tab/full-viewport/link-order and
+route-continuity assertion. Root takes the bounded existing narrow-layout correction, not
+popup coordinates, hidden links, fixed dimensions or a redesigned workbench. Actual code
+scroller readability also requires full native viewport intersection (rather than partial
+line visibility). Logs: `/private/tmp/elsa-568-root-liquid-completion-geometry.log`,
+`/private/tmp/elsa-568-root-horizontal-nav-row-red.log`. Temporary ancestor geometry is removed;
+corrected canonical proof remains pending.
+
+Root reviews the narrow-only14-line CSS correction: the sidebar aligns its strip contents,
+navigation sections/groups/children become non-shrinking horizontal flex containers, and
+heading/child block margins reset while existing inline grouping, gaps, all links, DOM order,
+route handling, search and focus rules remain. Complete Web445/445 (36files), direct changed
+app CSS Stylelint, harness ESLint and diff check pass. Log:
+`/private/tmp/elsa-568-root-horizontal-strip-web-units.log`. No new build or host proof is yet
+claimed; temporary no-build config and full ancestor geometry probe are removed before commit.
 
 ### M4 T036 scrollable-content boundary correction (not accepted)
 

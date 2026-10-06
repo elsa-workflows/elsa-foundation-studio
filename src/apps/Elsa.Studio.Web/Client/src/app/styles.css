@@ -2892,6 +2892,7 @@ textarea:focus {
   }
 
   .sidebar {
+    align-items: center;
     border-right: 0;
     border-bottom: 1px solid var(--border);
     flex-direction: row;
@@ -2924,6 +2925,19 @@ textarea:focus {
   .nav-section,
   .sidebar-footer {
     white-space: nowrap;
+  }
+
+  .sidebar .nav-section,
+  .sidebar .nav-item-group,
+  .sidebar .nav-children {
+    align-items: center;
+    display: flex;
+    flex: 0 0 auto;
+  }
+
+  .sidebar .nav-heading,
+  .sidebar .nav-children {
+    margin-block: 0;
   }
 
   .topbar {

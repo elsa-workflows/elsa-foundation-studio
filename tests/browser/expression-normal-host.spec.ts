@@ -108,6 +108,13 @@ completeTest("normal-host expression previews and help remain readable in Light,
     await expect(navigationLinks.nth(index)).toBeFocused();
     await expect(navigationLinks.nth(index)).toBeInViewport({ ratio: 1 });
   }
+  const navigationRow = await navigationLinks.evaluateAll(links => {
+    const boxes = links.map(link => link.getBoundingClientRect());
+    return { span: Math.max(...boxes.map(box => box.bottom)) - Math.min(...boxes.map(box => box.top)),
+      largestLink: Math.max(...boxes.map(box => box.height)) };
+  });
+  expect(navigationRow.span, "Narrow navigation must remain one horizontal row")
+    .toBeLessThanOrEqual(navigationRow.largestLink + 1);
   expect(page.url()).toBe(workflowUrl);
   await firstPreview.scrollIntoViewIfNeeded();
   await expect(firstPreview).toBeInViewport();
@@ -425,6 +432,10 @@ async function expectExpandedSourceContinuity(page: Page, pair: NormalHostPair,
 async function expectReadableCodeSurface(surface: Locator, options: { focused?: boolean; selected?: boolean } = {}) {
   await expect(surface).toBeVisible();
   await expect(surface).toBeInViewport();
+  if (await surface.evaluate(element => element.matches(".cm-content"))) {
+    await expect(surface.locator("xpath=ancestor::*[contains(@class, 'cm-scroller')][1]"))
+      .toBeInViewport({ ratio: 1 });
+  }
   const measurements = await surface.evaluate((element, selected) => {
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = 1;
