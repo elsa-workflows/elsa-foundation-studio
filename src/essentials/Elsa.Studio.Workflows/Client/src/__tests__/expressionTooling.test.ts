@@ -231,15 +231,17 @@ describe("expression tooling transport", () => {
       .resolves.toMatchObject({ state: "unavailable" });
   });
 
-  it("pages a full rich catalog and keeps supported-empty distinct from failure", async () => {
-    const symbols = Array.from({ length: 101 }, (_, index) => ({ symbolId: `value-${index}`, name: `value${index}`, kind: "Variable" }));
+  it.each([0, 1, 100])("pages a full raw catalog with %i malformed entries without truncating later symbols", async malformedCount => {
+    const symbols = Array.from({ length: 101 }, (_, index) => index < malformedCount
+      ? {} : { symbolId: `value-${index}`, name: `value${index}`, kind: "Variable" });
     const api = createContext(vi.fn(async (_url: string, body?: { skip?: number; take?: number }) => outcome({
       ...contextPayload, rootSymbols: symbols.slice(body?.skip ?? 0, (body?.skip ?? 0) + (body?.take ?? 100))
     })));
     const tooling = client(api.context);
     const context = (await tooling.getAuthoringContext(document, {})).data!;
     const first = await tooling.getCatalog(document, context);
-    expect(first.data?.symbols).toHaveLength(100);
+    expect(first.data?.symbols).toHaveLength(100 - malformedCount);
+    expect(first.state).toBe(malformedCount === 100 ? "supported-empty" : "ready");
     expect(first.data?.nextCursor).toBe("100");
     const next = await tooling.getCatalog(document, context, undefined, first.data?.nextCursor);
     expect(next.data?.symbols).toHaveLength(1);
