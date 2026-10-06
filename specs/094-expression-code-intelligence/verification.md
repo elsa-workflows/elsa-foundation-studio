@@ -1,5 +1,17 @@
 # Expression Code Intelligence — Verification
 
+## Current synchronized-head snapshot — 2026-10-07
+
+The existing Studio expression stack is being synchronized with qualified main `aedaacc360099f8a12fb3fa968fe97d5cd9d7aa4`. Its delta from `2bd5c076` is the contributor-matrix link plus explicit read-only CI/Docker permissions and non-persisted checkout credentials; no application source changes. Exact-head CI/review and fresh final Studio/Foundation producer pairing remain pending; no synchronized-pair pass is claimed. Retained M1/M2 automated passes apply only to their recorded revisions. The M1 `c9479fba` / `f81be4be` pair passed normal-host4/4 and unblocked M2 at that checkpoint. The dated entries below preserve historical statuses, including earlier M2-blocked states; they do not establish later integrated-head acceptance. Copilot requests do not establish a completed current-head review. All PRs remain draft/unmerged; final owner acceptance and delivery are open. Native Chrome/Safari VoiceOver is **SKIPPED BY OWNER DECISION — NEVER PASSED**.
+
+Retained CI558/37532060674 fails3/4 normal-host cases at the obsolete `.wf-status` locator; the Activity Definition case passes. Main's toolbar exposes the same autosave messages through `.wf-editor-save-status`, an atomic polite live status. The helper correction preserves Autosaving/Autosaved, exact persisted-source, successful fresh PUT and post-save revision/assistance assertions. Corrected `a3fefdc7` passes every job in [CI37534033046](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37534033046), including rebuilt normal hosts; no production toolbar or timing/assertion relaxation is introduced. That checkpoint does not establish the newly synchronized head's CI/review or final pair, which remain pending.
+
+### Theme-size correction candidate
+
+Source checkpoint `c2924337` moves only rich CodeMirror presentation into the existing lazy engine's `EditorView.theme` extensions. Fallback input, lightweight preview, shell and syntax-token CSS remain eager; host style discovery, manifest loading, bundler, dependencies and unchanged bundle budgets are untouched. Installed esbuild0.27.7 minifies the owning stylesheet from5623 to3397bytes (minus2226); this is not a full-bundle result. Root and independent source review find no concrete defect and confirm profile-specific presentation reconfiguration, but the new expanded-to-compact-to-expanded regression has not passed locally: its final run times out at the unchanged20-second limit under extreme shared load. The clean baseline fails the new theme assertion as intended. No timeout/assertion is relaxed. Fresh exact-head unit, full-bundle and integrated browser gates remain required; this candidate is not accepted.
+
+## Retained historical checkpoints
+
 Last reconciled: 2026-10-06 for Program #2310 T036 acceptance and in-progress T037 integration; all PRs draft/unmerged, current-head manual AT and human acceptance pending
 
 ## Program #2310 status

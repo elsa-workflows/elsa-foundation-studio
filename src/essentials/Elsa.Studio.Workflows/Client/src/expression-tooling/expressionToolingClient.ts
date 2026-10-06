@@ -35,6 +35,7 @@ import {
 const contractVersion = 1;
 const wireContractVersion = { major: 1, minor: 0 } as const;
 const valueShapesKey = Symbol("expression-value-shapes");
+const rawSymbolCountKey = Symbol("expression-raw-symbol-count");
 // Foundation v1 enum ordinals (ExpressionToolingModels.cs). Named values remain
 // supported for hosts using a string-enum JSON converter.
 const outcomeStateNames = ["Success", "SupportedEmpty", "Unavailable", "Unauthorized", "Incompatible", "Stale", "Canceled"] as const;
@@ -44,6 +45,7 @@ const severityNames = ["Error", "Warning", "Information", "Hint"] as const;
 
 type AuthoringContextWithShapes = StudioExpressionAuthoringContext & {
   [valueShapesKey]?: ReadonlyMap<string, StudioExpressionValueShape>;
+  [rawSymbolCountKey]?: number;
 };
 
 export interface ExpressionToolingCacheIdentity {
@@ -145,7 +147,7 @@ class ExpressionToolingClient implements StudioExpressionToolingClient {
           state: current.data.rootSymbols?.length ? current.state : "supported-empty" as const,
           data: {
             symbols: current.data.rootSymbols ?? [],
-            nextCursor: current.data.rootSymbols?.length === 100 ? String(skip + 100) : undefined
+            nextCursor: (current.data as AuthoringContextWithShapes)[rawSymbolCountKey] === 100 ? String(skip + 100) : undefined
           }
         }
       : withoutData(current);
@@ -461,7 +463,9 @@ function parseContextOutcome(
     visibleVariables: rootSymbols.filter(symbol => readWireKind(symbol.id) === "variable"),
     visibleActivityOutputs: rootSymbols.filter(symbol => readWireKind(symbol.id) === "activityresult"),
     shapeReferences: [...shapes.keys()],
-    [valueShapesKey]: shapes
+    [valueShapesKey]: shapes,
+    // Paging uses the wire count even when malformed symbols are omitted from advisory help.
+    [rawSymbolCountKey]: payload.rootSymbols.length
   };
   return result(outcome.state, expressionType, {
     contextVersion: version,

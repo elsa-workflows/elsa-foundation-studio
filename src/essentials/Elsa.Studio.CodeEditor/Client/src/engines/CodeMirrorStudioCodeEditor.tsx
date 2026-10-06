@@ -56,6 +56,98 @@ const activeCodeMirrorViews = new Set<EditorView>();
 const formattingControllers = new WeakMap<EditorView, CodeMirrorFormatter>();
 let authorizationGeneration = 0;
 
+const codeMirrorBaseTheme = EditorView.theme({
+  "&&": {
+    background: "var(--studio-surface-muted)",
+    border: "1px solid var(--studio-border)",
+    borderRadius: "var(--studio-radius-sm)",
+    color: "var(--studio-text)",
+    fontFamily: "var(--studio-font-mono)",
+    inlineSize: "100%"
+  },
+  "&&:focus-within": {
+    outline: "2px solid var(--studio-focus-strong, var(--studio-text))",
+    outlineOffset: "2px"
+  },
+  "& .cm-scroller": {
+    fontFamily: "var(--studio-font-mono)"
+  },
+  "&& .cm-activeLine, && .cm-activeLineGutter": {
+    background: "var(--studio-accent-soft)"
+  },
+  "&& .cm-gutters": {
+    background: "var(--studio-surface-muted)",
+    borderColor: "var(--studio-border)",
+    color: "var(--studio-text-muted)"
+  },
+  "& .cm-content::selection, & .cm-content ::selection": {
+    background: "var(--studio-accent)",
+    color: "var(--studio-accent-text)"
+  },
+  "& .cm-tooltip": {
+    background: "var(--studio-surface-raised)",
+    border: "1px solid var(--studio-border)",
+    boxSizing: "border-box",
+    color: "var(--studio-text)",
+    maxInlineSize: "min(32rem, calc(100vw - 2rem))",
+    overflowWrap: "anywhere",
+    whiteSpace: "normal"
+  },
+  "&& .cm-panels": {
+    background: "var(--studio-surface-raised)",
+    borderColor: "var(--studio-border)",
+    color: "var(--studio-text)"
+  },
+  "& .cm-panel, & .studio-code-editor-hover": {
+    color: "var(--studio-text)",
+    maxBlockSize: "min(18rem, 50vh)",
+    maxInlineSize: "min(32rem, calc(100vw - 2rem))",
+    overflow: "auto",
+    overflowWrap: "anywhere",
+    whiteSpace: "normal"
+  },
+  "& .cm-tooltip-autocomplete ul": {
+    maxBlockSize: "min(16rem, 40vh)",
+    maxInlineSize: "min(32rem, calc(100vw - 2rem))",
+    minInlineSize: "0",
+    overflow: "auto",
+    whiteSpace: "normal"
+  },
+  "& .cm-tooltip-autocomplete li": {
+    overflowWrap: "anywhere",
+    textOverflow: "clip",
+    whiteSpace: "normal"
+  },
+  '& .cm-tooltip-autocomplete li[aria-selected="true"]': {
+    background: "var(--studio-accent)",
+    color: "var(--studio-accent-text)"
+  },
+  '& .cm-tooltip-autocomplete li[aria-selected="true"] :is(.cm-completionDetail, .cm-completionMatchedText)': {
+    color: "inherit"
+  },
+  "& .cm-completionSection": {
+    borderColor: "var(--studio-border)",
+    color: "var(--studio-text-muted)"
+  },
+  "& .cm-tooltip-hover, & .cm-completionInfo": {
+    maxBlockSize: "min(18rem, 50vh)",
+    maxInlineSize: "min(32rem, calc(100vw - 2rem))",
+    overflow: "auto",
+    overflowWrap: "anywhere",
+    whiteSpace: "normal"
+  }
+});
+
+const codeMirrorCompactTheme = EditorView.theme({
+  "&&&": {
+    minBlockSize: "2.25rem"
+  },
+  "&& .cm-scroller": {
+    maxBlockSize: "2.25rem",
+    overflow: "hidden"
+  }
+});
+
 subscribeToStudioCodeEditorSessionRevocation(() => {
   authorizationGeneration++;
   destroyParkedCompactView();
@@ -316,7 +408,12 @@ async function runCurrentIntelligence<T>(runtime: CodeMirrorRuntime, signal: Abo
 }
 
 function presentationExtensions(profile: StudioCodeEditorEngineProps["profile"]) {
-  return profile === "expanded" ? [lineNumbers(), foldGutter(), highlightActiveLineGutter(), highlightActiveLine()] : [];
+  return [
+    codeMirrorBaseTheme,
+    ...(profile === "expanded"
+      ? [lineNumbers(), foldGutter(), highlightActiveLineGutter(), highlightActiveLine()]
+      : [codeMirrorCompactTheme])
+  ];
 }
 
 function editabilityExtensions(readOnly: boolean, ariaLabel: string) {
