@@ -2,6 +2,18 @@
 
 Last reconciled: 2026-10-06 for preview-publication authorization and renewed main integration; all PRs draft/unmerged, final human acceptance pending
 
+## Current corrective checkpoint — 2026-10-07
+
+The synchronized Studio `bfd05336` synthetic matrix ends **14/16**, not passed: Firefox's fifty-field activation exceeds the unchanged 1500ms ceiling (5097ms), and its narrow case times out at the unchanged 60-second limit. Shared-machine load exceeds300–700 during the run; contention is a hypothesis, not proved attribution. These failures are retained. Hosted Studio569/578 also fail unchanged bundle budgets; at578, Definitions386.57/384.50kB and upgrades376.49/375.50kB. A CSS split is rejected and reverted because the host eagerly preloads all emitted module styles; a lower static-closure metric alone would not reduce actual delivery.
+
+Corrected Studio557 `a3fefdc7e238cc8f2c9c44bf1fb7f5d8ce85c2c8` passes all jobs in [CI37534033046](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37534033046), including rebuilt normal hosts. Its save-status locator follows main's current live region without relaxing exact save/readback/revision assertions. Studio562's malformed-symbol pagination fix at `408b3c42` preserves continuation using raw page length; the one/100-malformed controls fail before correction, then all39 transport cases, owning typecheck, scoped lint and independent/root review pass. These fixes are propagating through the existing stack; neither establishes final corrected-pair acceptance.
+
+The separate `Expression acceptance matrix` workflow now runs the unchanged synthetic Chromium/Firefox/WebKit/touch command on an isolated hosted runner for pull requests and resulting main. It checks out the exact head with read-only contents permission and no persisted credentials, installs all three engines, and disables traces. No test timeout, activation ceiling, assertion, retry, configuration, bundle budget or existing CI gate is relaxed. Actual workflow execution and final corrected-stack matrix remain pending. WebKit is not native Safari, and this does not replace the owner-skipped VoiceOver gate.
+
+Foundation main `2a0d1f10` is fully qualified; root planning head `bb13422fe` includes it and passes combined Maps37538022928 and filters37538023052, while CI37538023573 is still running at this checkpoint. Producer-stack synchronization, immutable-pin advancement, coherent final normal-host/runtime/REST/architecture proof, current review or documented permitted fallback, final explicit owner acceptance, dependency-ordered merges and resulting-main qualification remain open. All program PRs remain draft. Native Chrome/Safari VoiceOver remains **SKIPPED BY OWNER DECISION — NEVER PASSED**.
+
+## Retained historical checkpoints
+
 ## Program #2310 status
 
 T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head automated M2 gate under the documented unavailable-external-review fallback. Studio spike #553 / T035 settles the technical decision: reject the current deeper-service candidate and retain the baseline path. No deeper-service dependency is adopted. T032-T034 pass their final exact-head automated M3 gate below. T036 passes its immutable bc305150/5cd44d63 automated gate; Task#572 / T037 passes at immutable ef523911/5cd44d63. Task#577 owns T038. Actual current-head Chrome/Safari VoiceOver is now skipped by owner decision and never passed; final human acceptance and delivery remain open. The 2026-07-28 evidence remains historical. All program PRs remain draft and unmerged.
