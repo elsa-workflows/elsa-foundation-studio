@@ -648,7 +648,16 @@ async function readNativeEditorCaret(editor: Locator) {
     const caretRange = document.createRange();
     caretRange.setStart(focusNode, selection.focusOffset);
     caretRange.collapse(true);
-    const caret = caretRange.getBoundingClientRect();
+    const nativeRange = caretRange.getBoundingClientRect();
+    // Chromium exposes no collapsed Range rectangle at the start of an empty
+    // CodeMirror line. Only that exact native-selection shape may use its BR
+    // anchor; text-backed and offscreen carets retain the strict Range check.
+    const emptyLineAnchor = focusNode === focusLine && selection.focusOffset === 0 &&
+      !focusLine.textContent && focusLine.childNodes.length === 1 &&
+      focusLine.firstChild instanceof HTMLBRElement && caretRange.getClientRects().length === 0 &&
+      nativeRange.left === 0 && nativeRange.right === 0 && nativeRange.top === 0 && nativeRange.bottom === 0
+      ? focusLine.firstChild.getBoundingClientRect() : null;
+    const caret = emptyLineAnchor ?? nativeRange;
     return { offset,
       visible: caret.height > 0 && caret.left >= viewport.left - 1 && caret.right <= viewport.right + 1 &&
         caret.top >= viewport.top - 1 && caret.bottom <= viewport.bottom + 1 };

@@ -42,9 +42,12 @@ clipboard guard incorrectly infers headless mode from a user agent overridden by
 Desktop Chrome device profile. It refuses the write before touching clipboard data.
 The correction uses Playwright's resolved built-in `headless` fixture instead; headed
 execution remains refused. Log: `/private/tmp/elsa-577-root-normal-host-cadd58ba.log`.
-CI37415408459 passes static/workspace and generic Chromium jobs; its paired job remains
-pending here, not accepted. An explicit manual CodeRabbit request starts actual review of
+CI37415408459 passes static/workspace and generic Chromium jobs; its paired job fails4/5
+on the same guard, with production-runtime parity skipped, not accepted. An explicit manual CodeRabbit request starts actual review of
 `cadd58ba` while keeping the PR draft; this is distinct from the initial draft skip.
+That review subsequently aborts when the head changes (bot reply6009576375), and the
+summary reverts to draft-skipped. No completed external review is claimed; the corrected
+checkpoint requires a fresh request and actual review-ledger inspection.
 
 The extra strict browser-harness typecheck also exposes three pre-existing variant alias
 type errors (redeclaring an already registered option fixture). Bare value overrides preserve
@@ -55,6 +58,22 @@ repository package or weakened compiler option. Both raw failures are retained i
 `/private/tmp/elsa-577-root-harness-typecheck-bundled.log`. Corrected strict compilation
 passes with no diagnostics in `/private/tmp/elsa-577-root-harness-typecheck-corrected.log`;
 changed-harness ESLint, five-case collection and diff checks pass.
+
+Committed `6f298c28` passes4/5 (6.7m): trusted native JavaScript paste, caret, exact saves,
+undo and redo pass. Liquid trusted paste, text and offset pass, but the empty final line
+returns a zero-sized native collapsed Range. Exact-head CI37416192618 fails the paired
+case on that visibility assertion; static/workspace and generic Chromium pass, actual
+runtime parity is skipped. Logs: `/private/tmp/elsa-577-root-normal-host-6f298c28.log`
+and `/private/tmp/elsa-577-root-ci-6f298c28-failed.log`.
+
+A root narrow rebuilt diagnostic confirms actual native selection at offset123, the empty
+line DIV at child offset0, no measurable collapsed Range, and its BR anchor at x92.8125,
+y406.5625–423.5625 within viewport x44–346.875/y358.1875–436.75. An independent synthetic
+Chromium probe corroborates the DOM limitation; it is not real-host acceptance. The
+correction permits that BR anchor only for this exact empty-line/zero-Range selection
+shape and keeps nonempty Range geometry, positive height and the same ±1 viewport bounds.
+The diagnostic remains `/private/tmp/elsa-577-root-empty-line-diagnostic.log`; the full
+corrected gate and discriminating restored negative controls remain pending.
 
 The native preflight confirms VoiceOver is not running and macOS UI automation is
 available, without changing accessibility settings. The connected Chrome browser is
