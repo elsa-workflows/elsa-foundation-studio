@@ -4,7 +4,7 @@ Elsa Foundation Studio is the modular React studio shell hosted by ASP.NET Core.
 
 ## Choose and align work
 
-Actionable Studio work is tracked in [GitHub Issues](https://github.com/elsa-workflows/elsa-foundation-studio/issues). Check an issue's comments and open pull requests before starting; an unassigned issue is not necessarily available. If ownership or scope is unclear, ask in the issue. This repository does not promise a ready starter queue.
+Actionable Studio work is tracked in [GitHub Issues](https://github.com/elsa-workflows/elsa-foundation-studio/issues). Check an issue's comments and open pull requests before starting; an unassigned issue is not necessarily available. If ownership or scope is unclear, ask in the issue.
 
 A small, concrete fix may be proposed directly in a pull request. For a substantial feature, describe the desired behavior in a Studio issue first and align its scope there; a pull request is not a feature-request substitute. General questions belong in the shared [Foundation Q&A](https://github.com/elsa-workflows/elsa-foundation/discussions/categories/q-a). Keep actionable Studio work in Studio Issues.
 
@@ -30,11 +30,11 @@ The repository-defined hosted PR jobs are in [CI](.github/workflows/ci.yml) and 
 
 The current `main` still pins `ConsoleLogStreaming.AspNetCore` `1.0.0-preview.13` in [`Directory.Packages.props`](Directory.Packages.props). An earlier isolated-cache restore failed for that version ([Foundation #2432](https://github.com/elsa-workflows/elsa-foundation/issues/2432)). Its correction is owned by [Studio #551](https://github.com/elsa-workflows/elsa-foundation-studio/issues/551) / [PR #557](https://github.com/elsa-workflows/elsa-foundation-studio/pull/557), which remains unmerged; the complete source setup and paired workflow are tracked in [Studio #566](https://github.com/elsa-workflows/elsa-foundation-studio/issues/566). The existing `dotnet build`, `dotnet test`, and `dotnet run` commands in README are not a verified cold-cache setup path. Check those issues for current status before relying on a from-source backend run.
 
-A `license/cla` check has appeared on merged pull requests from forks. If it appears on your pull request, follow the instructions shown by GitHub. The observed passing checks do not establish the unsigned-contributor flow, so this guide does not prescribe separate signing steps.
+If GitHub displays a `license/cla` check on your pull request, follow the instructions in that check.
 
 ## Open a pull request from a fork
 
-For an external contribution, clone your fork so `origin` points to your account. Replace `YOUR-ACCOUNT` with your GitHub account name before running the clone command, then add the upstream repository and branch from its current `main`:
+For an external contribution, use **Fork** on the [repository page](https://github.com/elsa-workflows/elsa-foundation-studio) to create a copy in your GitHub account. Clone your fork so `origin` points to your account. Replace `YOUR-ACCOUNT` with your GitHub account name before running the clone command, then add the upstream repository and branch from its current `main`:
 
 ```bash
 git clone https://github.com/YOUR-ACCOUNT/elsa-foundation-studio.git
@@ -52,7 +52,7 @@ git commit -m "Describe the change"
 git push -u origin docs/my-change
 ```
 
-On GitHub, open a **draft** pull request from `YOUR-ACCOUNT:docs/my-change` to `elsa-workflows/elsa-foundation-studio:main`. Include a short summary, link the issue when applicable, and report the checks you ran. Mark the draft ready when the change is reviewable. Respond to review requests and rerun and report affected checks after changes. No reviewer assignment or response time is promised.
+On GitHub, open a **draft** pull request from `YOUR-ACCOUNT:docs/my-change` to `elsa-workflows/elsa-foundation-studio:main`. Include a short summary, link the issue when applicable, and report the checks you ran. Mark the draft ready when the change is reviewable. Respond to review requests and rerun and report affected checks after changes.
 
 ## License
 
