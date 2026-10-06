@@ -34,7 +34,7 @@
 .studio-code-editor-rich .cm-editor:focus-within,
 .studio-code-editor-input:focus,
 .studio-code-editor-preview:focus-visible {
-  outline: 2px solid var(--studio-focus);
+  outline: 2px solid var(--studio-focus-strong, var(--studio-text));
   outline-offset: 2px;
 }
 

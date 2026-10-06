@@ -1,12 +1,158 @@
 # Expression Code Intelligence — Verification
 
-Last reconciled: 2026-10-06 for Program #2310 final automated M3 proof and M4 Task#568 start; all PRs draft/unmerged, current-head manual AT and human acceptance pending
+Last reconciled: 2026-10-06 for Program #2310 final automated M3 proof and M4 Task#568 verification corrections; all PRs draft/unmerged, current-head manual AT and human acceptance pending
 
 ## Program #2310 status
 
 T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head automated M2 gate under the documented unavailable-external-review fallback. Studio spike #553 / T035 settles the technical decision: reject the current deeper-service candidate and retain the baseline path. No deeper-service dependency is adopted. T032-T034 pass their final exact-head automated M3 gate below, permitting assigned M4 Task#568 / T036. Three-theme presentation, active parameters/overloads, formatting and current-head manual accessibility/continuity acceptance (T036-T038) remain open. The 2026-07-28 evidence remains historical. All program PRs remain draft and unmerged; final human acceptance is outstanding.
 
 ## Passing evidence
+
+### M4 T036 canonical responsive run — further viewport precondition (not accepted)
+
+The twenty-fourth canonical command rebuilds both actual hosts and passes unchanged budgets
+(primary entry127.44/127.50kB, stylesheet144.88/185kB, definitions379.66/384.50kB,
+upgrades369.66/375.50kB). With all diagnostic injection removed, actual keyboard traversal passes
+every sidebar link's ratio1 assertion. The case reaches diagnostics without a preceding failure
+in preview/editor focus, selection tokens, signature/hover/completion or consumed-Escape/maximize
+checks. It then fails the diagnostic viewport precondition (ratio0): the static-flow diagnostic
+is below the narrow inspector fold. Root adds only ordinary `scrollIntoViewIfNeeded` for that
+surface before the same visibility, containment and contrast assertions. Floating help surfaces
+still require actual in-view rendering without that scroll precondition. This is not all-theme
+or T036 acceptance. Log: `/private/tmp/elsa-568-root-responsive-canonical-twentyfourth.log`.
+
+An additional standalone Web-project TypeScript check, which is not the configured recursive CI
+typecheck command, fails with diagnostics outside the changed focus handler (including the
+unchanged PNG import, auth/Weaver mock types and React DOM vendor version declaration). That
+extra check is not reported as green or used to widen this task into project-configuration work.
+Log: `/private/tmp/elsa-568-root-web-responsive-typecheck.log`. Configured workspace typecheck,
+complete affected suites, all-five rebuilt-host proof and committed-head CI remain pending.
+
+Root restores the complete CodeEditor112/112 (eight files) and Web445/445 (36files) suites on
+the correction tree with one worker; Workflows' full affected suite is still running. Logs:
+`/private/tmp/elsa-568-root-responsive-editor-units.log`,
+`/private/tmp/elsa-568-root-responsive-web-units.log`. These do not substitute for all-theme,
+all-five normal-host, configured workspace typecheck or committed-head CI acceptance.
+
+### M4 T036 responsive-strip review round (not accepted)
+
+The twelfth canonical rebuilt-host run passes compilation and unchanged bundle budgets, then
+fails the added navigation check before expression contrast. Fresh-host diagnostics13-19 reuse
+those coherent application assets only for diagnosis. Font readiness, visible overflow, a
+single-frame focus reveal and a fixed search width do not correct the movement and are rejected;
+none is adopted in production. The nineteenth run records actual active-element/class and child
+geometry: Search modules grows from70px to235px while its `flex-shrink` interpolates to0 through
+the existing150ms `transition:all`, moving the focused Dashboard link fromx239.6875 tox404.6875
+without sidebar scrolling. Logs: `/private/tmp/elsa-568-root-narrow-canonical-twelfth.log`,
+`/private/tmp/elsa-568-root-nav-children-nineteenth.log`.
+
+A twentieth diagnostic waiting for that actual computed CSS state confirms native Tab scrolls
+Dashboard fully into view; it still fails at Modules (ratio0.6639702916145325), so it is not a
+passing navigation or T036 gate. The responsive strip's existing non-shrink rule now limits
+transitions to paint roles only (`background-color`, `color`, `border-color`, `box-shadow`),
+retaining visual transitions while making flex geometry immediate. That correction still needs
+canonical rebuilt-host proof. Temporary preconditions, geometry output and no-build configuration
+must be removed before committed-head acceptance. No focus handler, forced scroll, changed
+viewport ratio, budget or retention policy is adopted. T036 stays open; T037 is unassigned.
+Log: `/private/tmp/elsa-568-root-settled-nav-twentieth.log`.
+
+The twenty-first run separates the remaining Modules failure: x295.09375/width142.9375
+extends48px outside the390px strip, while its y97.796875/height90.796875 is vertically visible.
+Native Tab leaves it partially clipped. The twenty-second synchronous nearest-focus probe leaves
+only0.03125px right-edge clipping because the browser scroll offset is integral. A shared-spacing
+scroll gutter in the twenty-third probe passes every navigation link's unchanged ratio1 check,
+then fails the expression viewport precondition: the selected property is below the inspector fold.
+That is not a passing theme gate. The harness now uses the same ordinary property scroll action
+already required later in the case before asserting its viewport presence.
+Logs: `/private/tmp/elsa-568-root-modules-geometry-twentyfirst.log`,
+`/private/tmp/elsa-568-root-full-focus-reveal-twentysecond.log`,
+`/private/tmp/elsa-568-root-focus-gutter-twentythird.log`.
+
+The actual shell focus handler is limited to horizontally overflowing, `:focus-visible`
+HTMLElement targets and nearest/instant reveal; it does not click, prevent default, navigate or
+touch authority. Responsive scroll padding uses the existing shared spacing token. Independent
+source review finds no actionable defect. Root scoped ESLint passes with zero errors/five existing
+App warnings; direct Stylelint of all three changed stylesheets and diff check pass. Temporary
+CSS injection, focus handler, CSS-state wait, geometry output and no-build configuration are
+removed from the test tree. Canonical rebuilt-host/current-head proof remains pending. Shared
+machine load peaks above370 on8cores; any timing-shaped failure needs lower-load reconciliation.
+
+### M4 T036 rejected reduced-build diagnostic
+
+The eleventh local diagnostic passes scoped compilation/bundle checks but fails before expression
+setup at the console-stream-ready precondition. Its reduced build order is incoherent: Web's
+`vite.config.ts` uses `emptyOutDir:true` on the shared `wwwroot/studio` directory and was rebuilt
+after Workflows, removing the independent module/vendor artifacts. The canonical recursive build
+orders the host and module outputs coherently. This is rejected diagnostic setup, not product red
+or a passing narrow/contrast gate. Logs: `/private/tmp/elsa-568-root-narrow-scoped-build.log`,
+`/private/tmp/elsa-568-root-narrow-focused-eleventh.log`.
+Root removes the temporary no-build diagnostic configuration and returns to the canonical rebuilt
+host command. No build policy, assertion, timing or retention setting is changed.
+
+### M4 T036 keyboard geometry and consumed-Escape checkpoint (not accepted)
+
+The ninth canonical rebuilt-host run catches a horizontal navigation regression introduced by
+retaining the strip: the Modules link is focused through actual Tab but only0.9761136770248413
+of it is in view. The unchanged full-visibility check fails. The tenth local diagnostic reuses
+the just-built applications (no rebuild, not acceptance evidence) with fresh owned hosts and
+records only numeric/class geometry. The navigation column shrinks to72.609375px while its
+link needs105px, and its right edge is clipped. The bounded next correction stops the horizontal
+strip's direct children shrinking; it does not reduce the viewport ratio or force scrolling/clicks.
+Logs: `/private/tmp/elsa-568-root-focus-ninth.log`,
+`/private/tmp/elsa-568-root-nav-diagnostic-tenth.log`.
+
+The corrected nested-control hook fixture now reproduces two real failures (palette and inspector)
+when consumed Escape still restores the panel. Root adds only `!event.defaultPrevented` to the
+existing global Escape condition; both tests pass, including fresh unconsumed outside Escape
+restoring the panel. Scoped hook/test/harness ESLint passes. Logs:
+`/private/tmp/elsa-568-root-panel-escape-focused-red.log`,
+`/private/tmp/elsa-568-root-panel-escape-green.log`,
+`/private/tmp/elsa-568-root-panel-escape-lint.log`.
+Independent source review finds no focus-token ownership blocker; actual runtime contrast remains
+pending. Custom textured/material surfaces and current-head manual AT are not proven by the
+solid-background helper. Temporary diagnostic configuration/output must be removed before final
+committed-head all-five rebuilt-host/CI acceptance. T036 remains open; all PRs draft/unmerged.
+
+### M4 T036 opaque-focus red checkpoint (not accepted)
+
+The eighth rebuilt-host run, after the one-line phone sidebar correction, passes actual390px
+preview visibility, syntax and text contrast, then fails focused rich-editor outline contrast:
+1.4246653928201924 against the unchanged3:1 requirement. Log:
+`/private/tmp/elsa-568-root-narrow-shell-eighth.log`. Root adds central
+`--studio-focus-strong` defaulting to opaque primary text and consumes it only in the existing
+shared code input/preview focus rule, retaining2px solid/2px offset and the primary-text fallback.
+The global soft chrome ring and its material/high-contrast recipes remain unchanged. Central
+token documentation and Decision19 record the distinction. Scoped harness ESLint and direct
+changed CSS/token Stylelint pass; actual rebuilt-host contrast/Escape proof remains pending.
+
+The harness now also requires real Tab traversal from brand through Search modules and every
+navigation link at390px, each fully in view without changing route, and retains inspector maximize
+after consumed help/completion Escape. Temporary numeric geometry output is removed. A new owning
+hook-test fixture initially imports CodeMirror without a Workflows direct dependency and fails to
+load; that is rejected fixture setup, not behavioral red. The original1504 cases pass in that run,
+but the overall suite fails. The fixture is being corrected without dependency or engine-coupling
+changes. No complete affected-suite or T036 acceptance is claimed from that checkpoint.
+
+### M4 T036 narrow-shell geometry red checkpoint (not accepted)
+
+Hosted CI37393109900 at pushed `da83976b` passes full lint/typecheck/unit/shuffled/bundle
+and generic Chromium. Its normal-host gate reproduces the new narrow preview failure while
+all four original cases pass; it is not a passing theme gate. Local focused fourth/fifth runs
+fail the explicit viewport precondition, including after the real Maximize inspector action.
+The seventh rebuilt-host diagnostic also uses the existing Collapse bottom panel action and
+records only bounded numeric geometry/computed styles, not authored source or authority data.
+At390x844 the shell rows are804px/0px/40px; main-frame/content/workflow editor are all zero-height.
+The phone sidebar's column override consumes the auto row and starves the workflow viewport.
+Logs: `/private/tmp/elsa-568-root-theme-focused-fourth.log`,
+`/private/tmp/elsa-568-root-theme-focused-fifth.log`,
+`/private/tmp/elsa-568-root-theme-geometry-seventh.log`.
+
+The next bounded correction preserves the already intended horizontal navigation strip below
+640px instead of introducing a new responsive workbench. Root keeps actual inspector-maximize
+and bottom-panel-collapse setup, viewport/contrast/focus/source/undo assertions and all budgets.
+Temporary geometry output must be removed before final acceptance. Independent review, rebuilt
+focused proof, final all-five committed-head normal-host and CI proof remain required. T036
+stays open; T037 is unassigned; manual AT/human acceptance and delivery remain open. All PRs draft.
 
 ### M4 T036 viewport precondition checkpoint — committed `da83976b` (not accepted)
 

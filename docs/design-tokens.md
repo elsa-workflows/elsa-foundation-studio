@@ -148,7 +148,13 @@ mode alone. High-contrast hosts use primary text rather than decorative syntax c
 | `--studio-accent` | selection/primary accent fill |
 | `--studio-accent-text` | foreground ON the accent fill |
 | `--studio-accent-soft` | low-opacity accent wash (hover/selected rows) |
-| `--studio-focus` | focus-ring colour |
+| `--studio-focus` | existing soft chrome focus-ring colour |
+| `--studio-focus-strong` | opaque focus outline for code input/preview surfaces; defaults to primary text |
+
+CodeEditor consumes the strong role (with a primary-text fallback), not the translucent chrome
+ring. Keep its rendered outline at least 3:1 against adjacent surfaces in Light, Dark and Dim;
+the soft ring is not sufficient evidence of a visible outline. The shared role remains
+theme-owned and may be remapped centrally; no component-local palette is introduced.
 
 ### Semantic status
 

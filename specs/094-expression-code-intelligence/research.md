@@ -242,6 +242,14 @@ after source/language change, unmount or authorization revocation; source and do
 remain hidden immediately on revocation. Completion, hover, signature and diagnostic surfaces
 retain accessible focus/selection and narrow wrapping in all three supported appearances.
 
+Actual T036 narrow-host checks expose two bounded integration needs: preserve the existing
+horizontal shell navigation strip at phone widths so the workflow viewport has nonzero height,
+with immediate flex sizing, shared scroll padding and overflow-gated keyboard focus reveal,
+and use a centrally owned opaque `--studio-focus-strong` outline rather than the translucent
+chrome ring. The strong role defaults to primary text; verify its actual adjacent-surface contrast
+at least3:1. Editor-consumed Escape must not restore an inspector maximized for narrow editing;
+an unconsumed Escape retains the existing panel restore action.
+
 **Consequences**: Root owns integration, actual normal-host color-mode/contrast/narrow proof and
 complete affected gates. The bounded worker owns presentation implementation/tests and central
 token documentation only. Active-argument/overload semantics and explicit behavior-preserving

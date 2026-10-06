@@ -34,6 +34,7 @@
   --studio-accent-text: var(--primary-foreground);
   --studio-accent-soft: color-mix(in srgb, var(--primary) 10%, transparent);
   --studio-focus: color-mix(in srgb, var(--ring) 24%, transparent);
+  --studio-focus-strong: var(--studio-text);
 
   --studio-success: var(--success);
   --studio-success-text: var(--success-foreground);

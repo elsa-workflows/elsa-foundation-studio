@@ -84,6 +84,34 @@ completeTest("normal-host expression previews and help remain readable in Light,
   const firstPreview = page.getByRole("button", { name: "JavaScript expression. Activate to edit." });
   await expect(firstPreview.locator("[class*='studio-code-token-']").first()).toBeVisible();
   await expect(page.locator(".studio-code-editor-rich .cm-editor")).toHaveCount(0);
+  await page.getByRole("button", { name: "Collapse bottom panel", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Expand bottom panel", exact: true })).toBeVisible();
+  // Use the existing inspector-only UI instead of squeezing the desktop three-pane grid.
+  await page.getByRole("button", { name: "Maximize inspector panel", exact: true }).click();
+  await expect(page.locator(".wf-editor-body")).toHaveClass(/inspector-maximized/);
+  // The existing horizontal strip must keep every navigation control keyboard-reachable.
+  await page.setViewportSize({ width: 390, height: 844 });
+  const workflowUrl = page.url();
+  const sidebar = page.locator(".sidebar");
+  const brand = sidebar.locator(".brand");
+  await brand.focus();
+  await expect(brand).toBeInViewport({ ratio: 1 });
+  await page.keyboard.press("Tab");
+  const search = sidebar.getByRole("searchbox", { name: "Search modules" });
+  await expect(search).toBeFocused();
+  await expect(search).toBeInViewport({ ratio: 1 });
+  const navigationLinks = sidebar.locator(".nav-section a");
+  const navigationCount = await navigationLinks.count();
+  expect(navigationCount).toBeGreaterThan(0);
+  for (let index = 0; index < navigationCount; index++) {
+    await page.keyboard.press("Tab");
+    await expect(navigationLinks.nth(index)).toBeFocused();
+    await expect(navigationLinks.nth(index)).toBeInViewport({ ratio: 1 });
+  }
+  expect(page.url()).toBe(workflowUrl);
+  await firstPreview.scrollIntoViewIfNeeded();
+  await expect(firstPreview).toBeInViewport();
+  await page.setViewportSize({ width: 1280, height: 720 });
 
   for (const language of ["JavaScript", "Liquid"] as const) {
     if (language === "Liquid") {
@@ -137,6 +165,7 @@ completeTest("normal-host expression previews and help remain readable in Light,
         await expectReadableCodeSurface(hover);
       }).toPass({ timeout: 15_000 });
       await editor.press("Escape");
+      await expect(page.locator(".wf-editor-body")).toHaveClass(/inspector-maximized/);
       await moveEditorCursor(editor, source, language === "JavaScript" ? source.indexOf("abs") + 2 : position);
       await expect(async () => {
         await editor.press("Control+Space");
@@ -145,6 +174,7 @@ completeTest("normal-host expression previews and help remain readable in Light,
         await expectReadableCodeSurface(menu.locator('[aria-selected="true"]'));
       }).toPass({ timeout: 15_000 });
       await editor.press("Escape");
+      await expect(page.locator(".wf-editor-body")).toHaveClass(/inspector-maximized/);
       if (mode === "Light") {
         // Prove this language's current-source help is backed by successful version-matched
         // assistance; later repeated help may legitimately reuse that authorized metadata.
@@ -159,6 +189,7 @@ completeTest("normal-host expression previews and help remain readable in Light,
         language === "JavaScript" ? "if (" : "{{ customerName");
       const diagnostics = section.locator(".studio-code-editor-diagnostics");
       await expect(diagnostics).toContainText(`${language}/Syntax`);
+      await diagnostics.scrollIntoViewIfNeeded();
       await expectReadableCodeSurface(diagnostics);
       await editor.press("ControlOrMeta+Z");
       await expect.poll(() => readEditorSource(editor)).toBe(source);
@@ -375,6 +406,7 @@ async function expectExpandedSourceContinuity(page: Page, pair: NormalHostPair,
 
 async function expectReadableCodeSurface(surface: Locator, options: { focused?: boolean; selected?: boolean } = {}) {
   await expect(surface).toBeVisible();
+  await expect(surface).toBeInViewport();
   const measurements = await surface.evaluate((element, selected) => {
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = 1;
