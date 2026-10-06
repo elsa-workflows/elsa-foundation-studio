@@ -258,6 +258,10 @@ A workflow author gets relevant JavaScript local/member/type help and Liquid int
 - **SC-016**: Light, dark, and dim visual review finds no unreadable syntax, diagnostic, completion, hover, signature, selection, or preview state at the supported narrow inspector width.
 - **SC-017**: Multiline paste, compact/expanded transitions, syntax switching, explicit formatting, and help interactions preserve exact source where required plus cursor and undo continuity in every applicable real-browser acceptance case.
 
+### Program #2310 owner scope amendment — 2026-10-06
+
+Actual current-head Chrome+VoiceOver and Safari+VoiceOver observation is removed from program acceptance by explicit owner decision and recorded as **SKIPPED BY OWNER DECISION — NEVER PASSED**. Only those named native observations in SC-007/SC-012 and the baseline assumption below are excluded from current program delivery gates; native behavior remains unverified, not passed by automation. The product's screen-reader usability requirement remains unchanged. Historical baseline results and later failed/unverified attempts remain unchanged in `verification.md`. Every other scoped keyboard, automated accessibility, continuity, runtime, review and technical gate remains required, as do explicit final owner acceptance and verified green post-merge main. See [the scope decision and proof boundaries](verification.md#owner-acceptance-scope-amendment--2026-10-06).
+
 ## Assumptions
 
 - Existing workflow draft autosave, undo, concurrency, permission, Host Policy, and Test Run/publication mechanisms remain authoritative.

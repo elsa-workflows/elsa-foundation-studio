@@ -1,10 +1,20 @@
 # Expression Code Intelligence — Verification
 
-Last reconciled: 2026-10-06 for Program #2310 T037 automated acceptance and in-progress T038 / Studio Task#577; all PRs draft/unmerged, current-head manual AT and human acceptance pending
+Last reconciled: 2026-10-06 for the owner's native-AT scope amendment and remaining T038 / Studio Task#577 delivery; all PRs draft/unmerged, final human acceptance pending
 
 ## Program #2310 status
 
-T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head automated M2 gate under the documented unavailable-external-review fallback. Studio spike #553 / T035 settles the technical decision: reject the current deeper-service candidate and retain the baseline path. No deeper-service dependency is adopted. T032-T034 pass their final exact-head automated M3 gate below. T036 passes its immutable bc305150/5cd44d63 automated gate; Task#572 / T037 passes at immutable ef523911/5cd44d63. Task#577 owns T038. Current-head manual accessibility, T038/human acceptance and delivery remain open. The 2026-07-28 evidence remains historical. All program PRs remain draft and unmerged.
+T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head automated M2 gate under the documented unavailable-external-review fallback. Studio spike #553 / T035 settles the technical decision: reject the current deeper-service candidate and retain the baseline path. No deeper-service dependency is adopted. T032-T034 pass their final exact-head automated M3 gate below. T036 passes its immutable bc305150/5cd44d63 automated gate; Task#572 / T037 passes at immutable ef523911/5cd44d63. Task#577 owns T038. Actual current-head Chrome/Safari VoiceOver is now skipped by owner decision and never passed; final human acceptance and delivery remain open. The 2026-07-28 evidence remains historical. All program PRs remain draft and unmerged.
+
+## Owner acceptance-scope amendment — 2026-10-06
+
+The owner explicitly removes actual current-head Chrome+VoiceOver and Safari+VoiceOver observation from Program #2310 acceptance. Record both as **SKIPPED BY OWNER DECISION — NEVER PASSED**. Native screen-reader behavior remains unverified and is a final delivery limitation. This is not a test pass, an automation substitute or retrospective approval. See the [canonical Foundation decision](https://github.com/elsa-workflows/elsa-foundation/blob/claude/2310-expression-dx-foundation/docs/program-goals/studio-expression-developer-experience/decision-log.md#2026-10-06--remove-native-voiceover-verification-from-delivery-acceptance).
+
+Historical checkpoint statements and failed/unverified attempts below retain their original boundaries; July baseline AT does not establish current program acceptance. The immutable Studio `badc58e5c15d8403855992a49aa2eaacb1eb8798` / Foundation `5cd44d6312d9de85b13f4619fc7aa972a557d033` checkpoint passes root rebuilt5/5, synthetic cross-browser/axe16/16, registered Jint/Fluid parity and exact [CI37420205720](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37420205720). A fresh same-pair canonical rebuild rerun passes5/5 (24.3m), Foundation10NU1510warnings/0errors and Studio0warnings/0errors; local diagnostic log `/private/tmp/elsa-577-delivery-resume-normal-host.log` and [public root checkpoint](https://github.com/elsa-workflows/elsa-foundation-studio/pull/578#issuecomment-6018481800). Neither result is relabeled as a later documentation or integrated head's pass.
+
+Actual disposable native hosts and owned Chrome authentication/editor activation succeeded, but actual VoiceOver speech/caption output was not observed; Safari acceptance did not run. VoiceOver was restored OFF, original caption preferenceON remained unchanged, owned Chrome window closed, owned bootstrap completed exit0 and both listeners were absent. [Native cleanup record](https://github.com/elsa-workflows/elsa-foundation-studio/issues/577#issuecomment-6018480361) remains retained.
+
+This reconciliation changes documentation only. Fresh exact-head review/CI and all affected integrated-pair verification remain required. Keyboard, automated scoped accessibility, source/cursor/undo, runtime parity, technical/review/integration and required post-merge main gates are unchanged. T038 remains unchecked pending final acceptance/delivery. After all remaining gates pass, obtain explicit owner acceptance before Ready and dependency-ordered merging; no package publication or deployment is included.
 
 ## Verification evidence
 
