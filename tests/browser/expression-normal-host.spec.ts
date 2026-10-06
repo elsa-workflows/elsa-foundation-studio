@@ -321,8 +321,8 @@ async function replacePersistedWorkflowSource(page: Page, pair: NormalHostPair, 
   draft: PersistedExpressionDraft, traffic: SafeBackendTraffic[], syntax: string, source: string) {
   const phase = captureAssistancePhase(traffic, draft, syntax);
   await replaceEditorSource(page, editor, source);
-  await expect(page.locator(".wf-status")).toHaveText("Autosaving...");
-  await expect(page.locator(".wf-status")).toHaveText("Autosaved");
+  await expect(page.locator(".wf-editor-save-status")).toHaveText("Autosaving...");
+  await expect(page.locator(".wf-editor-save-status")).toHaveText("Autosaved");
   await expect.poll(() => readPersistedSource(page, pair, draft)).toEqual(source);
   // Both context and validation change provider identities. Opening assistance before
   // either settles would race the legitimate cancellation of pre-save results.
