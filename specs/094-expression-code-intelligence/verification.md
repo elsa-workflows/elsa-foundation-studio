@@ -1,5 +1,13 @@
 # Expression Code Intelligence — Verification
 
+## Current synchronized-head snapshot — 2026-10-06
+
+The existing Studio expression stack is synchronized with main `2bd5c076`. Exact-head CI/review and fresh final Studio/Foundation producer pairing remain pending; no synchronized-pair pass is claimed. Retained M1/M2 automated passes apply only to their recorded revisions. The M1 `c9479fba` / `f81be4be` pair passed normal-host4/4 and unblocked M2 at that checkpoint. The dated entries below preserve historical statuses, including earlier M2-blocked states; they do not establish later integrated-head acceptance. Copilot requests do not establish a completed current-head review. All PRs remain draft/unmerged; final owner acceptance and delivery are open. Native Chrome/Safari VoiceOver is **SKIPPED BY OWNER DECISION — NEVER PASSED**.
+
+The synchronized CI558/37532060674 fails3/4 normal-host cases at the obsolete `.wf-status` locator; the Activity Definition case passes. Main's toolbar exposes the same autosave messages through `.wf-editor-save-status`, an atomic polite live status. The test helper now targets that current surface while preserving Autosaving/Autosaved, exact persisted-source, successful fresh PUT and post-save revision/assistance assertions. No production toolbar change or timing/assertion relaxation is introduced. Corrected rebuilt browser and exact-head CI remain pending.
+
+## Retained historical checkpoints
+
 Last reconciled: 2026-10-03 for Program #2310 partial implementation evidence; normal-host acceptance pending
 
 ## Program #2310 status
