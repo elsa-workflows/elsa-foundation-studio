@@ -46,25 +46,26 @@ cleanup_contributor_backend() {
 
   if [ -n "$cid" ]; then
     if ! owns_contributor_container; then
-      printf 'Container ownership could not be verified; cleanup stopped.\n' >&2
-      return 1
-    fi
-    running="$(docker container inspect --format '{{.State.Running}}' "$cid" 2>/dev/null)"
-    inspect_status=$?
-    if [ "$inspect_status" -eq 0 ] && [ "$running" = "true" ]; then
-      if ! docker stop "$cid"; then
-        printf 'Could not stop container %s.\n' "$cid" >&2
-        cleanup_ok=0
-      fi
-    elif [ "$inspect_status" -ne 0 ]; then
-      printf 'Could not inspect container %s.\n' "$cid" >&2
-      cleanup_ok=0
-    fi
-    if ! docker rm "$cid"; then
-      printf 'Could not remove container %s.\n' "$cid" >&2
+      printf 'Container ownership could not be verified; leaving it untouched.\n' >&2
       cleanup_ok=0
     else
-      cid=''
+      running="$(docker container inspect --format '{{.State.Running}}' "$cid" 2>/dev/null)"
+      inspect_status=$?
+      if [ "$inspect_status" -eq 0 ] && [ "$running" = "true" ]; then
+        if ! docker stop "$cid"; then
+          printf 'Could not stop container %s.\n' "$cid" >&2
+          cleanup_ok=0
+        fi
+      elif [ "$inspect_status" -ne 0 ]; then
+        printf 'Could not inspect container %s.\n' "$cid" >&2
+        cleanup_ok=0
+      fi
+      if ! docker rm "$cid"; then
+        printf 'Could not remove container %s.\n' "$cid" >&2
+        cleanup_ok=0
+      else
+        cid=''
+      fi
     fi
   fi
 
