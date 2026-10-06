@@ -1,4 +1,4 @@
-import { autocompletion, closeCompletion, completionStatus, type Completion, type CompletionSource } from "@codemirror/autocomplete";
+import { autocompletion, closeCompletion, completionStatus, insertCompletionText, pickedCompletion, snippetCompletion, type Completion, type CompletionSource } from "@codemirror/autocomplete";
 import { StateEffect, StateField, type Extension } from "@codemirror/state";
 import { EditorView, hoverTooltip, panels, showPanel, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 import { sanitizeStudioCodeMarkdown } from "../StudioCodeDocumentation";
@@ -260,7 +260,7 @@ function createCompletionSource(
   return context => {
     const word = context.matchBefore(/[\p{L}\p{Nd}_$]*/u);
     if (!word && !context.explicit) return null;
-    const from = word?.from ?? context.pos;
+    const defaultFrom = word?.from ?? context.pos;
     const controller = new AbortController();
     completionRequests.add(controller);
     context.addEventListener("abort", () => controller.abort(), { onDocChange: true });
@@ -278,21 +278,52 @@ function createCompletionSource(
     return Promise.all([supplied, Promise.all(local)])
       .then(([authorized, results]) => {
         if (controller.signal.aborted || context.aborted) return null;
+        const replacement = authorized?.find(item => item.range)?.range;
+        const from = replacement?.from ?? defaultFrom;
+        const replacementTo = replacement?.to ?? context.pos;
+        const suffixLength = Math.max(0, replacementTo - context.pos);
+        const to = suffixLength ? context.pos : replacementTo;
         const merged = new Map<string, Completion>();
         for (const result of results) {
-          if (result?.from !== from) continue;
+          if (result?.from !== defaultFrom) continue;
           for (const item of result.options) merged.set(item.label, item);
         }
         // Authoritative documentation/application wins collisions with syntax-only help.
-        for (const item of authorized ?? []) merged.set(item.label, toCodeMirrorCompletion(item));
-        return merged.size ? { from, options: [...merged.values()], validFor: /^[\p{L}\p{Nd}_$]*$/u } : null;
+        // Only explicitly ranged authority owns the suffix; local help keeps its prefix span.
+        for (const item of authorized ?? []) {
+          const completion = toCodeMirrorCompletion(item);
+          const apply = completion.apply ?? completion.label;
+          merged.set(item.label, suffixLength && item.range ? {
+            ...completion,
+            apply: (view, selected, applyFrom, applyTo) => {
+              if (typeof apply === "function") apply(view, selected, applyFrom, applyTo + suffixLength);
+              else view.dispatch({
+                ...insertCompletionText(view.state, apply, applyFrom, applyTo + suffixLength),
+                annotations: pickedCompletion.of(selected)
+              });
+            }
+          } satisfies Completion : completion);
+        }
+        if (!merged.size) return null;
+        const completions = [...merged.values()];
+        if (!suffixLength) return { from, to, options: completions, validFor: /^[\p{L}\p{Nd}_$]*$/u };
+
+        // CodeMirror filters the result's from/to text, so filter only the cursor prefix.
+        // Application still replaces the full parser token, including its untyped suffix.
+        // Requery after every document edit instead of reusing position-dependent apply closures.
+        return {
+          from,
+          to,
+          map: () => null,
+          options: completions
+        };
       })
       .finally(() => completionRequests.delete(controller));
   };
 }
 
 function toCodeMirrorCompletion(completion: StudioCodeCompletion) {
-  return {
+  const item = {
     label: completion.label,
     detail: completion.detail,
     type: completion.kind,
@@ -307,4 +338,7 @@ function toCodeMirrorCompletion(completion: StudioCodeCompletion) {
         }
       : undefined
   };
+  return completion.snippet && completion.apply
+    ? snippetCompletion(completion.apply, item)
+    : item;
 }

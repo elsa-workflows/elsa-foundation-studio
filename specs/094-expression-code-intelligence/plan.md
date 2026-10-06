@@ -108,6 +108,17 @@ The Studio implementation can be built and tested against fixtures independently
 
 Each milestone retains one integration lane and separate exact-head review and live-verification evidence. A failed live demonstration reopens the owning task and keeps the milestone incomplete.
 
+### T033 implementation boundary — Studio Task#561
+
+Decision18 freezes the smallest Liquid consumer slice on the reviewed rich-catalog producer/consumer
+pair. Keep `lang-liquid` lazy behind CodeEditor; Liquid owns only plain cursor classification and
+runtime-metadata projection. Any shared range/snippet/cursor additions remain internal. Use parser
+position rather than prefix-only guesses, current rich authorized catalogs rather than baked lists,
+and fail-closed asynchronous outcomes. Root retains the integration/browser lane; the worker owns
+only the bounded code/tests. Existing JavaScript/program behavior, SDK/wire/dependencies, runtime
+and meaningful Liquid whitespace stay unchanged. T033 acceptance requires final paired-host,
+affected complete-suite, unchanged bundle and current-head CI/review evidence.
+
 ## Complexity Tracking
 
 No constitution violations require justification.

@@ -16,6 +16,12 @@ export {
   createStudioCodeToolingProjection,
   projectStudioCodeDiagnostics
 } from "./toolingProjection";
+export { createLiquidCursorClassifier } from "./languages/liquidCursor";
+export type {
+  StudioCodeLiquidCursorClassifier,
+  StudioCodeLiquidCursorContext,
+  StudioCodeLiquidCursorRegion
+} from "./languages/liquidCursor";
 export type {
   StudioCodeToolingAuthoringContext,
   StudioCodeToolingCatalogClient,

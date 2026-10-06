@@ -1,11 +1,11 @@
 import React from "react";
 import {
-  createStudioCodeToolingProjection,
   liquidLanguageAdapter,
   projectStudioCodeDiagnostics,
   StudioCodeEditor,
   type StudioCodeEditorProfile
 } from "@elsa-workflows/studio-code-editor";
+import { createLiquidToolingProjection } from "./liquidToolingProjection";
 import type { ElsaStudioModuleApi, StudioExpressionEditorProps, StudioExpressionSourceRendererProps } from "@elsa-workflows/studio-sdk";
 import "./styles.css";
 
@@ -76,7 +76,7 @@ function LiquidCodeEditor({
     value: source,
     version: context.document?.sourceVersion
   };
-  const tooling = createStudioCodeToolingProjection({
+  const tooling = createLiquidToolingProjection({
     document: context.document,
     authoringContext: withLiquidCapabilities(context.authoringContext?.data),
     tooling: context.tooling
