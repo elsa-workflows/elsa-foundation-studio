@@ -57,7 +57,7 @@ const formattingControllers = new WeakMap<EditorView, CodeMirrorFormatter>();
 let authorizationGeneration = 0;
 
 const codeMirrorBaseTheme = EditorView.theme({
-  "&&": {
+  "&.cm-editor": {
     background: "var(--studio-surface-muted)",
     border: "1px solid var(--studio-border)",
     borderRadius: "var(--studio-radius-sm)",
@@ -65,17 +65,17 @@ const codeMirrorBaseTheme = EditorView.theme({
     fontFamily: "var(--studio-font-mono)",
     inlineSize: "100%"
   },
-  "&&:focus-within": {
+  "&.cm-editor:focus-within": {
     outline: "2px solid var(--studio-focus-strong, var(--studio-text))",
     outlineOffset: "2px"
   },
   "& .cm-scroller": {
     fontFamily: "var(--studio-font-mono)"
   },
-  "&& .cm-activeLine, && .cm-activeLineGutter": {
+  "&.cm-editor .cm-activeLine, &.cm-editor .cm-activeLineGutter": {
     background: "var(--studio-accent-soft)"
   },
-  "&& .cm-gutters": {
+  "&.cm-editor .cm-gutters": {
     background: "var(--studio-surface-muted)",
     borderColor: "var(--studio-border)",
     color: "var(--studio-text-muted)"
@@ -93,7 +93,7 @@ const codeMirrorBaseTheme = EditorView.theme({
     overflowWrap: "anywhere",
     whiteSpace: "normal"
   },
-  "&& .cm-panels": {
+  "&.cm-editor .cm-panels": {
     background: "var(--studio-surface-raised)",
     borderColor: "var(--studio-border)",
     color: "var(--studio-text)"
@@ -139,10 +139,11 @@ const codeMirrorBaseTheme = EditorView.theme({
 });
 
 const codeMirrorCompactTheme = EditorView.theme({
-  "&&&": {
+  // CodeMirror replaces only one ampersand per selector. Explicit classes preserve CSS specificity.
+  "&.cm-editor.cm-editor": {
     minBlockSize: "2.25rem"
   },
-  "&& .cm-scroller": {
+  "&.cm-editor .cm-scroller": {
     maxBlockSize: "2.25rem",
     overflow: "hidden"
   }
