@@ -16,16 +16,17 @@ acceptance tests/evidence only, not production editors, SDK/wire contracts or ru
 The root reviewed the bounded test writer's delta and corrected two proof gaps before
 the coherent run: observe the original native paste target after compact DOM replacement,
 and perform the one-format undo **after** Format/Escape/Tab exit and reactivation.
-Independent source review agrees; runtime verification remains required.
+Independent source review agrees. The executable checkpoint below passes its automated
+matrix; actual native AT and owner acceptance remain open.
 
 | Acceptance surface | Current-head observation required | State |
 |---|---|---|
-| Real persisted workflow and Activity Definition | JavaScript/Liquid compact/expanded, authorized live assistance, exact saves and independent missing-module/provider editing | Canonical rebuilt five-case run pending |
-| Light/Dark/Dim, narrow inspector | Preview/editor/selection/help/completion/diagnostic contrast, native visible caret, clipped Liquid match-start precondition | Canonical rebuilt run pending |
-| Native multiline paste | Trusted browser paste event with exact synthetic payload, preserved whitespace, automatic expansion, persisted text, native caret and one undo/redo | Canonical rebuilt run pending |
-| Explicit Format and native exit | Visible narrow real Format control, mapped collapsed caret, exact source/persistence, Escape-to-editor and actual Tab exit, reactivation followed by one undo | Canonical rebuilt run pending |
-| Generic cross-browser/axe | Synthetic Chromium/Firefox/WebKit/touch fixture; not real-host/runtime or actual screen-reader evidence | Historical evidence only until rerun |
-| Chrome + VoiceOver; Safari + VoiceOver | Actual current-head screen-reader navigation/announcements, settings restored | Unverified; no current-head native AT acceptance |
+| Real persisted workflow and Activity Definition | JavaScript/Liquid compact/expanded, authorized live assistance, exact saves and independent missing-module/provider editing | PASS at b4083bd4/5cd44d63: root5/5 and hosted5/5 |
+| Light/Dark/Dim, narrow inspector | Preview/editor/selection/help/completion/diagnostic contrast, native visible caret, clipped Liquid match-start precondition | PASS at the same exact pair |
+| Native multiline paste | Trusted browser paste event with exact synthetic payload, preserved whitespace, automatic expansion, persisted text, native caret and one undo/redo | PASS at the same exact pair; restored negative control fails without trusted paste |
+| Explicit Format and native exit | Visible narrow real Format control, mapped collapsed caret, exact source/persistence, Escape-to-editor and actual Tab exit, reactivation followed by one undo | PASS at the same exact pair; restored negative control catches omitted exit undo |
+| Generic cross-browser/axe | Synthetic Chromium/Firefox/WebKit/touch fixture; not real-host/runtime or actual screen-reader evidence | PASS16/16 at b4083bd4, traces off |
+| Chrome + VoiceOver; Safari + VoiceOver | Actual current-head screen-reader navigation/announcements, settings restored | UNVERIFIED: native control reports locked Mac; manual unlock required |
 | Human acceptance and delivery | Owner acceptance; draft-to-ready/merge/delivery separately authorized | OPEN; all PRs draft/unmerged |
 
 The first coherent candidate run passes3/5 (5.3m) and exposes two test-assumption failures,
@@ -34,7 +35,7 @@ formatter status, making the former broad status locator ambiguous; single-line 
 focus immediately activates its editor, so waiting for that preview to remain focused is
 incorrect. The corrected test selects the exact formatter status, also measures its contrast,
 and observes native Shift+Tab reactivation directly. This failed run remains retained in
-`/private/tmp/elsa-577-root-normal-host-candidate.log`; the corrected complete gate is pending.
+`/private/tmp/elsa-577-root-normal-host-candidate.log`; the final corrected result is below.
 
 Committed `cadd58ba` passes4/5 (8.6m): the persisted-workflow/Activity Definition and both
 independent degradation cases pass. The narrow case reaches native paste but the added
@@ -72,8 +73,58 @@ y406.5625–423.5625 within viewport x44–346.875/y358.1875–436.75. An indepe
 Chromium probe corroborates the DOM limitation; it is not real-host acceptance. The
 correction permits that BR anchor only for this exact empty-line/zero-Range selection
 shape and keeps nonempty Range geometry, positive height and the same ±1 viewport bounds.
-The diagnostic remains `/private/tmp/elsa-577-root-empty-line-diagnostic.log`; the full
-corrected gate and discriminating restored negative controls remain pending.
+The diagnostic remains `/private/tmp/elsa-577-root-empty-line-diagnostic.log`. The exact
+helper's independent synthetic probe returns visible for text-backed and in-viewport BR
+carets, false for offscreen and hidden BR anchors. Root review finds no actionable issue;
+these synthetic checks are not actual host or screen-reader acceptance.
+
+#### Executable checkpoint b4083bd4 — automated matrix passes
+
+Studio `b4083bd487164218265bd7b7e48b286b44f6813d` / clean pinned Foundation
+`5cd44d6312d9de85b13f4619fc7aa972a557d033` pass root canonical coherent rebuilt normal
+hosts5/5 (5.4m) and exact-head [CI37417314313](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37417314313)
+ALL jobs: lint/layout/typecheck, complete workspace units and Workflows shuffle seeds1/11/29,
+bundle budget, generic Chromium, Foundation persisted-host request envelopes, hosted5/5
+(6.0m), and actual registered Jint/Fluid formatter parity. This is an executable checkpoint,
+not a claim that any later documentation-only reconciliation already passed its own CI.
+Root actual registered-runtime parity also passes its ten synthetic fixtures; log:
+`/private/tmp/elsa-577-root-runtime-parity-b4083bd4.log`.
+
+Three root temporary harness mutations use the canonical rebuilt setup with only the
+narrow-case selection, unchanged timing and no configuration fork. Each fails at its
+intended assertion and is restored exactly (`git diff --exit-code`):
+
+- Replacing native paste with `keyboard.insertText` produces no trusted paste observation.
+- Omitting logical newline accounting reports native offset22 rather than23.
+- Omitting the single format undo after actual exit/reactivation leaves formatted source
+  instead of the exact unformatted source.
+
+These discriminate the acceptance assertions, not mutations of production editing code.
+Logs: `/private/tmp/elsa-577-root-negative-native-paste.log`,
+`/private/tmp/elsa-577-root-negative-newline-offset.log`,
+`/private/tmp/elsa-577-root-negative-format-exit-undo.log`.
+
+The synthetic cross-browser/axe matrix initially passes6/16 but cannot launch ten Firefox/
+WebKit cases because the pinned browser binaries are absent. Installing only Playwright's
+official matching test binaries fixes that environment prerequisite; no dependencies,
+personal browsers or test configuration are changed. The unchanged rerun passes16/16
+(39.6s) with trace capture explicitly off. This remains separate from real host/runtime
+and native AT evidence. Logs: `/private/tmp/elsa-577-root-expression-matrix-b4083bd4.log`,
+`/private/tmp/elsa-577-root-test-browser-install.log`,
+`/private/tmp/elsa-577-root-expression-matrix-b4083bd4-retry.log`.
+
+Actual CodeRabbit review completes at this exact head: summary comment6009541054,
+run4ff5830f-58d8-4c6a-b264-f58704a9226a, all four changed files, no actionable code
+comments and no unresolved review threads. Its default docstring-coverage warning remains
+explicitly recorded, not silently passed; that advisory is not a required repository gate,
+and existing focused helper comments explain the non-obvious proof boundaries. No bulk
+documentation boilerplate is added. This is completed bot review evidence, not a GitHub
+APPROVED review or human acceptance. Copilot is requested but actual request/review/inline
+arrays remain empty after the window; no Greptile review is claimed.
+
+Primary root logs: `/private/tmp/elsa-577-root-normal-host-b4083bd4.log`,
+`/private/tmp/elsa-577-root-ci-b4083bd4-pass.log`,
+`/private/tmp/elsa-577-root-external-review-b4083bd4.json`.
 
 The native preflight confirms VoiceOver is not running and macOS UI automation is
 available, without changing accessibility settings. The connected Chrome browser is
@@ -91,6 +142,40 @@ is installed by both headless Chrome and the headless shell; no platform clipboa
 is used by the test.
 Default live catalogs supply single signatures; overload navigation remains separately
 proved by synthetic authorized-provider component tests, not invented live host data.
+
+#### Native AT blocker and exact acceptance handoff
+
+On resume, an owned blank QA tab opens, but native Chrome control reports the Mac locked
+and unable to unlock automatically. Manual unlock is requested; the temporary tab is
+closed. No native host is started, no personal surface is used, VoiceOver remains off,
+and no caption/accessibility setting is changed. The documented native keyboard caption
+path is still untried because the locked desktop prevents it; utility capture failure alone
+is not being treated as proof that all native observation paths are unavailable.
+
+After manual unlock, retain this branch and pinned Foundation checkout, rebuild using
+`ELSA_FOUNDATION_WORKTREE=/private/tmp/elsa-2379-foundation pnpm test:browser:expression-normal-host`.
+The prepared local bootstrap `/private/tmp/elsa-577-native-at-host.mjs` (Node25, import
+and syntax preflight pass; not yet run) reuses the actual host lifecycle and live-catalog
+draft seeder. Start it with
+`ELSA_FOUNDATION_WORKTREE=/private/tmp/elsa-2379-foundation node /private/tmp/elsa-577-native-at-host.mjs`.
+For independent degradation, repeat with its validated `missing-javascript-editor` or
+`missing-liquid-provider` argument, stopping the previous owned pair first. It prints only
+owned loopback login/workflow URLs and bounded fixture labels; it owns fresh SQLite and
+stops its hosts on SIGINT/SIGTERM. Sign into each owned Chrome/Safari private window
+using only the synthetic local fixture account, then use the printed JavaScript/Liquid
+workflow URLs and select the `target` activity's Text input.
+
+For both actual browser/VoiceOver combinations, observe actual speech or the native
+caption panel, not just page AX/DOM: preview/editor names and keyboard instructions;
+completion invocation/navigation/acceptance; `Math.pow(2, 3)` active-parameter signature
+and keyboard hover; local syntax diagnostics; compact/expanded source/focus/undo;
+real Format status and Escape-to-editor/Tab exit; Control-M/Tab expanded escape; the
+applicable theme/narrow flow and independent unavailable-editor/provider editing.
+Use only synthetic authored values and actual supplied signatures; do not invent live
+overloads. Record browser/OS/AT versions, exact source pair, expected versus observed
+announcements and any failure. Preserve original VoiceOver/caption settings, restore
+them, close only owned windows and stop only owned hosts. A failure keeps T038 unchecked.
+Human acceptance, Ready/merge and delivery remain separate and unauthorized here.
 
 ### Final T037 automated technical gate, 2026-10-06
 
@@ -125,11 +210,11 @@ upgrades370.70/375.50kB, largest263.18/500kB, eight heavy surfaces deferred. Log
 `/private/tmp/elsa-572-root-ci-ef523911-pass.log`,
 `/private/tmp/elsa-572-root-solution-registration.log`.
 
-Task577 / T038 is now the sole active final acceptance leaf. Native clipboard paste, Format
-caret/undo, narrow actual Format activation and Format-control native exit are the remaining
-automation controls identified by the read-only audit. Current-head Chrome/Safari VoiceOver,
-human acceptance and delivery remain OPEN; DOM/axe/Playwright and July historical AT evidence
-do not satisfy those gates. All PRs stay draft/unmerged.
+At T037 acceptance, Task577 / T038 became the sole active final acceptance leaf for native
+clipboard paste, Format caret/undo, narrow activation and native control exit. Its latest
+automated matrix and native AT blocker are recorded above. Current-head Chrome/Safari
+VoiceOver, human acceptance and delivery remain OPEN; DOM/axe/Playwright and July historical
+AT evidence do not satisfy those gates. All PRs stay draft/unmerged.
 
 ### T037 integration dd6bc1aa — complete gate pending
 
