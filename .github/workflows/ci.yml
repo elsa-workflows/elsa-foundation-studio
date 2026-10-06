@@ -103,21 +103,6 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
-      - name: Checkout the paired Foundation checkpoint
-        uses: actions/checkout@v4
-        with:
-          repository: elsa-workflows/elsa-foundation
-          # Program #2310 delivery pins the refreshed integrated producer source.
-          # Historical M3 proof stays at5cd; neither moving refs nor arbitrary main prove this pair.
-          ref: 59a3dd723b646f45264c5a1940715bc5b00ddd1e
-          path: .normal-host-foundation
-          persist-credentials: false
-
-      - name: Record exact source revisions
-        run: |
-          git rev-parse HEAD
-          git -C "$ELSA_FOUNDATION_WORKTREE" rev-parse HEAD
-
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
@@ -126,6 +111,32 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+
+      - name: Read the immutable paired Foundation revision
+        id: foundation-revision
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync, readFileSync } from "node:fs";
+          const { revision } = JSON.parse(readFileSync(".github/expression-foundation.json", "utf8"));
+          if (typeof revision !== "string" || !/^[0-9a-f]{40}$/.test(revision))
+            throw new Error("Foundation revision must be an immutable full SHA");
+          appendFileSync(process.env.GITHUB_OUTPUT, `revision=${revision}\n`);
+          NODE
+
+      - name: Checkout the paired Foundation checkpoint
+        uses: actions/checkout@v4
+        with:
+          repository: elsa-workflows/elsa-foundation
+          # Program #2310 delivery pins the refreshed integrated producer source.
+          # The runtime-parity guard reads the same manifest; historical pins stay in the evidence.
+          ref: ${{ steps.foundation-revision.outputs.revision }}
+          path: .normal-host-foundation
+          persist-credentials: false
+
+      - name: Record exact source revisions
+        run: |
+          git rev-parse HEAD
+          git -C "$ELSA_FOUNDATION_WORKTREE" rev-parse HEAD
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4

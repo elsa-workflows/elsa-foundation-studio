@@ -1,11 +1,11 @@
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { expect, it } from "vitest";
+import { revision as foundationRevision } from "../../.github/expression-foundation.json";
 import { formatJavaScript } from "../../src/essentials/Elsa.Studio.CodeEditor/Client/src/languages/javascriptFormatting";
 import { formatLiquid } from "../../src/essentials/Elsa.Studio.CodeEditor/Client/src/languages/liquidFormatting";
 import type { StudioCodeFormatRequest } from "../../src/essentials/Elsa.Studio.CodeEditor/Client/src/types";
 
-const foundationRevision = "5cd44d6312d9de85b13f4619fc7aa972a557d033";
 const fixtures = [
   { id: "js-arithmetic", language: "javascript", profile: "expression", before: "args.order+ 2", arguments: { order: 3 }, expected: 5, changed: true },
   { id: "js-opaque", language: "javascript", profile: "expression", before: '["a  b",/a  b/.test("a  b"),`x  ${1+2}`]', arguments: {}, expected: ["a  b", true, "x  3"] },
@@ -22,6 +22,7 @@ const fixtures = [
 it("proves actual formatter outputs against pinned registered Jint and Fluid production services", () => {
   const foundation = process.env.ELSA_FOUNDATION_WORKTREE;
   expect(foundation, "ELSA_FOUNDATION_WORKTREE must identify the pinned source checkout").toBeTruthy();
+  expect(foundationRevision, "The paired producer must be an immutable full revision").toMatch(/^[0-9a-f]{40}$/);
   const actualRevision = spawnSync("git", ["-C", foundation!, "rev-parse", "HEAD"], { encoding: "utf8" });
   expect(actualRevision.status).toBe(0);
   expect(actualRevision.stdout.trim()).toBe(foundationRevision);
