@@ -1,12 +1,92 @@
 # Expression Code Intelligence — Verification
 
-Last reconciled: 2026-10-06 for Program #2310 T036 acceptance and in-progress T037 integration; all PRs draft/unmerged, current-head manual AT and human acceptance pending
+Last reconciled: 2026-10-06 for Program #2310 T037 automated acceptance and in-progress T038 / Studio Task#577; all PRs draft/unmerged, current-head manual AT and human acceptance pending
 
 ## Program #2310 status
 
-T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head automated M2 gate under the documented unavailable-external-review fallback. Studio spike #553 / T035 settles the technical decision: reject the current deeper-service candidate and retain the baseline path. No deeper-service dependency is adopted. T032-T034 pass their final exact-head automated M3 gate below. T036 passes its immutable bc305150/5cd44d63 automated gate; Task#572 / Decision20 now owns T037 signature/formatting implementation. T037-T038 and current-head manual accessibility/human acceptance/delivery remain open. The 2026-07-28 evidence remains historical. All program PRs remain draft and unmerged.
+T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head automated M2 gate under the documented unavailable-external-review fallback. Studio spike #553 / T035 settles the technical decision: reject the current deeper-service candidate and retain the baseline path. No deeper-service dependency is adopted. T032-T034 pass their final exact-head automated M3 gate below. T036 passes its immutable bc305150/5cd44d63 automated gate; Task#572 / T037 passes at immutable ef523911/5cd44d63. Task#577 owns T038. Current-head manual accessibility, T038/human acceptance and delivery remain open. The 2026-07-28 evidence remains historical. All program PRs remain draft and unmerged.
 
 ## Verification evidence
+
+### T038 / Studio Task#577 — final matrix in progress, 2026-10-06
+
+The integration branch `codex/577-expression-acceptance-matrix` stacks over immutable
+T037 `ef523911` and retains the paired clean Foundation `5cd44d63`. This leaf changes
+acceptance tests/evidence only, not production editors, SDK/wire contracts or runtime.
+The root reviewed the bounded test writer's delta and corrected two proof gaps before
+the coherent run: observe the original native paste target after compact DOM replacement,
+and perform the one-format undo **after** Format/Escape/Tab exit and reactivation.
+Independent source review agrees; runtime verification remains required.
+
+| Acceptance surface | Current-head observation required | State |
+|---|---|---|
+| Real persisted workflow and Activity Definition | JavaScript/Liquid compact/expanded, authorized live assistance, exact saves and independent missing-module/provider editing | Canonical rebuilt five-case run pending |
+| Light/Dark/Dim, narrow inspector | Preview/editor/selection/help/completion/diagnostic contrast, native visible caret, clipped Liquid match-start precondition | Canonical rebuilt run pending |
+| Native multiline paste | Trusted browser paste event with exact synthetic payload, preserved whitespace, automatic expansion, persisted text, native caret and one undo/redo | Canonical rebuilt run pending |
+| Explicit Format and native exit | Visible narrow real Format control, mapped collapsed caret, exact source/persistence, Escape-to-editor and actual Tab exit, reactivation followed by one undo | Canonical rebuilt run pending |
+| Generic cross-browser/axe | Synthetic Chromium/Firefox/WebKit/touch fixture; not real-host/runtime or actual screen-reader evidence | Historical evidence only until rerun |
+| Chrome + VoiceOver; Safari + VoiceOver | Actual current-head screen-reader navigation/announcements, settings restored | Unverified; no current-head native AT acceptance |
+| Human acceptance and delivery | Owner acceptance; draft-to-ready/merge/delivery separately authorized | OPEN; all PRs draft/unmerged |
+
+The first coherent candidate run passes3/5 (5.3m) and exposes two test-assumption failures,
+not accepted product regressions: the Liquid caret now opens signature status alongside
+formatter status, making the former broad status locator ambiguous; single-line preview
+focus immediately activates its editor, so waiting for that preview to remain focused is
+incorrect. The corrected test selects the exact formatter status, also measures its contrast,
+and observes native Shift+Tab reactivation directly. This failed run remains retained in
+`/private/tmp/elsa-577-root-normal-host-candidate.log`; the corrected complete gate is pending.
+
+The native preflight confirms VoiceOver is not running and macOS UI automation is
+available, without changing accessibility settings. The connected Chrome browser is
+extension-backed, not the isolated Playwright context. Its initial native binding unexpectedly
+exposed an unrelated existing window; that content was not used and no unrelated action was
+taken. The owned blank tab was focused and a new Incognito window was then created and
+verified before further native QA. No personal credentials or clipboard contents are read,
+and no native announcement has been counted. Synthetic automated paste is guarded to
+headless Chromium, whose [platform-independent clipboard implementation](https://chromium.googlesource.com/chromium/src/+/HEAD/components/headless/clipboard/headless_clipboard.cc)
+is installed by both headless Chrome and the headless shell; no platform clipboard restore/read
+is used by the test.
+Default live catalogs supply single signatures; overload navigation remains separately
+proved by synthetic authorized-provider component tests, not invented live host data.
+
+### Final T037 automated technical gate, 2026-10-06
+
+Immutable Studio `ef523911c72aad209d483580dcd24dcb638686a9` / clean Foundation
+`5cd44d6312d9de85b13f4619fc7aa972a557d033` pass root coherent rebuilt normal hosts5/5
+(6.0m), final actual registered Jint/Fluid parity (ten synthetic fixtures), and exact-head
+[CI37413241474](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37413241474)
+ALL jobs: full lint/layout/typecheck, complete workspace units (CodeEditor196, JS16, Liquid28,
+Workflows1506), three Workflows shuffle seeds1/11/29, unchanged bundles, generic Chromium,
+Foundation persisted-host request envelopes, paired hosts5/5 (6.9m) and actual runtime parity.
+Actual Studio-only solution restore/build also passes0warnings/errors without Foundation.
+
+Root final integrated-delta review and independent latest-delta source review find no remaining
+actionable blocker. Signature evidence preserves actual supplied arrays/per-item arity and
+parser-proven positions; default catalogs expose single signatures, so authorized synthetic
+provider overload controls remain separate from live-host signature proof. Formatter edit/
+selection freshness and fail-closed atomicity, native focus and one-undo controls discriminate;
+intentional arithmetic/overlap mutations fail and are restored. Predecessor failed CI/host
+checkpoints below retain their original boundaries.
+
+Copilot is explicitly re-requested after the final push but actual requests/reviews/inline
+comments remain empty after the review window; no Greptile signal appears, and CodeRabbit
+skips the draft. Completed root/independent/local/hosted evidence uses the documented unavailable
+external-review fallback, not actual external approval. DraftPR#574 remains immutable,
+draft/open/unmerged; Task572's implementation claim is released, automated verification Passed,
+separate ReviewRequired/human/delivery boundaries preserved.
+
+CI budgets remain primary127.50/127.50kB, CSS145.86/185kB, Definitions380.70/384.50kB,
+upgrades370.70/375.50kB, largest263.18/500kB, eight heavy surfaces deferred. Logs:
+`/private/tmp/elsa-572-root-normal-host-ef523911.log`,
+`/private/tmp/elsa-572-root-runtime-parity-ef523911.log`,
+`/private/tmp/elsa-572-root-ci-ef523911-pass.log`,
+`/private/tmp/elsa-572-root-solution-registration.log`.
+
+Task577 / T038 is now the sole active final acceptance leaf. Native clipboard paste, Format
+caret/undo, narrow actual Format activation and Format-control native exit are the remaining
+automation controls identified by the read-only audit. Current-head Chrome/Safari VoiceOver,
+human acceptance and delivery remain OPEN; DOM/axe/Playwright and July historical AT evidence
+do not satisfy those gates. All PRs stay draft/unmerged.
 
 ### T037 integration dd6bc1aa — complete gate pending
 
@@ -1001,7 +1081,7 @@ The current complete Workflows suite passes 1,470 tests and none of these failur
 
 No CodeMirror type crosses the Studio SDK boundary, no expression source enters metadata caches, and no generic “Elsa globals” are synthesized. Each expression provider owns its globals/functions/variables.
 
-## Manual assistive-technology evidence
+## Historical manual assistive-technology evidence — 2026-07-28, not current-head acceptance
 
 The production fixture was exercised in Google Chrome and Safari with macOS VoiceOver enabled. Both runs confirmed:
 

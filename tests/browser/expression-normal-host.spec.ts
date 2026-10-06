@@ -215,6 +215,13 @@ completeTest("normal-host expression previews and help remain readable in Light,
       }
       await expect.poll(() => readEditorSource(editor)).toBe(source);
       await expect.poll(() => readPersistedSource(page, hostPair, draft)).toBe(source);
+      if (mode === "Light") {
+        // Exercise the real narrow inspector control, its editor-return path, and the
+        // existing native Tab escape without inventing a live overload catalog.
+        await exerciseExplicitFormatting(page, hostPair, editor, draft, traffic, language, "button", { syntax, preview });
+        await expect.poll(() => readEditorSource(editor)).toBe(source);
+        await expect.poll(() => readPersistedSource(page, hostPair, draft)).toBe(source);
+      }
       await replacePersistedWorkflowSource(page, hostPair, editor, draft, traffic, language,
         language === "JavaScript" ? "if (" : "{{ customerName");
       const diagnostics = section.locator(".studio-code-editor-diagnostics");
@@ -236,14 +243,36 @@ completeTest("normal-host expression previews and help remain readable in Light,
       // A multiline preview stays a real button on keyboard focus rather than activating.
       await preview.click();
       await expect(editor).toBeVisible();
-      const multilineSource = `${source}\n`;
-      await replacePersistedWorkflowSource(page, hostPair, editor, draft, traffic, language, multilineSource);
+      let multilineSource: string;
+      if (mode === "Light") {
+        // Use only this isolated Playwright context's synthetic clipboard. A trusted paste
+        // event distinguishes the browser paste path from keyboard.insertText/newline typing.
+        const pasteText = language === "JavaScript" ? " + 1\n  + 2 " : "\n  exact\t whitespace  \n";
+        multilineSource = source + pasteText;
+        await moveEditorCursor(editor, source, source.length);
+        await pasteFromIsolatedTestClipboard(page, editor, pasteText);
+      } else {
+        multilineSource = `${source}\n`;
+        await replacePersistedWorkflowSource(page, hostPair, editor, draft, traffic, language, multilineSource);
+      }
       // Inserting a newline intentionally expands compact editing. Close that real dialog
       // before checking the multiline preview's non-activating keyboard focus.
       const dialog = page.getByRole("dialog");
       const expanded = dialog.locator(".studio-code-editor-rich-expanded .cm-content");
       await expect(expanded).toBeFocused();
       await expect.poll(() => readEditorSource(expanded)).toBe(multilineSource);
+      if (mode === "Light") {
+        await expect.poll(() => readNativeEditorCaret(expanded)).toEqual({ offset: multilineSource.length, visible: true });
+        await expect.poll(() => readPersistedSource(page, hostPair, draft)).toBe(multilineSource);
+        await expanded.press("ControlOrMeta+Z");
+        await expect.poll(() => readEditorSource(expanded)).toBe(source);
+        await expect.poll(() => readNativeEditorCaret(expanded)).toEqual({ offset: source.length, visible: true });
+        await expect.poll(() => readPersistedSource(page, hostPair, draft)).toBe(source);
+        await expanded.press("ControlOrMeta+Shift+Z");
+        await expect.poll(() => readEditorSource(expanded)).toBe(multilineSource);
+        await expect.poll(() => readNativeEditorCaret(expanded)).toEqual({ offset: multilineSource.length, visible: true });
+        await expect.poll(() => readPersistedSource(page, hostPair, draft)).toBe(multilineSource);
+      }
       await dialog.getByRole("button", { name: `Close ${draft.inputName} editor` }).click();
       await expect(dialog).toHaveCount(0);
       // The row deliberately restores its expand button on the next animation frame.
@@ -604,12 +633,23 @@ async function readNativeEditorCaret(editor: Locator) {
     const selection = window.getSelection();
     const viewport = element.closest(".cm-scroller")?.getBoundingClientRect();
     if (!selection?.isCollapsed || !selection.rangeCount || !element.contains(selection.anchorNode) || !viewport) return null;
-    const range = selection.getRangeAt(0);
-    const caret = range.getBoundingClientRect();
+    const focusNode = selection.focusNode;
+    if (!focusNode) return null;
+    const focusLine = focusNode instanceof Element ? focusNode.closest(".cm-line") : focusNode.parentElement?.closest(".cm-line");
+    if (!focusLine) return null;
+    const lines = Array.from(element.querySelectorAll(".cm-line"));
+    const focusLineIndex = lines.indexOf(focusLine);
+    if (focusLineIndex < 0) return null;
     const prefix = document.createRange();
-    prefix.selectNodeContents(element);
-    prefix.setEnd(range.startContainer, range.startOffset);
-    return { offset: prefix.toString().length,
+    prefix.selectNodeContents(focusLine);
+    prefix.setEnd(focusNode, selection.focusOffset);
+    const offset = lines.slice(0, focusLineIndex)
+      .reduce((total, line) => total + (line.textContent?.length ?? 0) + 1, 0) + prefix.toString().length;
+    const caretRange = document.createRange();
+    caretRange.setStart(focusNode, selection.focusOffset);
+    caretRange.collapse(true);
+    const caret = caretRange.getBoundingClientRect();
+    return { offset,
       visible: caret.height > 0 && caret.left >= viewport.left - 1 && caret.right <= viewport.right + 1 &&
         caret.top >= viewport.top - 1 && caret.bottom <= viewport.bottom + 1 };
   });
@@ -832,15 +872,25 @@ async function exerciseLiquidDepth(page: Page, pair: NormalHostPair, editor: Loc
 }
 
 async function exerciseExplicitFormatting(page: Page, pair: NormalHostPair, editor: Locator,
-  draft: PersistedExpressionDraft, traffic: SafeBackendTraffic[], language: "JavaScript" | "Liquid", action: "button" | "shortcut") {
+  draft: PersistedExpressionDraft, traffic: SafeBackendTraffic[], language: "JavaScript" | "Liquid", action: "button" | "shortcut",
+  focusExit?: { syntax: Locator; preview: Locator }) {
   const source = language === "JavaScript" ? "args.customerName+ '!'" : "  Hello {{customerName|append: '  exact  '}}!  ";
   const formatted = language === "JavaScript" ? "args.customerName + '!'" : "  Hello {{customerName | append: '  exact  '}}!  ";
+  const previousSource = await readEditorSource(editor);
   await replacePersistedWorkflowSource(page, pair, editor, draft, traffic, language, source);
   const section = editor.locator("xpath=ancestor::section[@data-studio-code-editor='true'][1]");
   const format = section.getByRole("button", { name: "Format source", exact: true });
   await expect(format).toBeEnabled();
+  await expect(format).toBeVisible();
+  await expect(format).toBeInViewport();
+  await expectReadableCodeSurface(format);
   // Mere availability must not normalize source or create an extra history entry.
   await expect.poll(() => readEditorSource(editor)).toBe(source);
+  const caretToken = language === "JavaScript" ? "customerName" : "exact";
+  const sourceCaretOffset = source.indexOf(caretToken) + 2;
+  const formattedCaretOffset = formatted.indexOf(caretToken) + 2;
+  await moveEditorCursor(editor, source, sourceCaretOffset);
+  await expect.poll(() => readNativeEditorCaret(editor)).toEqual({ offset: sourceCaretOffset, visible: true });
   const nativeEditor = await editor.elementHandle();
   if (action === "button") {
     await format.focus();
@@ -852,12 +902,70 @@ async function exerciseExplicitFormatting(page: Page, pair: NormalHostPair, edit
   await expect.poll(() => readEditorSource(editor)).toBe(formatted);
   await expect.poll(() => readPersistedSource(page, pair, draft)).toBe(formatted);
   expect(await editor.evaluate((element, original) => element === original, nativeEditor)).toBe(true);
-  await expect(section.getByRole("status")).toContainText("Source formatted. Undo restores the original source.");
+  const formattingStatus = section.getByRole("status")
+    .filter({ hasText: /^Source formatted\. Undo restores the original source\.$/ });
+  await expect(formattingStatus).toBeVisible();
+  await expectReadableCodeSurface(formattingStatus);
   await editor.focus();
+  await expect.poll(() => readNativeEditorCaret(editor)).toEqual({ offset: formattedCaretOffset, visible: true });
+
+  if (focusExit) {
+    await format.focus();
+    await expect(format).toBeFocused();
+    await format.press("Escape");
+    await expect(editor).toBeFocused();
+    await editor.press("Tab");
+    await expect(focusExit.syntax).toBeFocused();
+    await expect(focusExit.preview).toBeVisible();
+    await expect(page.locator(".studio-code-editor-rich .cm-editor")).toHaveCount(0);
+    await focusExit.syntax.press("Shift+Tab");
+    // Single-line preview focus activates the rich editor through the real native path.
+    await expect(editor).toBeFocused();
+    await expect.poll(() => readEditorSource(editor)).toBe(formatted);
+    await expect.poll(() => readPersistedSource(page, pair, draft)).toBe(formatted);
+    await expect.poll(() => readNativeEditorCaret(editor)).toEqual({ offset: formattedCaretOffset, visible: true });
+  }
+  // One undo restores the exact pre-format source/caret, including after actual exit.
   await editor.press("ControlOrMeta+Z");
   await expect.poll(() => readEditorSource(editor)).toBe(source);
   await expect.poll(() => readPersistedSource(page, pair, draft)).toBe(source);
+  await expect.poll(() => readNativeEditorCaret(editor)).toEqual({ offset: sourceCaretOffset, visible: true });
+  if (focusExit) await replacePersistedWorkflowSource(page, pair, editor, draft, traffic, language, previousSource);
   await nativeEditor?.dispose();
+}
+
+async function pasteFromIsolatedTestClipboard(page: Page, editor: Locator, text: string) {
+  // Headless Chromium uses an in-memory clipboard. Never run this helper on the
+  // user's headed browser or read the platform clipboard to preserve/restore it.
+  expect(await page.evaluate(() => navigator.userAgent.includes("HeadlessChrome/")),
+    "Synthetic clipboard paste requires the isolated headless browser").toBe(true);
+  const origin = new URL(page.url()).origin;
+  await page.context().grantPermissions(["clipboard-write"], { origin });
+  await page.evaluate(async value => navigator.clipboard.writeText(value), text);
+  const nativeEditor = await editor.elementHandle();
+  if (!nativeEditor) throw new Error("The native paste target is unavailable");
+  try {
+    await nativeEditor.evaluate((element, expectedText) => {
+      const target = element as HTMLElement & {
+        expressionTestPaste?: { trusted: boolean; exact: boolean };
+      };
+      target.expressionTestPaste = undefined;
+      target.addEventListener("paste", event => {
+        const clipboardEvent = event as ClipboardEvent;
+        target.expressionTestPaste = {
+          trusted: clipboardEvent.isTrusted,
+          exact: clipboardEvent.clipboardData?.getData("text/plain") === expectedText
+        };
+      }, { once: true });
+    }, text);
+    await editor.press("ControlOrMeta+V");
+    // Multiline paste replaces compact DOM with the expanded view; retain the event target.
+    await expect.poll(() => nativeEditor.evaluate(element =>
+      (element as HTMLElement & { expressionTestPaste?: { trusted: boolean; exact: boolean } })
+        .expressionTestPaste ?? null)).toEqual({ trusted: true, exact: true });
+  } finally {
+    await nativeEditor.dispose();
+  }
 }
 
 async function readEditorSource(editor: Locator) {
