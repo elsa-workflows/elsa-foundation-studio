@@ -1,5 +1,17 @@
 # Expression Code Intelligence — Verification
 
+## Current paired candidate — 2026-10-07
+
+The final Studio layer includes qualified main `aedaacc360099f8a12fb3fa968fe97d5cd9d7aa4`, the corrected save-status locator, raw-count catalog pagination and the supported lazy CodeMirror theme selectors from `a0820157`. The formatting parent is `68365f148e054a545d7191f101c7a085fd15038a`. Historical failures and passes below remain tied to their recorded heads; none establishes this integrated candidate's acceptance.
+
+The shared immutable producer pin is now `4c388b94e672e0334e577db4d959d38050527456`, qualified by full [CI37540394248](https://github.com/elsa-workflows/elsa-foundation/actions/runs/37540394248) and [Maps37540393180](https://github.com/elsa-workflows/elsa-foundation/actions/runs/37540393180). The other three synchronized Foundation heads also pass their exact CI and Maps. The paired host job now additionally builds this producer in Debug and invokes the unchanged canonical ten-case JavaScript REST suite through its existing fresh-SQLite/free-loopback/owned-process lifecycle. It verifies the exact producer SHA, requires all ten results, and asserts owned-process exit plus a free port even after failure. Root and independent review cover the workflow delta; actionlint passes. No external publishing, secrets or deployment are part of this test.
+
+The supported-selector theme head `a0820157` passes complete units, generic Chromium/accessibility and bundle checks in [CI37546611911](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37546611911), but its normal-host suite fails4/5 at the later fresh-assistance provenance assertion. That failure remains unresolved at this checkpoint; visible help and preceding focus assertions passed, but neither a timing cause nor a product defect is established. The formatting descendant `68365f14` passes all jobs in [CI37547035176](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37547035176), including normal-host5/5 and actual formatter/runtime parity against its recorded producer. This is not a waiver of the earlier failure or acceptance of the newly pinned final pair.
+
+The unchanged synthetic hosted matrix passes16/16 at `d831600b` [37539555882](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37539555882), not this corrected integrated head. Fresh complete unit/bundle/browser, all-five rebuilt persisted hosts, registered Jint/Fluid formatter parity, current-producer REST and exact-head review or the documented permitted fallback remain required. All program PRs remain draft and unmerged; explicit final owner acceptance precedes Ready and dependency-ordered delivery. Preview packages are Feedz-only and existing Docker Hub publication is authorized; no stable release, deployment or Azure provisioning is performed. Native Chrome/Safari VoiceOver remains **SKIPPED BY OWNER DECISION — NEVER PASSED**.
+
+## Retained corrective checkpoint at d831600b
+
 Last reconciled: 2026-10-06 for preview-publication authorization and renewed main integration; all PRs draft/unmerged, final human acceptance pending
 
 ## Current corrective checkpoint — 2026-10-07
@@ -13,6 +25,23 @@ The separate `Expression acceptance matrix` workflow now runs the unchanged synt
 Foundation main `2a0d1f10` is fully qualified; root planning head `bb13422fe` includes it and passes combined Maps37538022928 and filters37538023052, while CI37538023573 is still running at this checkpoint. Producer-stack synchronization, immutable-pin advancement, coherent final normal-host/runtime/REST/architecture proof, current review or documented permitted fallback, final explicit owner acceptance, dependency-ordered merges and resulting-main qualification remain open. All program PRs remain draft. Native Chrome/Safari VoiceOver remains **SKIPPED BY OWNER DECISION — NEVER PASSED**.
 
 ## Retained historical checkpoints
+## Retained inherited integration checkpoint at 68365f14
+
+### Synchronized-head snapshot — 2026-10-07
+
+The existing Studio expression stack is being synchronized with qualified main `aedaacc360099f8a12fb3fa968fe97d5cd9d7aa4`. Its delta from `2bd5c076` is the contributor-matrix link plus explicit read-only CI/Docker permissions and non-persisted checkout credentials; no application source changes. Exact-head CI/review and fresh final Studio/Foundation producer pairing remain pending; no synchronized-pair pass is claimed. Retained M1/M2 automated passes apply only to their recorded revisions. The M1 `c9479fba` / `f81be4be` pair passed normal-host4/4 and unblocked M2 at that checkpoint. The dated entries below preserve historical statuses, including earlier M2-blocked states; they do not establish later integrated-head acceptance. Copilot requests do not establish a completed current-head review. All PRs remain draft/unmerged; final owner acceptance and delivery are open. Native Chrome/Safari VoiceOver is **SKIPPED BY OWNER DECISION — NEVER PASSED**.
+
+Retained CI558/37532060674 fails3/4 normal-host cases at the obsolete `.wf-status` locator; the Activity Definition case passes. Main's toolbar exposes the same autosave messages through `.wf-editor-save-status`, an atomic polite live status. The helper correction preserves Autosaving/Autosaved, exact persisted-source, successful fresh PUT and post-save revision/assistance assertions. Corrected `a3fefdc7` passes every job in [CI37534033046](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37534033046), including rebuilt normal hosts; no production toolbar or timing/assertion relaxation is introduced. That checkpoint does not establish the newly synchronized head's CI/review or final pair, which remain pending.
+
+### Theme-size correction candidate
+
+Source checkpoint `c2924337` moves only rich CodeMirror presentation into the existing lazy engine's `EditorView.theme` extensions. Fallback input, lightweight preview, shell and syntax-token CSS remain eager; host style discovery, manifest loading, bundler, dependencies and unchanged bundle budgets are untouched. Installed esbuild0.27.7 minifies the owning stylesheet from5623 to3397bytes (minus2226); this is not a full-bundle result. Root and independent source review find no concrete defect and confirm profile-specific presentation reconfiguration, but the new expanded-to-compact-to-expanded regression has not passed locally: its final run times out at the unchanged20-second limit under extreme shared load. The clean baseline fails the new theme assertion as intended. No timeout/assertion is relaxed. Fresh exact-head unit, full-bundle and integrated browser gates remain required; this candidate is not accepted.
+
+Hosted `4dfec0b3` [CI37544730647](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37544730647) establishes a real failed candidate: CodeEditor119/120, generic Chromium80/81 with a serious scrollable-region accessibility finding, and normal-host4/5 with dotted rather than required solid focus indication. Its build reports Definitions383.62/384.50kB, but unit/browser gates fail; no acceptance is claimed. Installed CodeMirror6.43.6 replaces only the first ampersand in a theme selector. A direct installed-package control emits invalid `.generated&&` and `.generated& .cm-scroller`; explicit editor classes emit valid selectors with the original specificity. Root corrects every repeated-ampersand selector without changing style values, lifecycle, focus behavior, tests, timeouts, accessibility rules or budgets. Independent source review confirms the correction. Fresh complete hosted proof is pending; the failed checkpoint remains retained.
+
+## Retained historical checkpoints
+
+Last reconciled: 2026-10-06 for Program #2310 T036 acceptance and in-progress T037 integration; all PRs draft/unmerged, current-head manual AT and human acceptance pending
 
 ## Program #2310 status
 

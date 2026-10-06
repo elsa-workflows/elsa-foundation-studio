@@ -1,5 +1,11 @@
 # Tasks: Expression Code Intelligence
 
+## Current synchronized-head snapshot — 2026-10-06
+
+The existing Studio expression stack is synchronized with main `2bd5c076`. Exact-head CI/review and fresh final Studio/Foundation producer pairing remain pending; no synchronized-pair pass is claimed. Retained M1/M2 automated passes apply only to their recorded revisions. The M1 `c9479fba` / `f81be4be` pair passed normal-host4/4 and unblocked M2 at that checkpoint. The dated implementation notes and checkbox states below remain historical; they do not revise earlier blocked states or prove later integrated heads. Copilot requests do not establish a completed current-head review. All PRs remain draft/unmerged; final owner acceptance and delivery are open. Native Chrome/Safari VoiceOver is **SKIPPED BY OWNER DECISION — NEVER PASSED**.
+
+## Retained task ledger
+
 Baseline implementation tasks are complete. File names below reflect the landed design rather than provisional planning names.
 
 The baseline tasks T001-T025 are historical. Program #2310 reopens this feature for dependency-ordered tasks T026-T038. T026-T029 have exact-head normal-host evidence. T030-T031 pass the exact M2 automated gate under the documented unavailable-review fallback. T035 / Studio #553 settles the technical decision: reject the current service candidate and retain the baseline path. T032-T034 pass the exact M3 automated producer-consumer gate at Studio `473cf1a9` / Foundation `5cd44d63`, under the same explicitly documented unavailable-external-review fallback. Task#568 / T036 passes at immutable bc305150/5cd44d63; Task#572 / T037 passes at immutable ef523911/5cd44d63. Task#577 owns T038. Actual current-head Chrome/Safari VoiceOver is skipped by owner decision and never passed; final human acceptance and delivery remain open. No deeper-service dependency is adopted.
