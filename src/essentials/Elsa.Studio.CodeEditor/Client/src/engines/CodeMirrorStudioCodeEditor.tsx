@@ -1,4 +1,4 @@
-import { acceptCompletion, closeCompletion, completionKeymap } from "@codemirror/autocomplete";
+import { acceptCompletion, closeCompletion, completionKeymap, completionStatus, selectedCompletion } from "@codemirror/autocomplete";
 import {
   defaultKeymap,
   history,
@@ -282,7 +282,13 @@ function editorKeymap(runtime: CodeMirrorRuntime): KeyBinding[] {
     ...hoverHelp,
     {
       key: "Enter",
-      run: view => runtime.props.profile === "compact" && (acceptCompletion(view) || requestExpansion(runtime))
+      run: view => {
+        if (acceptCompletion(view)) return true;
+        // CodeMirror blocks acceptance during its interaction delay and while a query is pending.
+        // Keep the visible selection in place instead of expanding compact mode or inserting a newline.
+        if (selectedCompletion(view.state) || completionStatus(view.state) === "pending") return true;
+        return runtime.props.profile === "compact" ? requestExpansion(runtime) : false;
+      }
     },
     {
       key: "Escape",
@@ -306,7 +312,7 @@ function editorKeymap(runtime: CodeMirrorRuntime): KeyBinding[] {
       key: "Shift-Tab",
       run: indentLess
     },
-    ...standard.filter(binding => binding.key !== "Enter" && binding.key !== "Tab" && binding.key !== "Shift-Tab")
+    ...standard.filter(binding => binding.key !== "Tab" && binding.key !== "Shift-Tab")
   ];
 }
 

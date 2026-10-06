@@ -17,6 +17,7 @@ describe("JavaScript expression editor module", () => {
     expect(contribution.supports(context("Literal"))).toBe(false);
     expect(contribution.surfaces.inline).toBe(JavaScriptInlineEditor);
     expect(contribution.surfaces.expanded).toBe(JavaScriptExpandedEditor);
+    expect(contribution.metadata?.editingMode).toBe("text");
     expect(contribution.metadata?.toolingCapabilities).toMatchObject({
       highlighting: true,
       signatures: true,

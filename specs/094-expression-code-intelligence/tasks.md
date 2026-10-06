@@ -1,5 +1,11 @@
 # Tasks: Expression Code Intelligence
 
+## Current synchronized-head snapshot — 2026-10-06
+
+The existing Studio expression stack is synchronized with main `2bd5c076`. Exact-head CI/review and fresh final Studio/Foundation producer pairing remain pending; no synchronized-pair pass is claimed. Retained M1/M2 automated passes apply only to their recorded revisions. The M1 `c9479fba` / `f81be4be` pair passed normal-host4/4 and unblocked M2 at that checkpoint. The dated implementation notes and checkbox states below remain historical; they do not revise earlier blocked states or prove later integrated heads. Copilot requests do not establish a completed current-head review. All PRs remain draft/unmerged; final owner acceptance and delivery are open. Native Chrome/Safari VoiceOver is **SKIPPED BY OWNER DECISION — NEVER PASSED**.
+
+## Retained task ledger
+
 Baseline implementation tasks are complete. File names below reflect the landed design rather than provisional planning names.
 
 The baseline tasks T001-T025 are historical. Program #2310 reopens this feature for the dependency-ordered completion tasks T026-T038 below; they are not complete until current-head normal-host evidence passes.
@@ -46,9 +52,9 @@ The baseline tasks T001-T025 are historical. Program #2310 reopens this feature 
 
 ## Program #2310 continuation: User Story 5 — Trust installed text-syntax support
 
-- [ ] T026 [US5] Add the normal-host Playwright configuration, package script and persisted-workflow JavaScript/Liquid journey in `tests/browser/playwright.expression-normal-host.config.ts`, `package.json` and `tests/browser/expression-code-intelligence.normal-host.spec.ts`, including matching Studio/Foundation host startup and teardown plus every currently supported workflow and activity-definition authoring surface.
+- [ ] T026 [US5] Add the normal-host Playwright configuration, package script and persisted-workflow JavaScript/Liquid journey in `tests/browser/playwright.expression-normal-host.config.ts`, `package.json` and `tests/browser/expression-normal-host.spec.ts`, including matching Studio/Foundation host startup and teardown plus every currently supported workflow and activity-definition authoring surface.
 - [ ] T027 [P] [US5] Add installed text-syntax readiness and independent module/provider degradation handling in `src/essentials/Elsa.Studio.Workflows/Client/src/ActivityPropertiesPanel.tsx` and focused Workflows tests.
-- [ ] T028 [US5] Add a negative normal-host regression that removes one editor feature and one backend capability in turn and asserts the exact missing/degraded state in `tests/browser/expression-code-intelligence.normal-host.spec.ts`; do not modify the merged #545 discovery guard.
+- [ ] T028 [US5] Add a negative normal-host regression that removes one editor feature and one backend capability in turn and asserts the exact missing/degraded state in `tests/browser/expression-normal-host.spec.ts`; do not modify the merged #545 discovery guard.
 - [ ] T029 [US5] Record rebuilt Studio/Foundation normal-host evidence, exact revisions and `pnpm test:browser:expression-normal-host` results in `specs/094-expression-code-intelligence/verification.md`.
 - [ ] T030 [US5] Align JavaScript expression-editor grammar and local diagnostics with the runtime expression grammar in `src/essentials/Elsa.Studio.CodeEditor/Client/src/languages/javascriptCodeMirror.ts` and its tests after T029 passes. Apply this only to the explicit expression profile; preserve the shared script/TypeScript/JSX project-file grammar.
 - [ ] T031 [US5] Add installed-text-syntax conformance cases for missing adapters/providers, permissions, incompatibility, incomplete source, syntax switching and independent composition under `tests/browser/` and the expression-editor module tests after T029 passes.

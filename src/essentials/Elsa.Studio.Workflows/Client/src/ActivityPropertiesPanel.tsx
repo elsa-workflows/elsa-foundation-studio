@@ -5,6 +5,7 @@ import {
   authSessionEndedEvent,
   authSessionStartedEvent,
   expressionEditorSessionEndedEvent,
+  expressionToolingAuthorizationRevokedEvent,
   expressionToolingAuthorizationRestoredEvent
 } from "@elsa-workflows/studio-sdk";
 import type {
@@ -19,6 +20,7 @@ import type {
   StudioExpressionEditorDiagnostic,
   StudioExpressionEditorProps,
   StudioExpressionAuthoringContext,
+  StudioExpressionToolingDescriptor,
   StudioExpressionDocument,
   StudioExpressionToolingClient,
   StudioExpressionToolingResult,
@@ -141,6 +143,14 @@ export function ActivityPropertiesPanel({
   const conversionProfiles = useConversionProfiles(context);
   const [activeToolingProperty, setActiveToolingProperty] = useState<string>();
   const toolingAuthorization = useExpressionToolingAuthorization(effectiveExpressionEditorSessionScope);
+  const authoredExpressionTypes = useMemo(() => descriptor?.inputs.flatMap(input => {
+    if (input.isWrapped === false) return [];
+    const wrapped = readWrappedInput(activity, input);
+    return wrapped ? [wrapped.expression.type] : [];
+  }) ?? [], [activity, descriptor]);
+  const providerReadiness = useExpressionProviderReadiness(expressionTooling, expressionDescriptors,
+    authoredExpressionTypes, toolingAuthorization.available && !toolingAuthorization.confirmationRequired,
+    toolingAuthorization.epoch);
   const activateToolingProperty = useCallback((property: string) => setActiveToolingProperty(property), []);
 
   useEffect(() => () => clearDictionaryEditorSessionScope(effectiveDictionarySessionScope), [effectiveDictionarySessionScope]);
@@ -205,6 +215,7 @@ export function ActivityPropertiesPanel({
               editors={editors}
               expressionEditors={expressionEditors}
               expressionDescriptors={expressionDescriptors}
+              providerReadiness={providerReadiness}
               conversionProfiles={conversionProfiles}
               toolingActive={activeToolingProperty === `${activity.nodeId}\u001f${input.referenceKey?.trim() || input.name}`}
               onToolingFocus={activateToolingProperty}
@@ -215,6 +226,121 @@ export function ActivityPropertiesPanel({
       ))}
     </div>
     </WorkflowReferenceAuthoringProvider>
+  );
+}
+
+type ExpressionProviderReadiness = "checking" | "ready" | "missing" | "unavailable" | "unauthorized" | "incompatible" | "stale";
+type ExpressionProviderReadinessByType = ReadonlyMap<string, ExpressionProviderReadiness>;
+const studioExpressionToolingContractVersion = 1;
+
+function useExpressionProviderReadiness(
+  tooling: StudioExpressionToolingClient | undefined,
+  descriptors: StudioExpressionDescriptor[],
+  authoredExpressionTypes: string[],
+  authorizationAvailable: boolean,
+  authorizationEpoch: number
+): ExpressionProviderReadinessByType {
+  const typesKey = JSON.stringify([...new Set([...descriptors
+    .filter(descriptor => descriptor.editingMode === "text")
+    .map(descriptor => descriptor.type), ...authoredExpressionTypes])].sort());
+  const textTypes = useMemo<string[]>(() => JSON.parse(typesKey), [typesKey]);
+  const [snapshot, setSnapshot] = useState<{
+    tooling: StudioExpressionToolingClient | undefined;
+    types: string;
+    authorizationEpoch: number;
+    result?: StudioExpressionToolingResult<StudioExpressionToolingDescriptor[]>;
+    failed?: boolean;
+  }>();
+
+  useEffect(() => {
+    if (textTypes.length === 0 || !tooling || !authorizationAvailable) return;
+    const controller = new AbortController();
+    void Promise.resolve().then(() => tooling.describe(controller.signal)).then(result => {
+      if (!controller.signal.aborted) setSnapshot({ tooling, types: typesKey, authorizationEpoch, result });
+    }).catch(() => {
+      if (!controller.signal.aborted) setSnapshot({ tooling, types: typesKey, authorizationEpoch, failed: true });
+    });
+    return () => controller.abort();
+  }, [textTypes.length, tooling, typesKey, authorizationAvailable, authorizationEpoch]);
+
+  return useMemo(() => {
+    const readiness = new Map<string, ExpressionProviderReadiness>();
+    const currentSnapshot = snapshot && snapshot.tooling === tooling && snapshot.types === typesKey &&
+      snapshot.authorizationEpoch === authorizationEpoch ? snapshot : undefined;
+    for (const type of textTypes) {
+      if (!authorizationAvailable) {
+        readiness.set(type, "unauthorized");
+        continue;
+      }
+      if (!tooling) {
+        readiness.set(type, "unavailable");
+        continue;
+      }
+      if (!currentSnapshot) {
+        readiness.set(type, "checking");
+        continue;
+      }
+      if (currentSnapshot.failed) {
+        readiness.set(type, "unavailable");
+        continue;
+      }
+      const result = currentSnapshot.result;
+      const state = result?.state;
+      if (state === "ready" && result) {
+        const descriptor = result.data?.find(item => item.expressionType === type);
+        readiness.set(type, !descriptor
+          ? "missing"
+          : supportsExpressionToolingContractVersion(descriptor) ? "ready" : "incompatible");
+      } else if (state === "supported-empty") {
+        readiness.set(type, "missing");
+      } else if (state === "canceled") {
+        // A settled cancellation with a live request signal is terminal, not still pending.
+        readiness.set(type, "unavailable");
+      } else if (state === "unauthorized" || state === "incompatible" || state === "unavailable" || state === "stale") {
+        readiness.set(type, state);
+      } else {
+        readiness.set(type, "unavailable");
+      }
+    }
+    return readiness;
+  }, [snapshot, textTypes, tooling, typesKey, authorizationAvailable, authorizationEpoch]);
+}
+
+function supportsExpressionToolingContractVersion(descriptor: StudioExpressionToolingDescriptor) {
+  const { contractMinVersion, contractMaxVersion } = descriptor;
+  return Number.isSafeInteger(contractMinVersion) && Number.isSafeInteger(contractMaxVersion) &&
+    contractMinVersion <= studioExpressionToolingContractVersion &&
+    studioExpressionToolingContractVersion <= contractMaxVersion;
+}
+
+function ExpressionReadinessStatus({
+  editorAvailable,
+  providerReadiness,
+  syntax
+}: {
+  editorAvailable: boolean;
+  providerReadiness: ExpressionProviderReadiness;
+  syntax: string;
+}) {
+  const editorState = editorAvailable ? "ready" : "missing";
+  const providerCopy: Record<ExpressionProviderReadiness, string> = {
+    checking: "checking",
+    ready: "available",
+    missing: "not installed",
+    unavailable: "unavailable",
+    unauthorized: "not authorized",
+    incompatible: "incompatible",
+    stale: "needs refresh"
+  };
+  return (
+    <p className="wf-expression-readiness" role="status" aria-label={`${syntax} editor and runtime readiness`}>
+      <span data-editor-readiness={editorState}>
+        Editor: {editorAvailable ? "rich editor available" : "rich editor unavailable; generic text editing remains available"}.
+      </span>{" "}
+      <span data-provider-readiness={providerReadiness}>
+        Runtime assistance: {providerCopy[providerReadiness]} for {syntax}.
+      </span>
+    </p>
   );
 }
 
@@ -344,13 +470,21 @@ function useExpressionToolingAuthorization(scope: string) {
       confirmationRequired: true,
       epoch: current.epoch + 1
     }));
+    const revokeScope = (event: Event) => {
+      const revokedScope = (event as CustomEvent<{ scope?: string }>).detail?.scope;
+      if (revokedScope && revokedScope !== scope) return;
+      // Keep fresh-context confirmation available, but discard cached readiness.
+      setState(current => ({ ...current, confirmationRequired: true, epoch: current.epoch + 1 }));
+    };
     window.addEventListener(authSessionEndedEvent, revoke);
     window.addEventListener(authSessionStartedEvent, restore);
+    window.addEventListener(expressionToolingAuthorizationRevokedEvent, revokeScope);
     return () => {
       window.removeEventListener(authSessionEndedEvent, revoke);
       window.removeEventListener(authSessionStartedEvent, restore);
+      window.removeEventListener(expressionToolingAuthorizationRevokedEvent, revokeScope);
     };
-  }, []);
+  }, [scope]);
   const confirm = useCallback(() => {
     setState(current => ({ ...current, confirmationRequired: false }));
     window.dispatchEvent(new CustomEvent(expressionToolingAuthorizationRestoredEvent, {
@@ -377,6 +511,7 @@ type PropertyRowProps = {
   editors: StudioActivityPropertyEditorContribution[];
   expressionEditors: StudioExpressionEditorContribution[];
   expressionDescriptors: StudioExpressionDescriptor[];
+  providerReadiness: ExpressionProviderReadinessByType;
   conversionProfiles: ConversionProfileReference[];
   toolingActive: boolean;
   onToolingFocus(property: string): void;
@@ -400,6 +535,7 @@ function PropertyRow({
   editors,
   expressionEditors,
   expressionDescriptors,
+  providerReadiness,
   conversionProfiles,
   toolingActive,
   onToolingFocus,
@@ -426,7 +562,10 @@ function PropertyRow({
   const wrapped = input.isWrapped !== false ? readWrappedInput(activity, input) : null;
   const syntax = wrapped?.expression.type ?? (secretOnly ? secretSyntax : "Literal");
   const expressionDescriptor = expressionDescriptors.find(descriptor => descriptor.type === syntax);
-  const editingMode = expressionDescriptor?.editingMode;
+  const installedTextEditor = expressionEditors.find(editor => editor.metadata?.editingMode === "text" &&
+    (["inline", "expanded"] as const).some(surface => !!editor.surfaces[surface] &&
+      editor.supports({ activity, descriptor: effectiveInput, expressionDescriptors, readOnly, surface, syntax })));
+  const editingMode = expressionDescriptor?.editingMode ?? (installedTextEditor ? "text" : undefined);
   // A masked input shows what it stores only under author code or a reference (showsMaskedValue); under any other
   // syntax, Literal and Object included, its value is masked. This flag is read, from the row's current state, by
   // the value editor, canExpandEditor (and through it the expanded editor) and the inline expression context, and
@@ -508,6 +647,7 @@ function PropertyRow({
     ? currentRequiresAdmission ? admittedExpressionEditor : resolveExpressionEditor(expressionEditors, inlineExpressionContext)
     : null;
   const InlineExpressionEditorComponent = inlineExpressionEditor?.surfaces.inline;
+  const currentProviderReadiness = providerReadiness.get(syntax) ?? "missing";
   const inlineDiagnosticProvider = inlineExpressionContext
     ? resolveExpressionDiagnosticProvider(expressionEditors, inlineExpressionContext)
     : null;
@@ -757,7 +897,7 @@ function PropertyRow({
   const renderedValueEditor = expanded && editingMode === "text" ? null : valueEditor;
 
   return (
-    <div ref={rowRef} className="wf-property-row">
+    <div ref={rowRef} className="wf-property-row" data-property-name={input.name}>
       <div className="wf-property-row-header">
         <label>{input.displayName || input.name}</label>
         <div className="wf-property-row-header-meta">
@@ -838,6 +978,13 @@ function PropertyRow({
           {renderExpressionDiagnostics(inlineDiagnostics)}
         </>
       )}
+      {wrapped && editingMode === "text" && !expanded ? (
+        <ExpressionReadinessStatus
+          editorAvailable={!!InlineExpressionEditorComponent}
+          providerReadiness={currentProviderReadiness}
+          syntax={syntax}
+        />
+      ) : null}
       {wrapped && !secretOnly && (conversionOpen || conversionAuthored) ? (
         <div id={conversionRegionId} className="wf-conversion-region">
           {conversionOpen ? (
@@ -939,6 +1086,7 @@ function PropertyRow({
           propertyEditors={editors}
           expressionEditors={expressionEditors}
           expressionContext={makeExpressionContext(syntax, "expanded")}
+          providerReadiness={currentProviderReadiness}
           disabled={readOnly}
           wrapped={wrapped}
           conversionProfiles={conversionProfiles}
@@ -975,6 +1123,7 @@ function arePropertyRowPropsEqual(previous: PropertyRowProps, next: PropertyRowP
     previous.editors !== next.editors ||
     previous.expressionEditors !== next.expressionEditors ||
     previous.expressionDescriptors !== next.expressionDescriptors ||
+    previous.providerReadiness !== next.providerReadiness ||
     previous.conversionProfiles !== next.conversionProfiles ||
     previous.toolingActive !== next.toolingActive ||
     previous.onToolingFocus !== next.onToolingFocus ||
@@ -1019,6 +1168,7 @@ function ExpandedPropertyEditor({
   propertyEditors,
   expressionEditors,
   expressionContext,
+  providerReadiness,
   disabled,
   wrapped,
   conversionProfiles,
@@ -1038,6 +1188,7 @@ function ExpandedPropertyEditor({
   propertyEditors: StudioActivityPropertyEditorContribution[];
   expressionEditors: StudioExpressionEditorContribution[];
   expressionContext: StudioExpressionEditorContext;
+  providerReadiness: ExpressionProviderReadiness;
   disabled: boolean;
   wrapped: WrappedActivityInputValue | null;
   conversionProfiles: ConversionProfileReference[];
@@ -1101,6 +1252,13 @@ function ExpandedPropertyEditor({
             <span>{formatTypeName(input.typeName)}</span>
           </div>
           {input.description ? <p>{input.description}</p> : null}
+          {useTextFallback ? (
+            <ExpressionReadinessStatus
+              editorAvailable={!!ExpressionEditorComponent}
+              providerReadiness={providerReadiness}
+              syntax={syntax}
+            />
+          ) : null}
           {dictionaryType ? (
             <DictionaryValueEditor
               input={input}

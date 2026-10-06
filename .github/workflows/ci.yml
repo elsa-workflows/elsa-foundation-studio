@@ -94,3 +94,65 @@ jobs:
 
       - name: Run browser tests
         run: pnpm test:browser
+
+  expression-normal-host:
+    name: Expression normal hosts (Chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    env:
+      ELSA_FOUNDATION_WORKTREE: ${{ github.workspace }}/.normal-host-foundation
+    steps:
+      - name: Checkout Studio at the tested head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Checkout the paired Foundation checkpoint
+        uses: actions/checkout@v4
+        with:
+          repository: elsa-workflows/elsa-foundation
+          # Program #2310 M1 is stacked across repositories. Keep the paired, reviewed source
+          # immutable until Foundation #2373 ships; main does not yet compose Liquid.
+          ref: f81be4beed6973378eb678b2327d789c19d8095e
+          path: .normal-host-foundation
+          persist-credentials: false
+
+      - name: Record exact source revisions
+        run: |
+          git rev-parse HEAD
+          git -C "$ELSA_FOUNDATION_WORKTREE" rev-parse HEAD
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.x
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Prove Foundation persisted-host request envelopes
+        working-directory: .normal-host-foundation
+        run: >-
+          dotnet test tests/essentials/Workbench/Tests/Elsa.Workbench.Tests.csproj -c Release
+          -p:RestoreLockedMode=true --filter FullyQualifiedName~ExpressionToolingHostEvidenceTests
+          --logger "console;verbosity=normal"
+
+      - name: Run real persisted-host expression gate
+        # The dedicated setup builds both actual applications from these checkouts. Each variant
+        # owns fresh SQLite/configuration and only its own child processes; traces remain off.
+        run: pnpm test:browser:expression-normal-host

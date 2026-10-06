@@ -4,15 +4,21 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   StudioActivityDescriptor,
+  StudioExpressionCompletionResult,
   StudioExpressionEditorContribution,
   StudioExpressionAuthoringContext,
   StudioExpressionDocument,
+  StudioExpressionHoverResult,
+  StudioExpressionSymbolCatalogPage,
+  StudioExpressionToolingDescriptor,
   StudioExpressionToolingClient,
   StudioExpressionToolingResult,
-  StudioExpressionValidationResult
+  StudioExpressionValidationResult,
+  StudioExpressionValueShape
 } from "@elsa-workflows/studio-sdk";
 import { ActivityPropertiesPanel } from "../ActivityPropertiesPanel";
 import type { ActivityNode, WorkflowDefinitionState } from "../workflowTypes";
+import { expressionAuthoringContextResult, expressionToolingDescriptorResult } from "./expressionToolingTestFixtures";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -36,6 +42,45 @@ const descriptor: StudioActivityDescriptor = {
   outputs: [],
   ports: []
 };
+
+const toolingDescriptor: StudioExpressionToolingDescriptor = {
+  expressionType: "JavaScript",
+  moduleId: "test.javascript",
+  moduleVersion: "1.0.0",
+  contractMinVersion: 1,
+  contractMaxVersion: 1,
+  capabilities: {
+    highlighting: true,
+    completion: true,
+    hover: true,
+    signatures: true,
+    formatting: false,
+    localDiagnostics: true,
+    semanticValidation: true
+  }
+};
+
+function createInjectedToolingClient(
+  overrides: Pick<StudioExpressionToolingClient, "getAuthoringContext" | "validate">
+): StudioExpressionToolingClient {
+  const unavailable = <T,>(): StudioExpressionToolingResult<T> => ({
+    state: "unavailable",
+    contractVersion: 1,
+    expressionType: "JavaScript"
+  });
+
+  return {
+    describe: vi.fn(async (_signal?: AbortSignal) => expressionToolingDescriptorResult("JavaScript", toolingDescriptor)),
+    getCatalog: vi.fn(async () => unavailable<StudioExpressionSymbolCatalogPage>()),
+    getValueShape: vi.fn(async () => unavailable<StudioExpressionValueShape>()),
+    getAuthoringContext: overrides.getAuthoringContext,
+    getCompletions: vi.fn(async () => unavailable<StudioExpressionCompletionResult>()),
+    getHover: vi.fn(async () => unavailable<StudioExpressionHoverResult>()),
+    validate: overrides.validate,
+    invalidateAuthorization: vi.fn(),
+    dispose: vi.fn()
+  };
+}
 
 const expressionEditor: StudioExpressionEditorContribution = {
   id: "test.javascript-validation",
@@ -92,22 +137,13 @@ function validation(sourceVersion: number, message: string): StudioExpressionToo
 describe("expression tooling validation presentation", () => {
   it("validates a supported-empty context immediately when the editor loses focus", async () => {
     const validate = vi.fn(async () => validation(0, "empty-context diagnostic"));
-    const tooling = {
-      getAuthoringContext: vi.fn(async () => ({
+    const tooling = createInjectedToolingClient({
+      getAuthoringContext: vi.fn(async () => expressionAuthoringContextResult({
         state: "supported-empty",
-        contractVersion: 1,
-        expressionType: "JavaScript",
-        contextVersion: "context-1",
-        data: {
-          version: "context-1",
-          capabilities: { semanticValidation: true },
-          workflowInputs: [],
-          visibleVariables: [],
-          visibleActivityOutputs: []
-        }
+        semanticValidation: true
       })),
       validate
-    } as unknown as StudioExpressionToolingClient;
+    });
     const node = activity("invalid");
 
     flushSync(() => root.render(<ActivityPropertiesPanel
@@ -128,8 +164,9 @@ describe("expression tooling validation presentation", () => {
     />));
 
     const input = container.querySelector<HTMLInputElement>("[aria-label='Expression source']")!;
-    input.focus();
-    input.blur();
+    // Commit activation before testing blur's immediate validation of the active editor.
+    flushSync(() => input.focus());
+    flushSync(() => input.blur());
 
     expect(input.dataset.sessionScope).toBe("workflow-editor-1");
     await vi.waitFor(() => expect(validate).toHaveBeenCalledOnce());
@@ -144,16 +181,10 @@ describe("expression tooling validation presentation", () => {
       _authoringContext: StudioExpressionAuthoringContext,
       _signal?: AbortSignal
     ) => new Promise<StudioExpressionToolingResult<StudioExpressionValidationResult>>(resolve => pendingValidations.push({ resolve })));
-    const tooling = {
-      getAuthoringContext: vi.fn(async () => ({
-        state: "ready",
-        contractVersion: 1,
-        expressionType: "JavaScript",
-        contextVersion: "context-1",
-        data: { version: "context-1", workflowInputs: [], visibleVariables: [], visibleActivityOutputs: [] }
-      })),
+    const tooling = createInjectedToolingClient({
+      getAuthoringContext: vi.fn(async () => expressionAuthoringContextResult()),
       validate
-    } as unknown as StudioExpressionToolingClient;
+    });
 
     function render(node: ActivityNode) {
       const workflowState: WorkflowDefinitionState = { inputs: [], variables: [], rootActivity: node };
@@ -199,16 +230,10 @@ describe("expression tooling validation presentation", () => {
   it("confirms a restored editor scope only after an injected client returns a fresh authorized context", async () => {
     const restored = vi.fn();
     window.addEventListener("elsa:expression-tooling-authorization-restored", restored);
-    const tooling = {
-      getAuthoringContext: vi.fn(async () => ({
-        state: "ready",
-        contractVersion: 1,
-        expressionType: "JavaScript",
-        contextVersion: "context-1",
-        data: { version: "context-1", workflowInputs: [], visibleVariables: [], visibleActivityOutputs: [] }
-      })),
+    const tooling = createInjectedToolingClient({
+      getAuthoringContext: vi.fn(async () => expressionAuthoringContextResult()),
       validate: vi.fn(async () => validation(0, "authorized"))
-    } as unknown as StudioExpressionToolingClient;
+    });
     const node = activity("return secret;");
 
     flushSync(() => root.render(<ActivityPropertiesPanel

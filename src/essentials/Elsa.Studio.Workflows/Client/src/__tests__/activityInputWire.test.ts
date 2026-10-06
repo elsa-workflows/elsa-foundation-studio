@@ -184,6 +184,35 @@ describe("activity input wire adapter", () => {
     expect(restored.inputs).toEqual([]);
     expect(restored.text).toEqual({ typeName: "", expression: { type: "Literal", value: "Hello World!" } });
   });
+
+  it.each([
+    { label: "null", wireValue: null, expandedValue: null, serializedValue: null },
+    { label: "undefined", wireValue: undefined, expandedValue: "", serializedValue: "" },
+    { label: "false", wireValue: false, expandedValue: false, serializedValue: "false" },
+    { label: "zero", wireValue: 0, expandedValue: 0, serializedValue: "0" },
+    { label: "empty string", wireValue: "", expandedValue: "", serializedValue: "" }
+  ])("preserves $label literal values while expanding and canonicalizing", ({ wireValue, expandedValue, serializedValue }) => {
+    const loaded: WorkflowDefinitionState = {
+      rootActivity: {
+        nodeId: "root",
+        activityVersionId: "write-line-version",
+        inputs: [{ referenceKey: "text", value: { value: wireValue, expressionType: "Literal" } }],
+        outputs: [],
+        structure: null
+      }
+    };
+
+    const expanded = expandStateFromWire(loaded).rootActivity as ActivityNode & {
+      text: { expression: { value: unknown } };
+    };
+    expect(expanded.text.expression.value).toBe(expandedValue);
+
+    const saved = canonicalizeStateForWire(expandStateFromWire(loaded)).rootActivity!;
+    expect(saved.inputs).toContainEqual({
+      referenceKey: "text",
+      value: { value: serializedValue, expressionType: "Literal" }
+    });
+  });
 });
 
 describe("authored conversion request round-trip", () => {
