@@ -4,6 +4,8 @@ This walkthrough pairs a source-built Elsa Foundation Studio with a source-built
 
 The commands below describe the tested macOS/Bash setup; other operating systems have not been verified here.
 
+The clone commands follow each repository's current default branch. The test and browser evidence below applies only to the exact Studio and Foundation revisions recorded in the evidence section; verify later source pairs separately.
+
 ## Prerequisites and setup
 
 Use Git, Node.js 22, the pnpm version pinned by Studio (`pnpm@11.9.0`), and a .NET 10 SDK. Start with a disposable Studio checkout, or use an existing disposable checkout/worktree:
