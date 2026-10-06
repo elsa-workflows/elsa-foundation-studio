@@ -102,22 +102,23 @@ prepare_contributor_backend() {
     printf 'Data volume creation failed; setup stopped.\n' >&2
     return 1
   fi
+  data_volume_created=1
   if ! owns_contributor_volume "$data_volume"; then
-    printf 'Data volume is not owned by this run; setup stopped without removing it.\n' >&2
+    printf 'Data volume ownership could not be verified; attempting guarded cleanup.\n' >&2
+    cleanup_contributor_backend
     return 1
   fi
-  data_volume_created=1
   if ! docker volume create --label "elsa.contributor.run=$run_id" "$packages_volume"; then
     printf 'Packages volume creation failed; cleaning up the data volume.\n' >&2
     cleanup_contributor_backend
     return 1
   fi
+  packages_volume_created=1
   if ! owns_contributor_volume "$packages_volume"; then
-    printf 'Packages volume is not owned by this run; preserving it.\n' >&2
+    printf 'Packages volume ownership could not be verified; attempting guarded cleanup.\n' >&2
     cleanup_contributor_backend
     return 1
   fi
-  packages_volume_created=1
   if ! docker volume inspect "$data_volume" "$packages_volume" --format '{{.Name}} {{.Mountpoint}}'; then
     printf 'Volume inspection failed; setup stopped.\n' >&2
     cleanup_contributor_backend
