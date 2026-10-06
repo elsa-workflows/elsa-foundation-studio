@@ -98,11 +98,21 @@ export interface StudioCodeSignatureParameter {
   optional?: boolean;
 }
 
-export interface StudioCodeSignature {
+export interface StudioCodeSignatureInfo {
   label: string;
   parameters?: readonly StudioCodeSignatureParameter[];
   returnShapeId?: string;
   documentation?: StudioCodeDocumentation;
+  /** Parser-proven argument ordinal within this signature's actual parameters; absent means unknown. */
+  activeParameter?: number;
+}
+
+export interface StudioCodeSignature extends StudioCodeSignatureInfo {
+  /** Absent preserves the legacy signature; an explicit empty list hides help. */
+  signatures?: readonly StudioCodeSignatureInfo[];
+  /** Zero-based selected actual signature, not inferred overload resolution. */
+  activeSignature?: number;
+  callableId?: string;
 }
 
 export type StudioCodeSignatureProvider = (
@@ -123,6 +133,30 @@ export interface StudioCodeLanguageSupport {
   readonly language: string;
 }
 
+export interface StudioCodeSelectionSet {
+  readonly ranges: readonly { readonly anchor: number; readonly head: number }[];
+  readonly mainIndex: number;
+}
+
+export interface StudioCodeFormatRequest {
+  readonly document: StudioCodeDocument;
+  readonly grammarProfile: StudioCodeGrammarProfile;
+  readonly selection: StudioCodeSelectionSet;
+  readonly signal: AbortSignal;
+}
+
+export interface StudioCodeFormatEdit {
+  readonly from: number;
+  readonly to: number;
+  readonly insert: string;
+}
+
+export type StudioCodeFormatResult =
+  | { readonly state: "ready"; readonly edits: readonly StudioCodeFormatEdit[]; readonly selection?: StudioCodeSelectionSet }
+  | { readonly state: "unsupported" };
+
+export type StudioCodeFormatter = (request: StudioCodeFormatRequest) => StudioCodeFormatResult | Promise<StudioCodeFormatResult>;
+
 export interface StudioCodeEditorEngineProps {
   document: StudioCodeDocument;
   profile: StudioCodeEditorProfile;
@@ -138,6 +172,7 @@ export interface StudioCodeEditorEngineProps {
   completionProvider?: StudioCodeCompletionProvider;
   hoverProvider?: StudioCodeHoverProvider;
   signatureProvider?: StudioCodeSignatureProvider;
+  loadFormatter?: StudioCodeLanguageAdapter["loadFormatter"];
   onChange(document: StudioCodeDocument): void;
   onFocus?(): void;
   onBlur?(): void;
@@ -154,6 +189,8 @@ export interface StudioCodeLanguageAdapter {
   loadSupport?(): Promise<StudioCodeLanguageSupport>;
   /** Loads parser-only support for an unfocused preview without creating an editor state or view. */
   loadPreviewHighlighter?(grammarProfile?: StudioCodeGrammarProfile): Promise<StudioCodePreviewHighlighter>;
+  /** Loads conservative explicit formatting without evaluating authored source. */
+  loadFormatter?(grammarProfile?: StudioCodeGrammarProfile): Promise<StudioCodeFormatter>;
   loadEditor?: StudioCodeEditorLoader;
 }
 

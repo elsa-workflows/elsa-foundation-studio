@@ -4,9 +4,32 @@ Last reconciled: 2026-10-06 for Program #2310 final automated M3 proof and M4 Ta
 
 ## Program #2310 status
 
-T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head automated M2 gate under the documented unavailable-external-review fallback. Studio spike #553 / T035 settles the technical decision: reject the current deeper-service candidate and retain the baseline path. No deeper-service dependency is adopted. T032-T034 pass their final exact-head automated M3 gate below, permitting assigned M4 Task#568 / T036. Three-theme presentation, active parameters/overloads, formatting and current-head manual accessibility/continuity acceptance (T036-T038) remain open. The 2026-07-28 evidence remains historical. All program PRs remain draft and unmerged; final human acceptance is outstanding.
+T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head automated M2 gate under the documented unavailable-external-review fallback. Studio spike #553 / T035 settles the technical decision: reject the current deeper-service candidate and retain the baseline path. No deeper-service dependency is adopted. T032-T034 pass their final exact-head automated M3 gate below. T036 passes its immutable bc305150/5cd44d63 automated gate; Task#572 / Decision20 now owns T037 signature/formatting implementation. T037-T038 and current-head manual accessibility/human acceptance/delivery remain open. The 2026-07-28 evidence remains historical. All program PRs remain draft and unmerged.
 
 ## Verification evidence
+
+### Final T036 automated technical gate, 2026-10-06
+
+Immutable Studio `bc3051501a4ec8bf391e8bb80727339409b77f98` / Foundation
+`5cd44d6312d9de85b13f4619fc7aa972a557d033` pass root coherent rebuilt normal hosts **5/5 (6.1m)**
+and exact-head [CI37407169529](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37407169529)
+**all jobs**, including full units/three Workflows shuffle seeds/lint/typecheck/bundles,
+generic Chromium, Foundation persisted-host envelopes and paired normal hosts **5/5 (6.3m)**.
+The CI log records both exact revisions. Final CodeEditor119/119, owning tsc, scoped ESLint,
+diff and frozen/offline install pass. Original-dependency anchor RED2failed/12passed becomes
+patched GREEN14/14, with final geometry controls and all retained predecessor failures below.
+Root integrated-delta review and independent current patch/harness review find no blocker.
+Copilot is explicitly re-requested but actual requests/reviews remain empty; the documented
+unavailable-external-review fallback is used, not actual external approval.
+
+Unchanged exact rebuilt budgets: primary127.44/127.50kB, stylesheet145.19/185kB,
+definitions379.97/384.50kB, upgrades369.97/375.50kB, largest263.18/500kB, eight heavy surfaces deferred.
+Logs: `/private/tmp/elsa-568-root-all-five-bc305150.log` and
+`/private/tmp/elsa-568-root-ci-bc305150-pass.log`. DraftPR#569 stays draft/open/unmerged;
+Task#568 implementation claim is released and automated verification is Passed.
+This clears T037's dependency, assigned Task#572 / Decision20. Manual AT, human acceptance,
+T038 and delivery stay OPEN. This reconciliation is recorded on the child without moving
+the immutable tested T036 head; candidate evidence below retains its historical boundaries.
 
 ### M4 T036 guarded completion-anchor candidate (not accepted)
 

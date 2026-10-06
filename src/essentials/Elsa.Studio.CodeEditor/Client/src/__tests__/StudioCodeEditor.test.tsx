@@ -24,6 +24,34 @@ import type { StudioCodeCompletion } from "../types";
 setupStudioCodeEditorTestLifecycle();
 
 describe("StudioCodeEditor", () => {
+  it("retains compact ownership on an internal control and blurs once on external exit", async () => {
+    const onBlur = vi.fn();
+    const { container } = renderEditor({
+      profile: "compact", languageAdapter: javaScriptLanguageAdapter, onBlur
+    });
+    await activateRichEditor(container, "compact");
+    const content = container.querySelector<HTMLElement>(".cm-content")!;
+    content.focus();
+    const control = globalThis.document.createElement("button");
+    control.textContent = "Internal editor action";
+    container.querySelector(".studio-code-editor")!.append(control);
+    control.focus();
+    await new Promise(resolve => queueMicrotask(() => resolve(undefined)));
+    expect(onBlur).not.toHaveBeenCalled();
+    expect(container.querySelector(".cm-content")).toBe(content);
+    expect(globalThis.document.activeElement).toBe(control);
+
+    const external = globalThis.document.createElement("button");
+    globalThis.document.body.append(external);
+    try {
+      external.focus();
+      await waitFor(() => !!container.querySelector(".studio-code-editor-preview"));
+      expect(onBlur).toHaveBeenCalledTimes(1);
+    } finally {
+      external.remove();
+    }
+  });
+
   it("renders the fallback editor for unsupported languages and emits document changes", () => {
     const document = codeDocument({ language: "liquid", value: "{{ total }}" });
     const onChange = vi.fn();
