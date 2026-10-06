@@ -1177,7 +1177,7 @@ At 12:29 UTC the canonical rebuilt normal-host browser passes 4/4 again in 2.4 m
 | Language contributions | JavaScript: 4 passing tests; Liquid: 4 passing tests |
 | Workflow integration | All feature-focused tests pass across tooling transport, activity orchestration, Object-editor regression, dynamic input options, property grouping, Test Run acknowledgement, and structured publication diagnostics |
 | Real inspector | 16 production-build Playwright cases pass across desktop Chromium, Firefox, and WebKit plus a Chromium touch profile: accessibility, completion/keyboard/expanded/type-switch continuity, unavailable-tooling degradation, 50-field lazy activation under the 1.5 s bound, and narrow touch interaction |
-| Manual assistive technology | Google Chrome and Safari pass with macOS VoiceOver enabled for focus, completion, signature/hover help, diagnostics, compact-to-expanded transition, Tab capture/escape, and unavailable-tooling editing |
+| Manual assistive technology | Historical 2026-07-28 Google Chrome/Safari VoiceOver evidence covers focus, completion, signature/hover help, diagnostics, compact-to-expanded transition, Tab capture/escape, and unavailable-tooling editing; current-head acceptance remains unverified |
 | Static gates | `pnpm lint` passes with existing warnings; `pnpm typecheck` passes; CSS token lint passes |
 | Build/bundles | `pnpm build` passes; Workflows entry 122.01 kB/122.50 kB, Definitions 376.93 kB/379 kB, upgrades 365.34 kB/367.50 kB, and largest JavaScript chunk 259.74 kB/500 kB |
 | .NET Studio | `dotnet test Elsa.Studio.slnx --no-build --no-restore` passes |
@@ -1196,7 +1196,10 @@ The historical baseline complete Workflows Vitest suite reported 1,059 passing a
 
 The current complete Workflows suite passes 1,470 tests and none of these failures reproduced. The historical complete Foundation architecture suite passed all 320 tests; current-head architecture proof is tracked separately above.
 
-## Requirement audit
+## Historical requirement audit — 2026-07-28 baseline
+
+This audit records the historical baseline, not current-head T038 acceptance. The exact
+automated checkpoints and open native AT/human acceptance gates are recorded above.
 
 | Requirement group | Evidence |
 |---|---|
@@ -1206,7 +1209,7 @@ The current complete Workflows suite passes 1,470 tests and none of these failur
 | FR-038–FR-047 | Editing remains available; full-draft Test Run/publication gates are authoritative; unavailable/unauthorized/incompatible states degrade safely; caches are memory-only and authorization-purged; no sensitive telemetry is emitted |
 | FR-048–FR-058 | Keyboard instructions/status semantics, pointer/touch viewport coverage, generic fallback, only JavaScript/Liquid advertised, stable module contract, design tokens, 50-field performance proof, unit degradation states, and real-inspector browser coverage |
 | SC-001–SC-011 | Focused/editor/browser tests, bundle budgets, version/cache tests, exact-source tests, Foundation gates, and cross-repository review provide the measurable automated acceptance evidence |
-| SC-012 | Automated browser accessibility checks and manual Google Chrome/Safari VoiceOver acceptance pass with no remaining release blocker |
+| SC-012 | Automated browser accessibility checks pass at the recorded checkpoint; manual Google Chrome/Safari VoiceOver evidence is historical (2026-07-28), and current-head acceptance remains unverified |
 
 No CodeMirror type crosses the Studio SDK boundary, no expression source enters metadata caches, and no generic “Elsa globals” are synthesized. Each expression provider owns its globals/functions/variables.
 
