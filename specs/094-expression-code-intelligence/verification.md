@@ -8,6 +8,30 @@ T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head autom
 
 ## Passing evidence
 
+### M4 T036 normal-host harness correction — packaging head `aa29c973` (not accepted)
+
+The second canonical command rebuilds both applications successfully against the corrected tree,
+then passes all four original cases. The new theme case fails before contrast measurement: the
+existing bottom panel intercepts the shell's Colour mode control at390px. It is not a syntax-color
+failure or a passing theme gate. The command begins before the source-equivalent `aa29c973` commit
+is created; it does not substitute for committed-head CI. Owned hosts stop through fixture teardown.
+Log: `/private/tmp/elsa-568-root-normal-host-second.log`.
+
+Root corrects only the new harness: choose each mode through its actual desktop UI, then shrink to
+390px before every preview/editor/help/diagnostic/selection and narrow expanded measurement.
+No forced click, shell change, assertion removal or timing/budget/retention relaxation. The shell's
+phone-width colour-control overlap remains outside this task and is not claimed fixed. Independent
+browser review also adds a real keyboard-focused multiline preview control: exact persisted source,
+no editor mount, actual `:focus-visible` outline/contrast, Enter expansion and source restoration.
+Scoped browser ESLint, five-case discovery and diff check pass. Corrected real-host/CI proof remains
+pending; T036 is unchecked and T037 unassigned. Manual AT and human acceptance remain open.
+Independent final harness-delta review finds no remaining material defect; it is source review only.
+Root restored full CodeEditor112/112 and package build/typecheck pass at committed `aa29c973`.
+Logs: `/private/tmp/elsa-568-root-editor-deferred-restored-final.log`,
+`/private/tmp/elsa-568-root-deferred-restored-typecheck.log`,
+`/private/tmp/elsa-568-root-theme-harness-correction-lint.log`,
+`/private/tmp/elsa-568-root-theme-harness-correction-list.log`.
+
 ### M4 T036 packaging correction checkpoint — Studio #568 / draft #569 (not accepted)
 
 The initial integrated head `08d1b31c1fe5e6152c26252eb1dab1bb502fa69e` passes root

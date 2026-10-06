@@ -98,11 +98,13 @@ completeTest("normal-host expression previews and help remain readable in Light,
     // Leaving the compact editor returns to the same lazy preview without editing the value.
     await syntax.focus();
     await expect(preview).toBeVisible();
-    await page.setViewportSize({ width: 390, height: 844 });
-
     for (const mode of ["Light", "Dark", "Dim"] as const) {
+      // The existing bottom panel overlaps the shell's colour control at narrow width.
+      // Use its real desktop control, then measure every authoring surface at narrow width.
+      await page.setViewportSize({ width: 1280, height: 720 });
       await page.getByRole("radiogroup", { name: "Colour mode" }).getByRole("radio", { name: mode, exact: true }).click();
       await expect(page.locator("html")).toHaveAttribute("data-theme-appearance", mode.toLowerCase());
+      await page.setViewportSize({ width: 390, height: 844 });
       await expect(preview.locator("[class*='studio-code-token-']").first()).toBeVisible();
       await expectReadableCodeSurface(preview);
       await expect.poll(() => readPersistedSource(page, hostPair, draft)).toBe(source);
@@ -166,6 +168,27 @@ completeTest("normal-host expression previews and help remain readable in Light,
       await expectReadableCodeSurface(preview);
       // Expanded rendering uses the same theme roles and exact source, not a separate engine.
       await expectExpandedSourceContinuity(page, hostPair, draft, source);
+      await expect(preview).toBeVisible();
+      // A multiline preview stays a real button on keyboard focus rather than activating.
+      await preview.click();
+      await expect(editor).toBeVisible();
+      const multilineSource = `${source}\n`;
+      await replacePersistedWorkflowSource(page, hostPair, editor, draft, traffic, language, multilineSource);
+      await editor.press("Escape");
+      await editor.press("Tab");
+      await expect(syntax).toBeFocused();
+      await syntax.press("Shift+Tab");
+      await expect(preview).toBeFocused();
+      await expect.poll(() => preview.evaluate(element => element.matches(":focus-visible"))).toBe(true);
+      await expect(page.locator(".studio-code-editor-rich .cm-editor")).toHaveCount(0);
+      await expectReadableCodeSurface(preview, { focused: true });
+      await expect.poll(() => readPersistedSource(page, hostPair, draft)).toBe(multilineSource);
+      await preview.press("Enter");
+      const expanded = page.getByRole("dialog").locator(".studio-code-editor-rich-expanded .cm-content");
+      await expect(expanded).toBeFocused();
+      await expect.poll(() => readEditorSource(expanded)).toBe(multilineSource);
+      await replacePersistedWorkflowSource(page, hostPair, expanded, draft, traffic, language, source);
+      await page.getByRole("dialog").getByRole("button", { name: `Close ${draft.inputName} editor` }).click();
       await expect(preview).toBeVisible();
     }
 
@@ -404,13 +427,14 @@ async function expectReadableCodeSurface(surface: Locator, options: { focused?: 
     const pane = element.closest(".wf-properties");
     const paneBounds = pane?.getBoundingClientRect();
     const editor = element.closest(".cm-editor");
-    const focusStyle = editor && getComputedStyle(editor);
+    const focusSurface = editor ?? element.closest(".studio-code-editor-preview");
+    const focusStyle = focusSurface && getComputedStyle(focusSurface);
     return {
       ratios, left: bounds.left, right: bounds.right, viewportWidth: window.innerWidth,
       pane: pane && paneBounds ? { left: paneBounds.left, right: paneBounds.right,
         scrollWidth: pane.scrollWidth, clientWidth: pane.clientWidth } : null,
-      focus: editor && focusStyle ? { width: parseFloat(focusStyle.outlineWidth), style: focusStyle.outlineStyle,
-        contrast: contrast(rgba(focusStyle.outlineColor), backgroundOf(editor.parentElement ?? editor)) } : null
+      focus: focusSurface && focusStyle ? { width: parseFloat(focusStyle.outlineWidth), style: focusStyle.outlineStyle,
+        contrast: contrast(rgba(focusStyle.outlineColor), backgroundOf(focusSurface.parentElement ?? focusSurface)) } : null
     };
   }, options.selected === true);
   expect(measurements.ratios.length).toBeGreaterThan(0);
