@@ -115,10 +115,14 @@ function createContext(postJson?: ReturnType<typeof vi.fn>) {
     }
     throw new Error(`Unexpected GET ${url}`);
   });
-  const post = postJson ?? vi.fn(async (url: string, body?: { documentRevision?: string; contextRevision?: string }) => {
+  const post = postJson ?? vi.fn(async (url: string, body?: { documentRevision?: string; contextRevision?: string; search?: string; skip?: number; take?: number }) => {
     const documentRevision = body?.documentRevision ?? "3";
     const contextRevision = body?.contextRevision ?? "context-1";
-    if (url.endsWith("/context")) return outcome(contextPayload, "Success", documentRevision);
+    if (url.endsWith("/context")) return outcome({
+      ...contextPayload, contextRevision,
+      rootSymbols: contextPayload.rootSymbols.filter(symbol => !body?.search || symbol.name.includes(body.search))
+        .slice(body?.skip ?? 0, (body?.skip ?? 0) + (body?.take ?? contextPayload.rootSymbols.length))
+    }, "Success", documentRevision, contextRevision);
     if (url.endsWith("/symbols")) {
       return outcome({ items: [{ label: "customer", documentation: "Current customer.", kind: "WorkflowInput" }] }, "Success", documentRevision, contextRevision);
     }
@@ -148,6 +152,176 @@ function client(context: StudioEndpointContext, authorizationScope?: string) {
 }
 
 describe("expression tooling transport", () => {
+  it("uses rich paged contexts without losing callable metadata or return shapes", async () => {
+    const rich = { ...contextPayload, rootSymbols: [{
+      symbolId: "math-abs", name: "Math.abs", kind: "Function", documentation: "Absolute value.",
+      signatures: [{ display: "Math.abs(value)", parameters: ["value"],
+        returnShape: { kind: "Scalar", displayName: "Number", isNullable: false } }]
+    }] };
+    const api = createContext(vi.fn(async () => outcome(rich)));
+    const tooling = client(api.context);
+    const context = (await tooling.getAuthoringContext(document, {})).data!;
+    const page = await tooling.getCatalog(document, context, "Math", "100");
+    expect(api.postJson).toHaveBeenLastCalledWith(
+      "/design/workflows/expression-tooling/context",
+      expect.objectContaining({ search: "Math", skip: 100, take: 100, contextRevision: "context-1" }),
+      { signal: undefined }
+    );
+    expect(page.data?.symbols[0]).toMatchObject({
+      id: "Function:math-abs", name: "Math.abs", documentation: "Absolute value.",
+      signatures: [{ label: "Math.abs(value)", parameters: [{ name: "value" }], returnShapeId: expect.any(String) }]
+    });
+    await expect(tooling.getValueShape(document, context, page.data!.symbols[0].signatures![0].returnShapeId!))
+      .resolves.toMatchObject({ state: "ready", data: { kind: "scalar", displayName: "Number" } });
+  });
+
+  it("adds shapes from later catalog pages only to their exact current context", async () => {
+    const api = createContext(vi.fn(async (_url: string, body?: { skip?: number }) => outcome({
+      ...contextPayload,
+      rootSymbols: body?.skip === 100 ? [{ symbolId: "later", name: "later", kind: "Variable",
+        valueShape: { kind: "Object", members: [{ name: "known", shape: { kind: "Scalar" } }] } }] : []
+    })));
+    const tooling = client(api.context);
+    const context = (await tooling.getAuthoringContext(document, {})).data!;
+    const page = await tooling.getCatalog(document, context, undefined, "100");
+    const shapeId = page.data!.symbols[0].shapeId!;
+    await expect(tooling.getValueShape(document, context, shapeId))
+      .resolves.toMatchObject({ state: "ready", data: { members: [{ name: "known" }] } });
+    await expect(tooling.getValueShape({ ...document, sourceVersion: 4 }, context, shapeId))
+      .resolves.toMatchObject({ state: "stale" });
+    tooling.invalidateAuthorization();
+    await expect(tooling.getValueShape(document, context, shapeId)).resolves.toMatchObject({ state: "unavailable" });
+  });
+
+  it.each(["Unavailable", "Incompatible", "Stale", "Canceled", "Unauthorized"])(
+    "keeps rich catalog capability outcome %s explicit and data-free", async state => {
+      const api = createContext(vi.fn(async () => outcome(null, state)));
+      const page = await client(api.context).getCatalog(document, {
+        version: "context-1", workflowInputs: [], visibleVariables: [], visibleActivityOutputs: []
+      });
+      expect(page.state).toBe(state.toLowerCase());
+      expect(page).not.toHaveProperty("data");
+    }
+  );
+
+  it.each([
+    [{ ...contextPayload, symbolCatalogRevision: "different" }, "stale"],
+    [{ ...contextPayload, rootSymbols: null }, "incompatible"]
+  ] as const)("rejects mismatched or malformed catalog payload as %s", async (payload, state) => {
+      const api = createContext(vi.fn(async () => outcome(payload)));
+      const page = await client(api.context).getCatalog(document, {
+        version: "context-1", catalogVersion: "catalog-1", workflowInputs: [], visibleVariables: [], visibleActivityOutputs: []
+      });
+      expect(page.state).toBe(state);
+      expect(page).not.toHaveProperty("data");
+  });
+
+  it("does not retain catalog metadata when an ignored cancellation arrives before its response", async () => {
+    let resolve!: (value: unknown) => void;
+    const api = createContext(vi.fn(() => new Promise(value => { resolve = value; })));
+    const tooling = client(api.context);
+    const context = { version: "context-1", workflowInputs: [], visibleVariables: [], visibleActivityOutputs: [] };
+    const controller = new AbortController();
+    const pending = tooling.getCatalog(document, context, undefined, undefined, controller.signal);
+    await vi.waitFor(() => expect(api.postJson).toHaveBeenCalledOnce());
+    controller.abort();
+    resolve(outcome(contextPayload));
+    await expect(pending).resolves.toMatchObject({ state: "canceled" });
+    await expect(tooling.getValueShape(document, context, "symbol:WorkflowInput:input-1"))
+      .resolves.toMatchObject({ state: "unavailable" });
+  });
+
+  it.each([0, 1, 100])("pages a full raw catalog with %i malformed entries without truncating later symbols", async malformedCount => {
+    const symbols = Array.from({ length: 101 }, (_, index) => index < malformedCount
+      ? {} : { symbolId: `value-${index}`, name: `value${index}`, kind: "Variable" });
+    const api = createContext(vi.fn(async (_url: string, body?: { skip?: number; take?: number }) => outcome({
+      ...contextPayload, rootSymbols: symbols.slice(body?.skip ?? 0, (body?.skip ?? 0) + (body?.take ?? 100))
+    })));
+    const tooling = client(api.context);
+    const context = (await tooling.getAuthoringContext(document, {})).data!;
+    const first = await tooling.getCatalog(document, context);
+    expect(first.data?.symbols).toHaveLength(100 - malformedCount);
+    expect(first.state).toBe(malformedCount === 100 ? "supported-empty" : "ready");
+    expect(first.data?.nextCursor).toBe("100");
+    const next = await tooling.getCatalog(document, context, undefined, first.data?.nextCursor);
+    expect(next.data?.symbols).toHaveLength(1);
+    expect(next.data?.symbols[0].name).toBe("value100");
+    expect(next.data?.nextCursor).toBeUndefined();
+    const empty = await tooling.getCatalog(document, context, undefined, "101");
+    expect(empty).toMatchObject({ state: "supported-empty", data: { symbols: [] } });
+    expect(empty.data?.nextCursor).toBeUndefined();
+  });
+
+  it("rejects delayed catalog data after disposal", async () => {
+    let resolve!: (value: unknown) => void;
+    let defer = false;
+    const api = createContext(vi.fn(async () => defer
+      ? new Promise(value => { resolve = value; }) : outcome(contextPayload)));
+    const tooling = client(api.context);
+    const context = (await tooling.getAuthoringContext(document, {})).data!;
+    defer = true;
+    const pending = tooling.getCatalog(document, context);
+    await vi.waitFor(() => expect(api.postJson).toHaveBeenCalledTimes(2));
+    tooling.dispose();
+    resolve(outcome(contextPayload));
+    await expect(pending).resolves.toMatchObject({ state: "canceled" });
+  });
+
+  it("rejects a pending catalog response across explicit authorization invalidation", async () => {
+    let resolve!: (value: unknown) => void;
+    const api = createContext(vi.fn(() => new Promise(value => { resolve = value; })));
+    const tooling = client(api.context);
+    const context = { version: "context-1", workflowInputs: [], visibleVariables: [], visibleActivityOutputs: [] };
+    const pending = tooling.getCatalog(document, context);
+    await vi.waitFor(() => expect(api.postJson).toHaveBeenCalledOnce());
+    tooling.invalidateAuthorization();
+    resolve(outcome(contextPayload));
+    await expect(pending).resolves.toMatchObject({ state: "unauthorized" });
+    await expect(tooling.getValueShape(document, context, "symbol:WorkflowInput:input-1"))
+      .resolves.toMatchObject({ state: "unavailable" });
+  });
+
+  it("rejects a delayed old page when a newer document context becomes current", async () => {
+    let resolve!: (value: unknown) => void;
+    const api = createContext(vi.fn(async (_url: string, body?: { take?: number; documentRevision?: string }) => {
+      if (body?.take === 100) return new Promise(value => { resolve = value; });
+      const revision = body?.documentRevision === "4" ? "context-2" : "context-1";
+      return outcome({ ...contextPayload, contextRevision: revision }, "Success", body?.documentRevision, revision);
+    }));
+    const tooling = client(api.context);
+    const previous = (await tooling.getAuthoringContext(document, {})).data!;
+    const pending = tooling.getCatalog(document, previous);
+    await vi.waitFor(() => expect(api.postJson).toHaveBeenCalledTimes(2));
+    await tooling.getAuthoringContext({ ...document, sourceVersion: 4 }, {});
+    resolve(outcome(contextPayload));
+    await expect(pending).resolves.toMatchObject({ state: "stale" });
+    await expect(tooling.getValueShape(document, previous, previous.rootSymbols![0].shapeId!))
+      .resolves.toMatchObject({ state: "stale" });
+  });
+
+  it("rejects out-of-order authoring contexts and revoked late pages without retaining shapes", async () => {
+    let resolve!: (value: unknown) => void;
+    let calls = 0;
+    const api = createContext(vi.fn(async () => ++calls === 1
+      ? new Promise(value => { resolve = value; }) : outcome(contextPayload)));
+    const tooling = client(api.context);
+    const pending = tooling.getAuthoringContext(document, {});
+    await vi.waitFor(() => expect(api.postJson).toHaveBeenCalledOnce());
+    await tooling.getAuthoringContext(document, {});
+    resolve(outcome(contextPayload));
+    await expect(pending).resolves.toMatchObject({ state: "stale" });
+    api.postJson.mockImplementation(() => new Promise(value => { resolve = value; }));
+    const context = { version: "context-1", workflowInputs: [], visibleVariables: [], visibleActivityOutputs: [],
+      catalogVersion: "catalog-1", permissionRevision: "permission-1", hostPolicyRevision: "policy-1" };
+    const page = tooling.getCatalog(document, context);
+    await vi.waitFor(() => expect(api.postJson).toHaveBeenCalledTimes(3));
+    tooling.revokeAuthorization?.();
+    resolve(outcome(contextPayload));
+    await expect(page).resolves.toMatchObject({ state: "unauthorized" });
+    await expect(tooling.getValueShape(document, context, "symbol:WorkflowInput:input-1"))
+      .resolves.toMatchObject({ state: "unauthorized" });
+  });
+
   it("parses normal-host numeric enums across descriptors, context, assistance and diagnostics", async () => {
     const numericContext = {
       ...contextPayload,
@@ -191,7 +365,9 @@ describe("expression tooling transport", () => {
       .resolves.toMatchObject({ data: { kind: "object" } });
     await expect(tooling.getValueShape(document, context, context.rootSymbols![3].shapeId!))
       .resolves.toMatchObject({ data: { kind: "callable" } });
-    await expect(tooling.getCatalog(document, context)).resolves.toMatchObject({ data: { symbols: [{ kind: "function" }] } });
+    await expect(tooling.getCatalog(document, context)).resolves.toMatchObject({ data: { symbols: [
+      { kind: "value" }, { kind: "value" }, { kind: "value" }, { kind: "function" }
+    ] } });
     await expect(tooling.getCompletions(document, context, { line: 0, column: 1 }))
       .resolves.toMatchObject({ state: "ready", data: { items: [{ kind: "function" }] } });
     await expect(tooling.getHover(document, context, { line: 0, column: 1 }))
@@ -290,7 +466,7 @@ describe("expression tooling transport", () => {
     });
     await tooling.getCatalog(document, contextResult.data!, "cust");
 
-    expect(api.postJson.mock.calls.filter(([url]) => String(url).endsWith("/symbols"))).toHaveLength(1);
+    expect(api.postJson.mock.calls.filter(([url, body]) => String(url).endsWith("/context") && body?.take === 100)).toHaveLength(1);
     expect(api.postJson).toHaveBeenCalledWith(
       "/design/workflows/expression-tooling/context",
       expect.objectContaining({
@@ -322,7 +498,7 @@ describe("expression tooling transport", () => {
     await tooling.getCatalog(document, firstContext, "customer");
     await tooling.getCatalog(secondDocument, secondContext, "customer");
 
-    const symbolRequests = api.postJson.mock.calls.filter(([url]) => String(url).endsWith("/symbols"));
+    const symbolRequests = api.postJson.mock.calls.filter(([url]) => String(url).endsWith("/context"));
     expect(symbolRequests).toHaveLength(2);
     expect(symbolRequests.map(([, body]) => body)).toEqual(expect.arrayContaining([
       expect.objectContaining({ nodeId: "activity-1", documentRevision: "3", contextRevision: "context-1", expressionType: "JavaScript" }),
@@ -344,7 +520,7 @@ describe("expression tooling transport", () => {
     await tooling.getCatalog(document, { ...baseContext, permissionRevision: "permission-1", hostPolicyRevision: "policy-1" });
     await tooling.getCatalog(document, { ...baseContext, permissionRevision: "permission-2", hostPolicyRevision: "policy-2" });
 
-    expect(api.postJson.mock.calls.filter(([url]) => String(url).endsWith("/symbols"))).toHaveLength(2);
+    expect(api.postJson.mock.calls.filter(([url]) => String(url).endsWith("/context"))).toHaveLength(2);
   });
 
   it("maps a missing optional relation to unavailable without issuing a domain request", async () => {
@@ -369,11 +545,11 @@ describe("expression tooling transport", () => {
     window.addEventListener(expressionToolingAuthorizationRevokedEvent, toolingAuthorizationRevoked);
     window.addEventListener(expressionToolingAuthorizationRestoredEvent, toolingAuthorizationRestored);
     let symbolsCalls = 0;
-    const api = createContext(vi.fn(async (url: string) => {
-      if (url.endsWith("/context")) return outcome(contextPayload);
-      if (url.endsWith("/symbols")) {
+    const api = createContext(vi.fn(async (url: string, body?: { take?: number }) => {
+      if (url.endsWith("/context") && body?.take === undefined) return outcome(contextPayload);
+      if (url.endsWith("/context")) {
         symbolsCalls++;
-        if (symbolsCalls === 1) return outcome({ items: [{ label: "customer" }] });
+        if (symbolsCalls === 1) return outcome(contextPayload);
         throw new StudioHttpError(403, "hidden symbol");
       }
       throw new Error(`Unexpected POST ${url}`);

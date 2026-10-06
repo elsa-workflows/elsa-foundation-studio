@@ -8,13 +8,90 @@ Retained CI558/37532060674 fails3/4 normal-host cases at the obsolete `.wf-statu
 
 ## Retained historical checkpoints
 
-Last reconciled: 2026-10-03 for Program #2310 exact-head M2 automated gate and M3 spike exit; delivery and final human acceptance pending
+Last reconciled: 2026-10-05 for Program #2310 M3 accessor correction after restart; corrected-head CI/review and paired-host gate, delivery and human acceptance pending
 
 ## Program #2310 status
 
 T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head automated M2 gate under the documented unavailable-external-review fallback. Studio spike #553 / T035 settles the technical decision: reject the current deeper-service candidate and retain the baseline path. No dependency or production integration is adopted. Deeper language help, three-theme presentation, formatting and current-head manual accessibility/continuity acceptance (T032-T034, T036-T038) remain open. The 2026-07-28 evidence remains historical. All program PRs remain draft and unmerged; final human acceptance is outstanding.
 
 ## Passing evidence
+
+### M3 accessor policy correction — Studio #560, 2026-10-05
+
+Independent review finds the fixed `getVariable` accessor was synthesized after common profile
+policy filtering in both producer and consumer. Retained failing controls reproduce denied
+reinsertion, missing-binding leakage and lost approved metadata. The correction keeps only the
+authorized declared candidate and omits it without visible bindings. A variable literally named
+`variable` cannot restore a denied accessor under a generated getter ID or duplicate an approved
+one; the reserved-name controls fail before correction. Complete JavaScript tests pass 15/15,
+and independent exact-delta review finds no actionable remaining issue.
+
+The immutable CI producer pin advances to Foundation `5cd44d6312d9de85b13f4619fc7aa972a557d033`.
+Its corrected-tree catalog27/27, Expressions236/236, Design534/534, DesignAPI143/143,
+PublishingAPI714/714, Jint126/126, scopedArchitecture17/17 and unchanged map freshness pass.
+Runtime grants, SDK, wire and dependencies are unchanged. Corrected paired browser, configured
+Studio gates and exact committed-head CI/review remain pending at this checkpoint.
+
+Predecessor Studio `8ab8fced71095b085e592442c65d01c143649f37` passes all three jobs in
+[CI 37147792665](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37147792665),
+including paired normal-host Chromium against predecessor Foundation58238b86. That producer
+passes fullCI37147080477 on one failed-job retry and Maps37147082366. These historical green
+heads do not accept the correction or Liquid Task#561. Copilot has no actual M3 review at the
+restart checkpoint. All PRs remain draft/unmerged; M3, human and manual AT acceptance stay open.
+
+### M3 baseline implementation checkpoint — Studio #560, 2026-10-03
+
+The isolated candidate implements rich catalog transport through the existing context relation,
+exact-identity shape retention and authorization/cancellation guards, expression-only local and
+bounded const-object member sources, safe explicit expression templates and full callable lookup.
+Runtime metadata wins completion collisions. Structured signature parameters and return-shape IDs
+remain available to the internal presentation contract; no SDK/wire field or dependency is added.
+
+Root checks pass CodeEditor 77/77 (including compact and expanded real CodeMirror merge tests),
+JavaScript module 10/10 and full Workflows 1,504/1,504, including the complete 101-symbol paging and
+supported-empty regression. Workspace typecheck and full repository lint pass (zero errors,
+48 existing warnings). A controlled removal of the local source fails exactly three
+positive local/member/sibling-scope cases (28/31 pass); a controlled removal of language-owned
+callable lookup fails five signature/non-code cases (5/10 pass). Both controls are restored before
+integration. Transport's original rich-response, shape, malformed/revision and delayed-cancel tests
+also failed against the predecessor implementation. Logs are retained locally under
+`/private/tmp/elsa-560-root-*.log`.
+
+Independent read-only review covers catalog paging/lifetime, expression-local merging and full
+callable-name safety. It identifies the structured-parameter mismatch, now corrected, and reports
+no remaining concrete blocker in the reviewed areas. The bare JavaScript-module `tsc --noEmit`
+command remains non-green: all 17 current diagnostics reproduce against clean Studio `ecc3edee`
+with the same frozen dependency installation (missing React/JSX declarations and a pre-existing
+SDK-versus-neutral result-state mismatch). The newly introduced parameter-shape mismatch is
+corrected and does not appear in the final run. This extra command is not a passing gate and
+is separate from the successful configured workspace typecheck.
+
+Foundation #2379's reviewed root checkpoint `58238b8678dce6dc3dc7510d88c630d106892393`
+is the immutable CI producer pin. Its corrected local affected suites, scoped architecture/maps,
+real authenticated Workbench 3/3 and fresh SQLite JavaScript REST 10/10 pass; full local Architecture
+is not claimed. Independent browser-test review catches a substring assertion that could confuse
+local `customer` with backend `customerName`; the new browser helper now requires exact completion
+labels. Rebuilt paired browser, final-head CI/review and manual assistive-technology acceptance remain
+pending. T032/T034 are not yet checked complete; all PRs remain draft/unmerged.
+
+The final canonical command `ELSA_FOUNDATION_WORKTREE=/private/tmp/elsa-2379-foundation pnpm
+test:browser:expression-normal-host` passes all four Chromium scenarios in 2.8 minutes against
+immutable Foundation `58238b8678dce6dc3dc7510d88c630d106892393`. It rebuilds both actual hosts and
+all client packages serially, uses fresh SQLite and real authentication, and tears down only its
+owned processes. The persisted workflow now proves exact parameter/local/member completion entries
+and real `abs(x): Number` signature help in both compact and expanded editors, alongside existing
+scope, hover, validation, Activity Definition readback and missing-module/provider controls.
+Zero-console-error and exact persisted-source/fresh-revision checks remain intact. Evidence:
+`/private/tmp/elsa-560-root-normal-host-third.log`.
+
+The first paired attempt stops before browser execution on an unsupported test-only completion
+kind; corrected CodeEditor build and all 77 tests pass. The second run has one pass and three
+failures because the safe traffic fixture drops actual uppercase64-hex profile-composed revisions.
+The final fixture retains only bounded32/64-hex revisions, preserving every identity/freshness
+assertion. This fixes evidence collection, not the API or runtime. Serial clients and Studio Release
+builds pass; unchanged bundle budgets pass (entry127.47/127.50kB, Definitions376.92/384.50kB,
+upgrades366.93/375.50kB). Final committed-head CI/review, Liquid consumer T033 and current-head
+manual assistive-technology/human acceptance remain separate outstanding gates.
 
 ### M3 optional service spike exit, 2026-10-03
 
