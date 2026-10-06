@@ -101,6 +101,7 @@ export function StudioCodeEditor({
     ariaLabel,
     autoFocus: profile === "compact" || focusOnMount === true,
     diagnostics: visibleDiagnostics,
+    grammarProfile: languageAdapter?.grammarProfile,
     completions,
     completionProvider,
     hoverProvider,

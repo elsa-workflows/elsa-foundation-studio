@@ -8,13 +8,59 @@ Retained CI558/37532060674 fails3/4 normal-host cases at the obsolete `.wf-statu
 
 ## Retained historical checkpoints
 
-Last reconciled: 2026-10-03 for Program #2310 partial implementation evidence; normal-host acceptance pending
+Last reconciled: 2026-10-03 for Program #2310 M2 local conformance verification; committed-head CI/review, delivery and final human acceptance pending
 
 ## Program #2310 status
 
-The 2026-07-28 evidence below is retained as historical baseline evidence. It is not current-head normal-host proof. Studio PRs #546 and #545 now protect default-host feature discovery, but no persisted-workflow browser walkthrough has yet proved matching Studio/Foundation composition, actual location-scoped metadata, runtime-compatible JavaScript/Liquid help, the three themes, formatting, or the final accessibility/continuity matrix. T026-T038 remain open and all four program milestones remain incomplete.
+T026-T029 pass at the exact M1 pair below. T030-T031 are implemented with the local M2 evidence below; their committed-head CI/review gate is pending. Deeper language help, three-theme presentation, formatting and current-head manual accessibility/continuity acceptance (T032-T038) remain open. The 2026-07-28 evidence remains historical. All program PRs remain draft and unmerged; final human acceptance is outstanding.
 
 ## Passing evidence
+
+### M2 final immutable producer correction, 2026-10-03
+
+Predecessor Studio `d2d4f4cd00c6e7ca93fc86e159841097292d902c` passes every job in [CI 37133114873](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37133114873), including generic Chromium 67/67 and paired normal-host 4/4 against Foundation `99a28c7ff63b8748550ade79dab0fcff7acf0350`. The browser focus synchronization is test-only; all original assertions remain intact and no production focus fix is claimed.
+
+The immutable producer pin now advances to Foundation `7457b7a4564892bab4b28bd0d07fac9709462d56`. Independent and root reviews close absent-root optional-typeof, literal/coalescing, composed-fact retention, primitive-member and mutable-intrinsic identity findings. Root producer checks pass Expressions 218/218, Jint 126/126, Design 507/507, Design API 142/142, Publishing API 714/714, scoped Architecture 17/17, map freshness, rebuilt authenticated Workbench 3/3 and fresh Debug JavaScript REST 10/10. Runtime grants and actual evaluation are unchanged; the classifier preserves native errors when intrinsic identity is uncertain.
+
+This Studio delta changes only the producer pin and verification record, not editor production code, SDK, persisted contracts or dependencies. Its rebuilt paired browser and exact-head full CI remain pending at this checkpoint. Predecessor results are not acceptance of the new pair. Copilot re-review requests have not produced a new work-start event/current-head review after a reasonable window; independent/root review is not Copilot approval. M2 remains open until the corrected pair passes; M3/M4 remain Not Ready here. No current-head manual assistive-technology pass, human acceptance or merge is claimed.
+
+### M2 browser sequencing correction, 2026-10-03
+
+At Studio `3c37b4869e034548a538830d9160bcfe08c5a2d3`, [CI 37131596196](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37131596196) passes lint/typecheck and the dedicated rebuilt normal-host Chromium job against Foundation `99a28c7ff63b8748550ade79dab0fcff7acf0350`, but its generic browser job fails one of 67 cases at the expression syntax popover keyboard reopening assertion. Root reproduces the same failure in four of 30 focused repetitions across both themes.
+
+Syntax selection intentionally focuses the new editor synchronously and again on the row's requested animation frame. The test starts its next independent trigger-key interaction before that focus handoff finishes. Waiting only for initial textbox focus still fails two of 60 repetitions. The shared test helper now verifies textbox focus, crosses two animation frames, and verifies focus again before proceeding; there is no wall-clock sleep, retry, production change, or weakened keyboard assertion. All 60 focused repetitions and the full 67-case Chromium suite pass, as do scoped ESLint and diff review. Root reviews a bounded read-only worker assessment. This proves the scenario after transition completion, not rapid user input during the transition or a production focus fix.
+
+The upcoming committed head requires fresh full CI. Copilot re-review requests through REST, GraphQL bot review requests and the documented CLI return success but produce no new work-start event or current-head review; this is not external approval. M2 remains open, M3/M4 remain Not Ready, and all PRs remain draft and unmerged.
+
+### M2 first review correction, 2026-10-03
+
+Studio `54fceb950e29d9f09d667bcb809aae4a73b0a9ac` passes all jobs in [CI 37129335170](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37129335170), including the normal-host job pinned to Foundation `59ef03004cb514520686de00467a425e340b11aa`. Copilot review 5401220606 identifies one valid test gap: the sequential profile-switch test cannot detect an out-of-order language load. This predecessor CI is not acceptance of the corrective commit.
+
+A controlled loader regression starts expression and program loads without settling the first, confirms the compact editor reuses the same `EditorView`, resolves the program load first and then the stale expression load, and verifies that the active grammar remains `Script`, source is exact and diagnostics remain current. Removing only the generation guard makes the test fail because `SingleExpression` replaces `Script`; the guard is restored. The first expanded-editor variant did not discriminate because cleanup destroyed the old view, so that variant is not used as adverse proof. Root reviews the final test and the complete CodeEditor suite passes 65/65, with package typecheck, scoped lint and diff check passing. No production implementation or dependency changes are needed for this finding.
+
+Foundation's four diagnostic findings are corrected at `99a28c7ff63b8748550ade79dab0fcff7acf0350`, which is now the immutable CI producer pin. Root complete Foundation suites pass Expressions 168/168, Jint 92/92, Design 507/507, Design API 142/142, Publishing API 714/714, scoped Architecture 17/17 and map freshness. At 14:58 UTC the canonical paired command rebuilds both Release hosts and serial clients and passes all four Chromium cases in 2.9 minutes against that producer, retaining exact persisted source, fresh revision correlation, real authentication, fresh SQLite, zero console errors and owned teardown. New exact-head CI/review remains pending after the coordinated corrective commits. M2 remains open and M3/M4 remain Not Ready; no merge or human acceptance is claimed.
+
+### M2 reviewed local candidate, 2026-10-03
+
+Branch `codex/552-javascript-expression-conformance` is based on reviewed M1 `c9479fba`, paired with Foundation's local `claude/2352-javascript-runtime-conformance` branch. Only the JavaScript ExpressionEditor adapter opts into the internal single-expression grammar profile. General-purpose JavaScript/TypeScript/JSX editors retain the existing program grammar and statement completion sources. No engine-specific type enters the Studio SDK or persisted expression document. Profile changes preserve source and undo while stale asynchronous language loads are rejected.
+
+- CodeEditor passes 64/64, including 21 parser/profile tests, incomplete-source recovery, valid function-body returns, TypeScript/JSX/statement rejection, property-name false positives, program-editor preservation and source/undo continuity. JavaScript and Liquid module suites pass 4/4 each.
+- The existing installed-syntax readiness matrix passes 122/122, covering missing adapters/providers, permission/session revocation, incompatible contract ranges, canceled/stale results, syntax switching and independent language composition. Orchestration/transport passes 25/25, and the complete Workflows suite passes 1,489/1,489 across 116 files. These are component/contract-layer edge cases, not claims of live role changes in the browser.
+- Workspace typecheck and full lint pass (zero errors, 48 existing warnings). Both source-built Release hosts and serial client builds pass. Unchanged bundle budgets pass: entry 127.47/127.50 kB, Definitions 376.92/384.50 kB and upgrades 366.93/375.50 kB.
+- The canonical rebuilt paired-host Chromium command passes 4/4 in 3.2 minutes. The persisted workflow checks unsupported TypeScript, JSX and top-level declarations in compact mode, blocked ambient access in expanded mode, and recovery to a valid Math/JSON function expression in both sizes. Existing Activity Definition, missing-editor and missing-provider controls remain green. Exact source is saved/read back and assistance is correlated to fresh post-save revisions; real authentication, fresh SQLite, zero console errors and owned teardown are retained.
+- The first extended browser run passed three cases but its new recovery assertion incorrectly required a diagnostics panel to exist after all diagnostics disappeared. The assertion now checks that no matching diagnostic panel remains; the real backend SupportedEmpty recovery and exact persisted source requirements are unchanged. The full rebuilt rerun passes.
+- Temporarily disabling the expression grammar causes seven of the 21 parser/profile cases to fail; the profile is restored and the full 64-case CodeEditor suite passes.
+- After Foundation's final runtime error-attribution correction, root reviews the producer diff, its complete Jint suite passes 80/80, and the canonical paired command rebuilds both hosts and clients again and passes all four browser cases in 2.4 minutes. This final candidate run retains zero console errors, real authentication, fresh SQLite and owned teardown.
+
+These are reviewed local candidate-tree checks. Exact committed-head CI and Copilot review remain pending. M2 is not accepted or shipped; no current-head manual assistive-technology pass or M3/M4 completion is claimed.
+
+### M1 exact-head automated gate, 2026-10-03
+
+Studio `c9479fba29613b6c58335c05e1d26fb40a51514e` passes all jobs in [CI 37123111128](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37123111128), including static/unit/bundle checks, the existing Chromium browser suite and the paired source-built normal-host suite, 4/4 against Foundation `f81be4beed6973378eb678b2327d789c19d8095e`. Exact-head Copilot 5400803545 reports no actionable findings; all M1 review threads are resolved. Root local Workflows passes 1,489/1,489 and the rebuilt paired browser passes 4/4, with real authentication, fresh SQLite, zero console errors and owned teardown. Null preservation is separately proved by adapter/API round trips, not a new live null scenario.
+
+Paired Foundation has green [CI 37116214636](https://github.com/elsa-workflows/elsa-foundation/actions/runs/37116214636), full hosted Architecture, [Maps 37116216477](https://github.com/elsa-workflows/elsa-foundation/actions/runs/37116216477), and no Copilot findings in review 5400291420. Root local persisted-host 3/3, Design API 142/142, composition 11/11 and JavaScript REST e2e 10/10 pass. The full local Architecture attempt was not green because unrelated full-tree/Debug restore prerequisites were absent; the hosted gate passes instead.
+
+This closes the automated T026-T029 dependency and unblocks M2. It does not prove arbitrary main compatibility, M2-M4 completion, current-head manual assistive-technology acceptance, final human acceptance or delivery. PR #557 and Foundation #2373 remain draft and unmerged. Earlier checkpoints below retain their historical failures and pending states.
 
 ### Program #2310 implementation checkpoint, 2026-10-03
 

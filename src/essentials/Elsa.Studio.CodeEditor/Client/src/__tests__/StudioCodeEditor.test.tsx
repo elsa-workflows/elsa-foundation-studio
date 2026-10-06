@@ -1,9 +1,20 @@
 import { flushSync } from "react-dom";
+import { undo } from "@codemirror/commands";
+import { syntaxTree } from "@codemirror/language";
+import type { Extension } from "@codemirror/state";
 import { createRoot } from "react-dom/client";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { EditorView } from "@codemirror/view";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { StudioCodeEditor } from "../StudioCodeEditor";
+import * as codeMirrorLanguages from "../engines/codeMirrorLanguages";
 import { javaScriptLanguageAdapter } from "../languages/javascript";
 import type { StudioCodeCompletion, StudioCodeDocument, StudioCodeEditorProps } from "../types";
+
+const mountedEditors = new Set<() => void>();
+afterEach(() => {
+  for (const unmount of mountedEditors) unmount();
+  window.dispatchEvent(new Event("elsa:auth-session-ended"));
+});
 
 beforeEach(() => {
   window.dispatchEvent(new Event("elsa:auth-session-started"));
@@ -365,6 +376,94 @@ describe("StudioCodeEditor", () => {
     unmount();
   }, 20000);
 
+  it("reconfigures an existing JavaScript session when its adapter grammar profile changes", async () => {
+    const expressionAdapter = { ...javaScriptLanguageAdapter, grammarProfile: "expression" as const };
+    const document = codeDocument({ value: "(total: number) => total" });
+    const editor = renderEditor({ document, languageAdapter: expressionAdapter });
+
+    await waitFor(() => !!editor.container.querySelector(".cm-lintRange-error"));
+    expect(editor.container.querySelector(".cm-content")?.textContent).toBe(document.value);
+
+    editor.rerender({ document, languageAdapter: javaScriptLanguageAdapter });
+    await waitFor(() => !editor.container.querySelector(".cm-lintRange-error"));
+    expect(editor.container.querySelector(".cm-content")?.textContent).toBe(document.value);
+
+    editor.rerender({ document, languageAdapter: expressionAdapter });
+    await waitFor(() => !!editor.container.querySelector(".cm-lintRange-error"));
+    expect(editor.container.querySelector(".cm-content")?.textContent).toBe(document.value);
+    editor.unmount();
+  }, 20000);
+
+  it("preserves authored source and undo history across JavaScript grammar-profile switches", async () => {
+    const expressionAdapter = { ...javaScriptLanguageAdapter, grammarProfile: "expression" as const };
+    const document = codeDocument({ value: "input" });
+    const onChange = vi.fn();
+    const editor = renderEditor({ document, languageAdapter: expressionAdapter, onChange });
+    await waitFor(() => !!editor.container.querySelector(".cm-content"));
+
+    let content = editor.container.querySelector<HTMLElement>(".cm-content")!;
+    let view = EditorView.findFromDOM(content)!;
+    view.dispatch({ changes: { from: view.state.doc.length, insert: ".total" } });
+    expect(onChange).toHaveBeenLastCalledWith({ ...document, value: "input.total" });
+
+    const editedDocument = { ...document, value: "input.total" };
+    editor.rerender({ document: editedDocument, languageAdapter: javaScriptLanguageAdapter, onChange });
+    await waitFor(() => !editor.container.querySelector(".cm-lintRange-error"));
+    editor.rerender({ document: editedDocument, languageAdapter: expressionAdapter, onChange });
+    await waitFor(() => editor.container.querySelector(".cm-content")?.textContent === "input.total");
+    content = editor.container.querySelector<HTMLElement>(".cm-content")!;
+    view = EditorView.findFromDOM(content)!;
+
+    expect(undo(view)).toBe(true);
+    expect(view.state.doc.toString()).toBe("input");
+    expect(onChange).toHaveBeenLastCalledWith({ ...document, value: "input" });
+    editor.unmount();
+  }, 20000);
+
+  it("ignores a stale asynchronous language load after a newer grammar profile wins", async () => {
+    const pendingLoads: Array<{
+      grammarProfile: string | undefined;
+      resolve(extensions: Extension[]): void;
+    }> = [];
+    const loadLanguageExtensions = codeMirrorLanguages.loadCodeMirrorLanguageExtensions;
+    const loadSpy = vi.spyOn(codeMirrorLanguages, "loadCodeMirrorLanguageExtensions")
+      .mockImplementation((_language, grammarProfile) => new Promise(resolve => {
+        pendingLoads.push({ grammarProfile, resolve });
+      }));
+    let unmount: (() => void) | undefined;
+
+    try {
+      const expressionAdapter = { ...javaScriptLanguageAdapter, grammarProfile: "expression" as const };
+      const document = codeDocument({ value: "(total: number) => total" });
+      const editor = renderEditor({ document, languageAdapter: expressionAdapter, profile: "compact" });
+      unmount = editor.unmount;
+      click(editor.container.querySelector<HTMLButtonElement>(".studio-code-editor-preview")!);
+      await waitFor(() => pendingLoads.length === 1 && !!editor.container.querySelector(".cm-content"));
+      const expressionView = EditorView.findFromDOM(editor.container.querySelector<HTMLElement>(".cm-content")!)!;
+
+      editor.rerender({ document, languageAdapter: javaScriptLanguageAdapter, profile: "compact" });
+      await waitFor(() => pendingLoads.length === 2);
+      expect(pendingLoads.map(load => load.grammarProfile)).toEqual(["expression", undefined]);
+      const programView = EditorView.findFromDOM(editor.container.querySelector<HTMLElement>(".cm-content")!)!;
+      expect(programView).toBe(expressionView);
+
+      pendingLoads[1].resolve(await loadLanguageExtensions("javascript"));
+      await waitFor(() => !editor.container.querySelector(".cm-lintRange-error"));
+      expect(syntaxTree(programView.state).topNode.name).toBe("Script");
+      expect(editor.container.querySelector(".cm-content")?.textContent).toBe(document.value);
+
+      pendingLoads[0].resolve(await loadLanguageExtensions("javascript", "expression"));
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(syntaxTree(programView.state).topNode.name).toBe("Script");
+      expect(editor.container.querySelector(".cm-lintRange-error")).toBeNull();
+      expect(editor.container.querySelector(".cm-content")?.textContent).toBe(document.value);
+    } finally {
+      unmount?.();
+      loadSpy.mockRestore();
+    }
+  }, 20000);
+
   it("shows keyboard-accessible signature help in the rich editor", async () => {
     const { container, unmount } = renderEditor({
       document: codeDocument({ value: "formatTotal(" }),
@@ -673,13 +772,17 @@ function renderEditor(props: Partial<StudioCodeEditorProps> = {}) {
   };
   render(props);
 
+  const unmount = () => {
+    if (!mountedEditors.delete(unmount)) return;
+    flushSync(() => root.unmount());
+    host.remove();
+  };
+  mountedEditors.add(unmount);
+
   return {
     container: host,
     rerender: render,
-    unmount: () => {
-      root.unmount();
-      host.remove();
-    }
+    unmount
   };
 }
 

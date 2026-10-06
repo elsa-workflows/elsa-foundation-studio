@@ -8,7 +8,7 @@ The existing Studio expression stack is synchronized with main `2bd5c076`. Exact
 
 Baseline implementation tasks are complete. File names below reflect the landed design rather than provisional planning names.
 
-The baseline tasks T001-T025 are historical. Program #2310 reopens this feature for the dependency-ordered completion tasks T026-T038 below; they are not complete until current-head normal-host evidence passes.
+The baseline tasks T001-T025 are historical. Program #2310 reopens this feature for dependency-ordered tasks T026-T038. T026-T029 have exact-head normal-host evidence. T030-T031 are implemented with reviewed local conformance evidence; their committed-head CI/review gate is pending. T032-T038 remain open.
 
 ## Contracts and transport
 
@@ -52,12 +52,12 @@ The baseline tasks T001-T025 are historical. Program #2310 reopens this feature 
 
 ## Program #2310 continuation: User Story 5 — Trust installed text-syntax support
 
-- [ ] T026 [US5] Add the normal-host Playwright configuration, package script and persisted-workflow JavaScript/Liquid journey in `tests/browser/playwright.expression-normal-host.config.ts`, `package.json` and `tests/browser/expression-normal-host.spec.ts`, including matching Studio/Foundation host startup and teardown plus every currently supported workflow and activity-definition authoring surface.
-- [ ] T027 [P] [US5] Add installed text-syntax readiness and independent module/provider degradation handling in `src/essentials/Elsa.Studio.Workflows/Client/src/ActivityPropertiesPanel.tsx` and focused Workflows tests.
-- [ ] T028 [US5] Add a negative normal-host regression that removes one editor feature and one backend capability in turn and asserts the exact missing/degraded state in `tests/browser/expression-normal-host.spec.ts`; do not modify the merged #545 discovery guard.
-- [ ] T029 [US5] Record rebuilt Studio/Foundation normal-host evidence, exact revisions and `pnpm test:browser:expression-normal-host` results in `specs/094-expression-code-intelligence/verification.md`.
-- [ ] T030 [US5] Align JavaScript expression-editor grammar and local diagnostics with the runtime expression grammar in `src/essentials/Elsa.Studio.CodeEditor/Client/src/languages/javascriptCodeMirror.ts` and its tests after T029 passes. Apply this only to the explicit expression profile; preserve the shared script/TypeScript/JSX project-file grammar.
-- [ ] T031 [US5] Add installed-text-syntax conformance cases for missing adapters/providers, permissions, incompatibility, incomplete source, syntax switching and independent composition under `tests/browser/` and the expression-editor module tests after T029 passes.
+- [x] T026 [US5] Add the normal-host Playwright configuration, package script and persisted-workflow JavaScript/Liquid journey in `tests/browser/playwright.expression-normal-host.config.ts`, `package.json` and `tests/browser/expression-normal-host.spec.ts`, including matching Studio/Foundation host startup and teardown plus every currently supported workflow and activity-definition authoring surface.
+- [x] T027 [P] [US5] Add installed text-syntax readiness and independent module/provider degradation handling in `src/essentials/Elsa.Studio.Workflows/Client/src/ActivityPropertiesPanel.tsx` and focused Workflows tests.
+- [x] T028 [US5] Add a negative normal-host regression that removes one editor feature and one backend capability in turn and asserts the exact missing/degraded state in `tests/browser/expression-normal-host.spec.ts`; do not modify the merged #545 discovery guard.
+- [x] T029 [US5] Record rebuilt Studio/Foundation normal-host evidence, exact revisions and `pnpm test:browser:expression-normal-host` results in `specs/094-expression-code-intelligence/verification.md`.
+- [x] T030 [US5] Align JavaScript expression-editor grammar and local diagnostics with the runtime expression grammar in `src/essentials/Elsa.Studio.CodeEditor/Client/src/languages/javascriptCodeMirror.ts` and its tests after T029 passes. Apply this only to the explicit expression profile; preserve the shared script/TypeScript/JSX project-file grammar.
+- [x] T031 [US5] Add installed-text-syntax conformance cases for missing adapters/providers, permissions, incompatibility, incomplete source, syntax switching and independent composition under `tests/browser/` and the expression-editor module tests after T029 passes.
 
 ## Program #2310 continuation: User Story 6 — Receive precise, readable language help
 
@@ -72,6 +72,6 @@ The baseline tasks T001-T025 are historical. Program #2310 reopens this feature 
 ## Dependencies
 
 - T026 is the first executable implementation leaf; T027-T028 may follow on the same integration head, and T029 closes milestone 1 only after all three pass.
-- T030-T031 remain Not Ready until T029 passes.
-- T032-T035 remain Not Ready until T031 and the linked Foundation provider tasks pass.
+- T029 passes at Studio `c9479fba` with paired Foundation `f81be4be`; see `verification.md`. T030-T031 are unblocked.
+- T032-T035 remain Not Ready until the committed-head T030-T031 and linked Foundation M2 gates pass; local implementation checkboxes are not delivery acceptance.
 - T036-T038 remain Not Ready until T032-T035 settle the language behavior they present.

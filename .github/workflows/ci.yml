@@ -114,9 +114,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: elsa-workflows/elsa-foundation
-          # Program #2310 M1 is stacked across repositories. Keep the paired, reviewed source
-          # immutable until Foundation #2373 ships; main does not yet compose Liquid.
-          ref: f81be4beed6973378eb678b2327d789c19d8095e
+          # Program #2310 M2 is stacked across repositories. Pin the reviewed producer source;
+          # neither moving branches nor arbitrary main prove this conformance pair.
+          ref: 7457b7a4564892bab4b28bd0d07fac9709462d56
           path: .normal-host-foundation
           persist-credentials: false
 

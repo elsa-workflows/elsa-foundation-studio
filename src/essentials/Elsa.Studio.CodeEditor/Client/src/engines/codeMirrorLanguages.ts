@@ -1,10 +1,14 @@
 import type { Extension } from "@codemirror/state";
+import type { StudioCodeGrammarProfile } from "../types";
 
-export async function loadCodeMirrorLanguageExtensions(language: string): Promise<Extension[]> {
+export async function loadCodeMirrorLanguageExtensions(
+  language: string,
+  grammarProfile?: StudioCodeGrammarProfile
+): Promise<Extension[]> {
   const normalized = language.trim().toLowerCase();
   if (normalized === "javascript" || normalized === "typescript") {
     const module = await import("../languages/javascriptCodeMirror");
-    return module.createJavaScriptCodeMirrorExtensions();
+    return module.createJavaScriptCodeMirrorExtensions(grammarProfile);
   }
 
   if (normalized === "liquid") {

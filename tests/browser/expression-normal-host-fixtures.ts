@@ -146,7 +146,8 @@ export const test = base.extend<NormalHostFixtures>({
                 // Only known provider codes are retained. Parser messages/source and auth data
                 // never enter the traffic record or failure output.
                 record.diagnosticCodes = diagnostics.flatMap(diagnostic =>
-                  diagnostic.code === "JavaScript/Syntax" || diagnostic.code === "Liquid/Syntax" ? [diagnostic.code] : []);
+                  diagnostic.code === "JavaScript/Syntax" || diagnostic.code === "JavaScript/AmbientCapability" ||
+                  diagnostic.code === "Liquid/Syntax" ? [diagnostic.code] : []);
               }
             }).catch(() => undefined);
           }
