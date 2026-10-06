@@ -64,6 +64,8 @@ dotnet build src/apps/Elsa.Studio.Web/Elsa.Studio.Web.csproj
 
 The Dashboard Vite build writes its module assets under `src/essentials/Elsa.Studio.Dashboard/wwwroot/studio/modules/dashboard`. Rebuilding and restarting is the verified source-edit path; do not assume hot reload for this asset.
 
+After restarting Studio, reload `http://localhost:5089` and confirm the Dashboard heading reads `Your first Studio change` before restoring the exercise. After restoration, rebuild and restart again, reload the page, and confirm the default `Dashboard` heading returns.
+
 To return to the default Dashboard, restore both the component heading and test expectation to `Dashboard`, rerun the focused test, build the Dashboard assets and Studio host with the commands above, and restart your own Studio process. Stop only the Workbench and Studio processes you started, with Ctrl+C in their terminals.
 
 ## Run a workflow in the browser

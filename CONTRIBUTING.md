@@ -32,7 +32,7 @@ The repository-defined hosted PR jobs are in [CI](.github/workflows/ci.yml) and 
 
 [`Directory.Packages.props`](Directory.Packages.props) now pins `ConsoleLogStreaming.AspNetCore` `1.1.0`. [Studio #579](https://github.com/elsa-workflows/elsa-foundation-studio/issues/579) records the correction of the earlier preview-package restore failure, with a Studio.Web restore using isolated package-cache, HTTP-cache, and CLI-home paths, a scoped host build, and affected console-stream/host tests. Installed SDK packs remained available during those checks.
 
-The complete source setup, paired workflow and visible source-edit journey remain tracked in [Studio #566](https://github.com/elsa-workflows/elsa-foundation-studio/issues/566). The existing `dotnet build`, `dotnet test`, and `dotnet run` commands in README are not, by themselves, a verified fresh-machine walkthrough. Check that issue for the remaining setup and browser evidence.
+The source-paired Studio/Workbench setup, visible edit, and browser workflow are recorded in the [Studio source quickstart](docs/contributing/studio-source-quickstart.md). Broader contributor acceptance remains tracked in [Studio #566](https://github.com/elsa-workflows/elsa-foundation-studio/issues/566), including the reference-backend option, mismatched Studio/Workbench versions, fresh-OS setup, and first-time contributor trials.
 
 If GitHub displays a `license/cla` check on your pull request, follow the instructions in that check.
 
