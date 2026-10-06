@@ -107,9 +107,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: elsa-workflows/elsa-foundation
-          # Program #2310 M3 is stacked across repositories. Pin the reviewed producer source;
-          # neither moving branches nor arbitrary main prove this language-help pair.
-          ref: 5cd44d6312d9de85b13f4619fc7aa972a557d033
+          # Program #2310 delivery pins the refreshed integrated producer source.
+          # Historical M3 proof stays at5cd; neither moving refs nor arbitrary main prove this pair.
+          ref: 59a3dd723b646f45264c5a1940715bc5b00ddd1e
           path: .normal-host-foundation
           persist-credentials: false
 

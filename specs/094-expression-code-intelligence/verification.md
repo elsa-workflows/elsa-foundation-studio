@@ -16,6 +16,12 @@ Actual disposable native hosts and owned Chrome authentication/editor activation
 
 This reconciliation changes documentation only. Fresh exact-head review/CI and all affected integrated-pair verification remain required. Keyboard, automated scoped accessibility, source/cursor/undo, runtime parity, technical/review/integration and required post-merge main gates are unchanged. T038 remains unchecked pending final acceptance/delivery. After all remaining gates pass, obtain explicit owner acceptance before Ready and dependency-ordered merging; no package publication or deployment is included.
 
+## Refreshed integrated-pair candidate — 2026-10-06
+
+The canonical CI host job now pins immutable Foundation `59a3dd723b646f45264c5a1940715bc5b00ddd1e`, the existing PR2367→2373→2378→2380 stack synchronized with Foundation main `d652f7342f79daea32e9986f9c381fac8a93ba3f`. Main's active spec192 and shell startup-validation registration are preserved; expression runtime/provider source is unchanged from the retained5cd checkpoint. Only generated-map conflicts required resolution, with deliberate regeneration and local authoritative checks passing. Final M3 task/evidence records now distinguish retained automated proof from this unaccepted integration head. All Foundation PRs remain draft.
+
+This pin changes tested composition, so root starts a fresh coherent rebuild and all-five persisted-host browser gate, actual registered-runtime parity, synthetic cross-browser/axe, affected REST and exact-head CI/review. Results are pending, not inherited from5cd. Foundation main is still red and peer-owned WorkerOIDC correction plus subsequent green actual-main qualification remain required; the peer has released its local test lane but retains the main-merge reservation. The documentation-only Studio checkpoint `dc0d543a`/historical5cd and CI37484877562 remain separately recorded, not acceptance of this newly pinned pair.
+
 ## Verification evidence
 
 ### T038 / Studio Task#577 — final matrix in progress, 2026-10-06
