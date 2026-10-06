@@ -182,13 +182,16 @@ completeTest("normal-host expression previews and help remain readable in Light,
       await expectReadableCodeSurface(page.getByRole("status", { name: "Hover information" }));
       await editor.press("Escape");
       await expect(page.locator(".wf-editor-body")).toHaveClass(/inspector-maximized/);
-      await moveEditorCursor(editor, source, language === "JavaScript" ? source.indexOf("abs") + 2 : position);
+      const completionPosition = language === "JavaScript" ? source.indexOf("abs") + 2 : position;
+      await moveEditorCursor(editor, source, completionPosition);
+      await expect.poll(() => readNativeEditorCaret(editor)).toEqual({ offset: completionPosition, visible: true });
       await expect(async () => {
         await editor.press("Control+Space");
         const menu = page.locator(".cm-tooltip-autocomplete");
         await expect(menu).toBeVisible({ timeout: 1_000 });
       }).toPass({ timeout: 15_000 });
       await expectReadableCodeSurface(page.locator('.cm-tooltip-autocomplete [aria-selected="true"]'));
+      await expect.poll(() => readNativeEditorCaret(editor)).toEqual({ offset: completionPosition, visible: true });
       await editor.press("Escape");
       await expect(page.locator(".wf-editor-body")).toHaveClass(/inspector-maximized/);
       if (mode === "Light") {
@@ -548,18 +551,7 @@ async function expectHorizontalEditorNavigation(editor: Locator, source: string)
   const scroller = editor.locator("xpath=ancestor::*[contains(@class, 'cm-scroller')][1]");
   const overflows = await scroller.evaluate(element => element.scrollWidth > element.clientWidth + 1);
   expect(overflows, "The long Liquid source must exercise horizontal navigation").toBe(true);
-  const caretPosition = () => editor.evaluate(element => {
-    const selection = window.getSelection();
-    const viewport = element.closest(".cm-scroller")?.getBoundingClientRect();
-    if (!selection?.isCollapsed || !selection.rangeCount || !element.contains(selection.anchorNode) || !viewport) return null;
-    const range = selection.getRangeAt(0);
-    const caret = range.getBoundingClientRect();
-    const prefix = document.createRange();
-    prefix.selectNodeContents(element);
-    prefix.setEnd(range.startContainer, range.startOffset);
-    return { offset: prefix.toString().length,
-      visible: caret.height > 0 && caret.left >= viewport.left - 1 && caret.right <= viewport.right + 1 };
-  });
+  const caretPosition = () => readNativeEditorCaret(editor);
   // A restored session may already have its caret at the end; move it before requesting End.
   await editor.press("Home");
   await expect.poll(caretPosition).toEqual({ offset: 0, visible: true });
@@ -572,6 +564,22 @@ async function expectHorizontalEditorNavigation(editor: Locator, source: string)
   await expect.poll(caretPosition).toEqual({ offset: 0, visible: true });
   await expect.poll(() => scroller.evaluate(element => element.scrollLeft)).toBeLessThan(endScroll);
   await expect.poll(() => readEditorSource(editor)).toBe(source);
+}
+
+async function readNativeEditorCaret(editor: Locator) {
+  return editor.evaluate(element => {
+    const selection = window.getSelection();
+    const viewport = element.closest(".cm-scroller")?.getBoundingClientRect();
+    if (!selection?.isCollapsed || !selection.rangeCount || !element.contains(selection.anchorNode) || !viewport) return null;
+    const range = selection.getRangeAt(0);
+    const caret = range.getBoundingClientRect();
+    const prefix = document.createRange();
+    prefix.selectNodeContents(element);
+    prefix.setEnd(range.startContainer, range.startOffset);
+    return { offset: prefix.toString().length,
+      visible: caret.height > 0 && caret.left >= viewport.left - 1 && caret.right <= viewport.right + 1 &&
+        caret.top >= viewport.top - 1 && caret.bottom <= viewport.bottom + 1 };
+  });
 }
 
 async function openWorkflowDraft(page: Page, pair: NormalHostPair, draft: PersistedExpressionDraft) {

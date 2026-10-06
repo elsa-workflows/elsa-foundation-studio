@@ -255,6 +255,18 @@ CodeMirror's light default overlay and gutter palette. Actual Dark-host proof ex
 4.364519:1 function token on the stock active-line overlay. Keep the syntax foregrounds
 unchanged and map that fill to the existing soft accent; verify rendered gutter text as well.
 
+Long-source narrow proof also exposes an offscreen completion match-start anchor while the
+actual caret remains visible. A version-specific patch to installed autocomplete6.20.3 may use
+the documented [`TooltipView.getCoords`](https://codemirror.net/docs/ref/#view.TooltipView.getCoords)
+seam to anchor at that caret only when the match start
+is horizontally clipped, the collapsed main head remains in that same active result, and both
+positions occupy the same visual row. Keep normal visible anchors and null/different-row/
+offscreen-caret cases unchanged. Native tooltip clipping, result ranges, filtering, application,
+source, selection and undo remain authoritative; do not force scrolling or disable clipping.
+Apply identical ESM/CommonJS patches reproducibly through pnpm, with focused guard/replacement
+controls and the unchanged coherent normal-host gate. This adds no resolved dependency version
+or new dependency; reassess/remove the patch when the pinned implementation changes.
+
 **Consequences**: Root owns integration, actual normal-host color-mode/contrast/narrow proof and
 complete affected gates. The bounded worker owns presentation implementation/tests and central
 token documentation only. Active-argument/overload semantics and explicit behavior-preserving
