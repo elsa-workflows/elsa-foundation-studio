@@ -140,13 +140,13 @@ prepare_contributor_backend() {
     --mount "type=volume,src=$data_volume,dst=/app/data" \
     "$image")"; then
     if [ -z "$cid" ]; then
-      cid="$(docker container inspect --format '{{.Id}}' "$name" 2>/dev/null)" || cid=''
+      cid="$(docker container inspect --format '{{.Id}}' "$name" 2>/dev/null)" || cid="$name"
       printf 'Workbench launch returned no container ID; setup stopped.\n' >&2
       cleanup_contributor_backend
       return 1
     fi
   else
-    cid="$(docker container inspect --format '{{.Id}}' "$name" 2>/dev/null)" || cid=''
+    cid="$(docker container inspect --format '{{.Id}}' "$name" 2>/dev/null)" || cid="$name"
     printf 'Workbench container launch failed; setup stopped.\n' >&2
     cleanup_contributor_backend
     return 1
