@@ -21,7 +21,6 @@
   padding: 0.5rem;
 }
 
-.studio-code-editor-rich .cm-editor,
 .studio-code-editor-input {
   background: var(--studio-surface-muted);
   border: 1px solid var(--studio-border);
@@ -31,26 +30,10 @@
   inline-size: 100%;
 }
 
-.studio-code-editor-rich .cm-editor:focus-within,
 .studio-code-editor-input:focus,
 .studio-code-editor-preview:focus-visible {
   outline: 2px solid var(--studio-focus-strong, var(--studio-text));
   outline-offset: 2px;
-}
-
-.studio-code-editor-rich .cm-scroller {
-  font-family: var(--studio-font-mono);
-}
-
-.studio-code-editor-rich .cm-editor .cm-activeLine,
-.studio-code-editor-rich .cm-editor .cm-activeLineGutter {
-  background: var(--studio-accent-soft);
-}
-
-.studio-code-editor-rich .cm-editor .cm-gutters {
-  background: var(--studio-surface-muted);
-  border-color: var(--studio-border);
-  color: var(--studio-text-muted);
 }
 
 .studio-code-token-keyword { color: var(--studio-syntax-keyword, var(--studio-text)); }
@@ -65,83 +48,16 @@
 .studio-code-token-type { color: var(--studio-syntax-type, var(--studio-text)); }
 .studio-code-token-tag { color: var(--studio-syntax-tag, var(--studio-text)); }
 
-.studio-code-editor-rich .cm-content::selection,
-.studio-code-editor-rich .cm-content ::selection,
 .studio-code-editor-input::selection {
   background: var(--studio-accent);
   color: var(--studio-accent-text);
 }
 
-.studio-code-editor-rich .cm-tooltip {
-  background: var(--studio-surface-raised);
-  border: 1px solid var(--studio-border);
-  box-sizing: border-box;
-  color: var(--studio-text);
-  max-inline-size: min(32rem, calc(100vw - 2rem));
-  overflow-wrap: anywhere;
-  white-space: normal;
-}
-
-.studio-code-editor-rich .cm-editor .cm-panels {
-  background: var(--studio-surface-raised);
-  border-color: var(--studio-border);
-  color: var(--studio-text);
-}
-
-.studio-code-editor-rich .cm-panel,
-.studio-code-editor-rich .studio-code-editor-hover {
-  color: var(--studio-text);
-  max-block-size: min(18rem, 50vh);
-  max-inline-size: min(32rem, calc(100vw - 2rem));
-  overflow: auto;
-  overflow-wrap: anywhere;
-  white-space: normal;
-}
-
-.studio-code-editor-rich .cm-tooltip-autocomplete ul {
-  max-block-size: min(16rem, 40vh);
-  max-inline-size: min(32rem, calc(100vw - 2rem));
-  min-inline-size: 0;
-  overflow: auto;
-  white-space: normal;
-}
-
-.studio-code-editor-rich .cm-tooltip-autocomplete li {
-  overflow-wrap: anywhere;
-  text-overflow: clip;
-  white-space: normal;
-}
-
-.studio-code-editor-rich .cm-tooltip-autocomplete li[aria-selected="true"] {
-  background: var(--studio-accent);
-  color: var(--studio-accent-text);
-}
-
-.studio-code-editor-rich .cm-tooltip-autocomplete li[aria-selected="true"] :is(.cm-completionDetail, .cm-completionMatchedText) {
-  color: inherit;
-}
-
-.studio-code-editor-rich .cm-completionSection {
-  border-color: var(--studio-border);
-  color: var(--studio-text-muted);
-}
-
-.studio-code-editor-rich .cm-tooltip-hover,
-.studio-code-editor-rich .cm-completionInfo {
-  max-block-size: min(18rem, 50vh);
-  max-inline-size: min(32rem, calc(100vw - 2rem));
-  overflow: auto;
-  overflow-wrap: anywhere;
-  white-space: normal;
-}
-
-.studio-code-editor-compact .studio-code-editor-rich .cm-editor,
 .studio-code-editor-input-compact,
 .studio-code-editor-preview {
   min-block-size: 2.25rem;
 }
 
-.studio-code-editor-compact .studio-code-editor-rich .cm-scroller,
 .studio-code-editor-input-compact {
   max-block-size: 2.25rem;
   overflow: hidden;

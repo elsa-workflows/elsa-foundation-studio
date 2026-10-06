@@ -406,6 +406,65 @@ describe("StudioCodeEditor", () => {
     unmount();
   }, 20000);
 
+  it("applies token-based CodeMirror themes to rich surfaces and reconfigures compact sizing", async () => {
+    const initialProps = {
+      document: codeDocument({ value: "" }),
+      languageAdapter: javaScriptLanguageAdapter,
+      profile: "expanded",
+      completionProvider: () => [{ label: "total" }]
+    } as const;
+    const { container, rerender, unmount } = renderEditor(initialProps);
+
+    try {
+      const content = await activateRichEditor(container, "expanded");
+      const expandedEditor = content.closest<HTMLElement>(".cm-editor")!;
+      const editorThemeStyles = () => [...document.head.querySelectorAll("style")]
+        .map(style => style.textContent ?? "")
+        .join("\n");
+
+      expect(editorThemeStyles()).toContain("var(--studio-surface-muted)");
+      expect(editorThemeStyles()).toContain("var(--studio-focus-strong, var(--studio-text))");
+      expect(editorThemeStyles()).toContain("var(--studio-accent-soft)");
+      expect(editorThemeStyles()).toContain(".cm-tooltip-autocomplete");
+      expect(editorThemeStyles()).toContain(".studio-code-editor-hover");
+
+      key(content, " ", { code: "Space", ctrlKey: true });
+      await waitFor(() => !!container.querySelector(".cm-tooltip-autocomplete"));
+      const completionTooltip = container.querySelector<HTMLElement>(".cm-tooltip-autocomplete")!;
+      expect(completionTooltip.closest(".cm-editor")).toBe(expandedEditor);
+      expect(window.getComputedStyle(completionTooltip.querySelector("ul")!).getPropertyValue("max-inline-size"))
+        .toBe("min(32rem, calc(100vw - 2rem))");
+
+      const richEditor = (profile: "compact" | "expanded") =>
+        container.querySelector<HTMLElement>(`.studio-code-editor-rich-${profile} .cm-editor`);
+      rerender({ ...initialProps, profile: "compact" });
+      await waitFor(() => richEditor("compact") !== null &&
+        window.getComputedStyle(richEditor("compact")!).getPropertyValue("min-block-size") === "2.25rem");
+      const compactEditor = richEditor("compact")!;
+      expect(window.getComputedStyle(compactEditor).getPropertyValue("min-block-size")).toBe("2.25rem");
+      expect(window.getComputedStyle(compactEditor.querySelector(".cm-scroller")!).getPropertyValue("max-block-size"))
+        .toBe("2.25rem");
+      expect(compactEditor.querySelector(".cm-gutters")).toBeNull();
+
+      rerender({ ...initialProps, profile: "expanded" });
+      await waitFor(() => richEditor("expanded") !== null &&
+        !!richEditor("expanded")!.querySelector(".cm-gutters") &&
+        window.getComputedStyle(richEditor("expanded")!).getPropertyValue("min-block-size") !== "2.25rem");
+      const restoredExpandedEditor = richEditor("expanded")!;
+      expect(window.getComputedStyle(restoredExpandedEditor).getPropertyValue("min-block-size")).not.toBe("2.25rem");
+      expect(restoredExpandedEditor.querySelector(".cm-gutters")).toBeTruthy();
+
+      rerender({ ...initialProps, profile: "compact" });
+      await waitFor(() => richEditor("compact") !== null &&
+        window.getComputedStyle(richEditor("compact")!).getPropertyValue("min-block-size") === "2.25rem");
+      const restoredCompactEditor = richEditor("compact")!;
+      expect(window.getComputedStyle(restoredCompactEditor).getPropertyValue("min-block-size")).toBe("2.25rem");
+      expect(restoredCompactEditor.querySelector(".cm-gutters")).toBeNull();
+    } finally {
+      unmount();
+    }
+  }, 20000);
+
   it("reconfigures an existing JavaScript session when its adapter grammar profile changes", async () => {
     const expressionAdapter = { ...javaScriptLanguageAdapter, grammarProfile: "expression" as const };
     const document = codeDocument({ value: "(total: number) => total" });
