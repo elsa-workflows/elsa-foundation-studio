@@ -8,6 +8,59 @@ T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head autom
 
 ## Passing evidence
 
+### M4 T036 committed-head reconciliation — multiline journey correction (not accepted)
+
+At Studio `966d823e2b50b09339c31e5be72152ff823e0e96`, local all-five actual-host
+verification and CI37399634010 both pass the original four cases and fail only the added
+theme case at line211. The newline is persisted exactly; the compact engine intentionally
+opens the expanded editor when a newline is inserted. The test incorrectly presses Escape
+on the now-unmounted compact editor. The correction asserts the actual expanded focus/source,
+closes that dialog, and enters the unchanged multiline-preview Shift+Tab/Enter assertions
+from the syntax control. It does not change production behavior, timeouts or source checks.
+Logs: `/private/tmp/elsa-568-root-normal-host-all-five-966d823e.log`,
+`/private/tmp/elsa-568-root-ci-966-failure.log`. Corrected actual-host proof is pending.
+
+The next canonical theme run progresses through the corrected multiline journey and fails
+Dark expanded-source continuity: actual function-token contrast4.364519 is below the unchanged
+4.5 threshold. A fresh-host diagnostic reusing only that immediately preceding coherent build
+confirms foreground `[168,193,255]` against composited background
+`[73.2,83.46666666666667,91.46666666666667]`. Expanded-only `highlightActiveLine` retains
+CodeMirror's light default `#cceeff44`; no Studio active-line/gutter overrides exist. This
+is not a reason to lighten the syntax palette or lower the assertion. The bounded correction
+maps active-line/gutter fills and gutter chrome to existing Studio semantic tokens; expanded
+continuity also checks actual gutter text contrast. Logs:
+`/private/tmp/elsa-568-root-multiline-canonical-fix.log`,
+`/private/tmp/elsa-568-root-expanded-contrast-confirmation.log`.
+
+An intervening diagnostic fails because `closeExpanded` deliberately restores the expand-button
+focus on the next animation frame after the test focuses syntax. The test now awaits that actual
+button focus before the syntax/Shift+Tab entry; it does not add sleep, force-click or retries.
+That failed diagnostic is retained at `/private/tmp/elsa-568-root-expanded-contrast-diagnostic.log`.
+
+Root reviews the11-line shared-CSS correction, gives its scoped selectors greater specificity
+than the engine's base theme selectors, removes the diagnostic no-build configuration, and
+passes the complete112-test/eight-file CodeEditor suite plus changed CSS Stylelint, harness
+ESLint and diff check. Log: `/private/tmp/elsa-568-root-expanded-editor-units.log`.
+Fresh canonical all-five actual-host and successor committed-head CI remain pending; these
+source/static/unit checks alone do not accept the corrected theme gate.
+
+Configured recursive workspace typecheck passes. Root CodeEditor112/112 and Web445/445 pass.
+The complete local Workflows run reports1505pass/1fail in unchanged activity-definition
+diagnostic navigation; it is retained as failed, not renamed green. The same case passes
+unchanged in isolation, then its whole48-case file plus both new Escape cases passes50/50.
+The machine reaches load248 on8cores during the complete local run. Exact-head CI37399634010
+passes the full workspace units, all three Workflows shuffle seeds, lint/typecheck/bundles and
+generic Chromium; its normal-host job fails as described above. These rechecks reconcile the
+unit failure without claiming load as a proven cause. Logs:
+`/private/tmp/elsa-568-root-responsive-workflows-units.log`,
+`/private/tmp/elsa-568-root-authoring-recheck.log`,
+`/private/tmp/elsa-568-root-authoring-whole-file-recheck.log`,
+`/private/tmp/elsa-568-root-responsive-workspace-typecheck.log`.
+
+Copilot was explicitly requested on966d823e; no actual review feedback or approval is visible.
+T036 remains unaccepted/ReviewRequired/VerificationRunning; T037 is unassigned and current-head
+manual AT, human acceptance and delivery remain open. All program PRs are draft/unmerged.
+
 ### M4 T036 canonical responsive run — further viewport precondition (not accepted)
 
 The twenty-fourth canonical command rebuilds both actual hosts and passes unchanged budgets
@@ -25,11 +78,12 @@ An additional standalone Web-project TypeScript check, which is not the configur
 typecheck command, fails with diagnostics outside the changed focus handler (including the
 unchanged PNG import, auth/Weaver mock types and React DOM vendor version declaration). That
 extra check is not reported as green or used to widen this task into project-configuration work.
-Log: `/private/tmp/elsa-568-root-web-responsive-typecheck.log`. Configured workspace typecheck,
-complete affected suites, all-five rebuilt-host proof and committed-head CI remain pending.
+Log: `/private/tmp/elsa-568-root-web-responsive-typecheck.log`. At this earlier checkpoint,
+configured workspace typecheck, complete affected suites, all-five rebuilt-host proof and
+committed-head CI were pending; the later committed-head reconciliation above supersedes it.
 
 Root restores the complete CodeEditor112/112 (eight files) and Web445/445 (36files) suites on
-the correction tree with one worker; Workflows' full affected suite is still running. Logs:
+the correction tree with one worker; Workflows' full affected suite was still running. Logs:
 `/private/tmp/elsa-568-root-responsive-editor-units.log`,
 `/private/tmp/elsa-568-root-responsive-web-units.log`. These do not substitute for all-theme,
 all-five normal-host, configured workspace typecheck or committed-head CI acceptance.

@@ -42,6 +42,17 @@
   font-family: var(--studio-font-mono);
 }
 
+.studio-code-editor-rich .cm-editor .cm-activeLine,
+.studio-code-editor-rich .cm-editor .cm-activeLineGutter {
+  background: var(--studio-accent-soft);
+}
+
+.studio-code-editor-rich .cm-editor .cm-gutters {
+  background: var(--studio-surface-muted);
+  border-color: var(--studio-border);
+  color: var(--studio-text-muted);
+}
+
 .studio-code-token-keyword { color: var(--studio-syntax-keyword, var(--studio-text)); }
 .studio-code-token-operator { color: var(--studio-syntax-operator, var(--studio-text)); }
 .studio-code-token-literal { color: var(--studio-syntax-literal, var(--studio-text)); }

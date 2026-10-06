@@ -140,6 +140,9 @@ These roles paint text on the editor and preview surfaces, not the status-chip o
 Keep each mode's foreground legible against the actual theme-provided code surface when changing
 the central palette, and verify in a rendered host; do not infer contrast from the token name or
 mode alone. High-contrast hosts use primary text rather than decorative syntax colors.
+Expanded code active-line and active-gutter fills use `--studio-accent-soft`; gutter text,
+surface and border use the corresponding Studio semantic roles. Do not leave the editor
+engine's light-only default overlays or gutter palette over a host-selected dark surface.
 
 ### Accent & focus
 

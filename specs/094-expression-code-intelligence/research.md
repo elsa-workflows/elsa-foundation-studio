@@ -250,6 +250,11 @@ chrome ring. The strong role defaults to primary text; verify its actual adjacen
 at least3:1. Editor-consumed Escape must not restore an inspector maximized for narrow editing;
 an unconsumed Escape retains the existing panel restore action.
 
+Expanded-only active-line and gutter chrome must also consume Studio roles rather than
+CodeMirror's light default overlay and gutter palette. Actual Dark-host proof exposes a
+4.364519:1 function token on the stock active-line overlay. Keep the syntax foregrounds
+unchanged and map that fill to the existing soft accent; verify rendered gutter text as well.
+
 **Consequences**: Root owns integration, actual normal-host color-mode/contrast/narrow proof and
 complete affected gates. The bounded worker owns presentation implementation/tests and central
 token documentation only. Active-argument/overload semantics and explicit behavior-preserving

@@ -208,8 +208,17 @@ completeTest("normal-host expression previews and help remain readable in Light,
       await expect(editor).toBeVisible();
       const multilineSource = `${source}\n`;
       await replacePersistedWorkflowSource(page, hostPair, editor, draft, traffic, language, multilineSource);
-      await editor.press("Escape");
-      await editor.press("Tab");
+      // Inserting a newline intentionally expands compact editing. Close that real dialog
+      // before checking the multiline preview's non-activating keyboard focus.
+      const dialog = page.getByRole("dialog");
+      const expanded = dialog.locator(".studio-code-editor-rich-expanded .cm-content");
+      await expect(expanded).toBeFocused();
+      await expect.poll(() => readEditorSource(expanded)).toBe(multilineSource);
+      await dialog.getByRole("button", { name: `Close ${draft.inputName} editor` }).click();
+      await expect(dialog).toHaveCount(0);
+      // The row deliberately restores its expand button on the next animation frame.
+      await expect(page.getByRole("button", { name: `Open expanded ${draft.inputName} editor` })).toBeFocused();
+      await syntax.focus();
       await expect(syntax).toBeFocused();
       await syntax.press("Shift+Tab");
       await expect(preview).toBeFocused();
@@ -218,7 +227,6 @@ completeTest("normal-host expression previews and help remain readable in Light,
       await expectReadableCodeSurface(preview, { focused: true });
       await expect.poll(() => readPersistedSource(page, hostPair, draft)).toBe(multilineSource);
       await preview.press("Enter");
-      const expanded = page.getByRole("dialog").locator(".studio-code-editor-rich-expanded .cm-content");
       await expect(expanded).toBeFocused();
       await expect.poll(() => readEditorSource(expanded)).toBe(multilineSource);
       await replacePersistedWorkflowSource(page, hostPair, expanded, draft, traffic, language, source);
@@ -399,6 +407,7 @@ async function expectExpandedSourceContinuity(page: Page, pair: NormalHostPair,
   const expanded = dialog.locator(".studio-code-editor-rich-expanded .cm-content");
   await expect.poll(() => readEditorSource(expanded)).toBe(source);
   await expectReadableCodeSurface(expanded);
+  await expectReadableCodeSurface(dialog.locator(".cm-gutters"));
   await dialog.getByRole("button", { name: `Close ${draft.inputName} editor` }).click();
   await expect(dialog).toHaveCount(0);
   await expect.poll(() => readPersistedSource(page, pair, draft)).toBe(source);
@@ -452,7 +461,7 @@ async function expectReadableCodeSurface(surface: Locator, options: { focused?: 
       const selectionBackground = selected ? rgba(style.backgroundColor) : undefined;
       const foreground = rgba(style.color);
       const background = selectionBackground ? blend(selectionBackground, backgroundOf(node)) : backgroundOf(node);
-      return { className: node.className, contrast: contrast(foreground, background),
+      return { className: node.className, foreground, background, contrast: contrast(foreground, background),
         selectionAlpha: selectionBackground?.[3],
         selectionTokenOwned: selected && !!accentRgba && !!onAccentRgba &&
           selectionBackground?.every((channel, index) => channel === accentRgba[index]) &&
@@ -474,7 +483,9 @@ async function expectReadableCodeSurface(surface: Locator, options: { focused?: 
   }, options.selected === true);
   expect(measurements.ratios.length).toBeGreaterThan(0);
   for (const measurement of measurements.ratios) {
-    expect(measurement.contrast, `Text contrast for ${measurement.className}`).toBeGreaterThanOrEqual(4.5);
+    expect(measurement.contrast, `Text contrast for ${measurement.className} (${JSON.stringify({
+      foreground: measurement.foreground, background: measurement.background
+    })})`).toBeGreaterThanOrEqual(4.5);
     if (options.selected) {
       expect(measurement.selectionAlpha).toBeGreaterThan(0);
       expect(measurement.selectionTokenOwned, `Selection tokens for ${measurement.className}`).toBe(true);
