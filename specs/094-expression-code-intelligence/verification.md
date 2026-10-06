@@ -8,6 +8,73 @@ T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head autom
 
 ## Passing evidence
 
+### M4 T036 scrollable-content boundary correction (not accepted)
+
+At committed Studio `d4f4362fd26e9c111321eea95e9bc5650d157c99`, the canonical all-five
+run passes the original four cases and progresses through JavaScript Light/Dark/Dim including
+expanded/gutter contrast and multiline continuity. It fails in Liquid Light because the helper
+compares the intrinsic single-line `.cm-content` box with the screen boundary. A fresh-host
+diagnostic reusing that immediately preceding coherent build shows: content right399.734px;
+actual editor/scroller/inspector left0/right365px on a390px screen; editor and inspector
+scrollWidth/clientWidth365; scroller scrollWidth400/clientWidth365/overflow-x:hidden.
+The viewport is clipped/contained, not a whole-editor or inspector overflow.
+
+The harness now uses the code scroller's bounds only for `.cm-content`. All other surfaces keep
+their actual bounds, text contrast remains measured on every actual text parent, and the existing
+inspector/viewport containment checks remain. Overflowing source additionally requires an actual
+clipping/scrolling policy and contained editor width. End/Home keyboard checks prove horizontal
+scroll movement in both directions and visible collapsed carets at the exact source end/start;
+source/persistence assertions remain exact. No production layout, assertion threshold, timeout
+or forced scroll changes. Corrected proof remains pending. Logs:
+`/private/tmp/elsa-568-root-all-five-d4f4362f.log`,
+`/private/tmp/elsa-568-root-liquid-content-geometry.log`.
+
+Exact-head CI37401854948 is terminal: full workspace units, three Workflows shuffle seeds,
+lint/typecheck/bundles and generic Chromium pass. Normal hosts reproduce the same Liquid
+content-box boundary failure (right406 vs390px screen), with the original four cases passing.
+Retained log: `/private/tmp/elsa-568-root-ci-d4f4362f-failure.log`. This is not theme acceptance.
+
+The first navigation diagnostic observes scrollLeft0 after End; it does not prove actual caret
+movement. Its failure is retained at `/private/tmp/elsa-568-root-liquid-viewport-navigation.log`.
+The independent source review recommends Home before End, then Home again, because a restored
+caret may already be at the end. That sequence also observes scrollLeft0 and remains failed at
+`/private/tmp/elsa-568-root-liquid-home-end-navigation.log`. Root is measuring native selection
+offsets and bounded geometry before inferring a key or product defect. The check also asserts
+exact editor source after navigation; no unsuccessful diagnostic is labeled passing.
+
+The key-position diagnostic confirms the keys work: Home moves the native collapsed caret to
+offset0/x16, End moves it to offset32/x265.719, both within the365px viewport. The short actual
+text fits even though the logical content has a400px minimum width; it needs no scrolling.
+Root replaces only the new case's Liquid string argument with genuinely long representative
+source to prove horizontal navigation, keeping the actual append metadata/help and exact-source
+checks. Temporary selection-offset/platform console diagnostics are removed. Log:
+`/private/tmp/elsa-568-root-liquid-navigation-keys.log`. Long-source proof remains pending.
+
+The first long-source diagnostic reaches a visible end caret and scrolls horizontally, then
+fails the return-Home assertion: scrollLeft11 rather than exactly0. Requiring an exact native
+padding offset is not the accessibility contract. The corrected check requires genuine
+overflow, exact start/end native selection offsets, visible carets and scroll movement in
+both directions, plus unchanged exact source. It cannot silently skip a non-overflowing
+fixture. Log: `/private/tmp/elsa-568-root-long-liquid-navigation.log`. Proof remains pending.
+
+The revised long-source navigation passes its actual start/end caret and bidirectional-scroll
+assertions, then the Liquid Light completion readability path times out inside its combined
+interaction/readability retry. The selected append completion is present in the native snapshot.
+Root separates surface readability from the existing bounded hotkey retry so a geometry or
+contrast failure is reported directly rather than hidden by that retry; thresholds and wait
+limits are unchanged. Log: `/private/tmp/elsa-568-root-long-liquid-caret-boundaries.log`.
+
+The next run catches a real theme-switch contrast dip in the static Liquid preview:
+Light string foreground `[23,96,32]` on an intermediate surface `[187,190,196]` gives
+4.129539:1, below4.5. The global button rule animates all properties for0.15s; static syntax
+roles change immediately. An actual native computed-style red confirms the preview inherits
+`transition-property:all; transition-duration:0.15s`. The bounded production correction makes
+only this code-preview button's foreground/background change atomically (`transition:none`),
+without palette changes, injected waits, global motion-policy changes or relaxed contrast.
+The browser check now guards that invariant in all six language/appearance paths. Logs:
+`/private/tmp/elsa-568-root-liquid-completion-readability.log`,
+`/private/tmp/elsa-568-root-preview-transition-red.log`. Canonical corrected proof is pending.
+
 ### M4 T036 committed-head reconciliation — multiline journey correction (not accepted)
 
 At Studio `966d823e2b50b09339c31e5be72152ff823e0e96`, local all-five actual-host

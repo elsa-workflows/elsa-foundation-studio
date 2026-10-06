@@ -121,7 +121,8 @@ completeTest("normal-host expression previews and help remain readable in Light,
     const preview = page.getByRole("button", { name: `${language} expression. Activate to edit.` });
     await preview.click();
     const editor = page.locator(".studio-code-editor-rich-compact .cm-content");
-    const source = language === "JavaScript" ? "Math.abs(-2)" : "{{ customerName | append: 'x' }}";
+    const source = language === "JavaScript" ? "Math.abs(-2)"
+      : "{{ customerName | append: 'theme-aware compact source remains readable at narrow inspector width' }}";
     const sourcePhase = await replacePersistedWorkflowSource(page, hostPair, editor, draft, traffic, language, source);
     // Leaving the compact editor returns to the same lazy preview without editing the value.
     await syntax.focus();
@@ -137,6 +138,13 @@ completeTest("normal-host expression previews and help remain readable in Light,
       await preview.scrollIntoViewIfNeeded();
       await expect(preview).toBeInViewport();
       await expect(preview.locator("[class*='studio-code-token-']").first()).toBeVisible();
+      const previewTransition = await preview.evaluate(element => {
+        const style = getComputedStyle(element);
+        return { property: style.transitionProperty, duration: style.transitionDuration };
+      });
+      // Syntax roles switch immediately. An inherited button color/background transition
+      // would pair the new foreground with an intermediate old surface and lose contrast.
+      expect(previewTransition, "Preview theme colors must change atomically").toEqual({ property: "none", duration: "0s" });
       await expectReadableCodeSurface(preview);
       await expect.poll(() => readPersistedSource(page, hostPair, draft)).toBe(source);
       await preview.focus();
@@ -144,6 +152,7 @@ completeTest("normal-host expression previews and help remain readable in Light,
       await expect(editor).toBeFocused();
       await expect(editor.locator("[class*='studio-code-token-']").first()).toBeVisible();
       await expectReadableCodeSurface(editor, { focused: true });
+      if (language === "Liquid") await expectHorizontalEditorNavigation(editor, source);
       await editor.press("ControlOrMeta+A");
       await expect.poll(() => editor.evaluate(element => {
         const selection = window.getSelection();
@@ -162,8 +171,8 @@ completeTest("normal-host expression previews and help remain readable in Light,
         await editor.press("Alt+i");
         const hover = page.getByRole("status", { name: "Hover information" });
         await expect(hover).toBeVisible({ timeout: 1_000 });
-        await expectReadableCodeSurface(hover);
       }).toPass({ timeout: 15_000 });
+      await expectReadableCodeSurface(page.getByRole("status", { name: "Hover information" }));
       await editor.press("Escape");
       await expect(page.locator(".wf-editor-body")).toHaveClass(/inspector-maximized/);
       await moveEditorCursor(editor, source, language === "JavaScript" ? source.indexOf("abs") + 2 : position);
@@ -171,8 +180,8 @@ completeTest("normal-host expression previews and help remain readable in Light,
         await editor.press("Control+Space");
         const menu = page.locator(".cm-tooltip-autocomplete");
         await expect(menu).toBeVisible({ timeout: 1_000 });
-        await expectReadableCodeSurface(menu.locator('[aria-selected="true"]'));
       }).toPass({ timeout: 15_000 });
+      await expectReadableCodeSurface(page.locator('.cm-tooltip-autocomplete [aria-selected="true"]'));
       await editor.press("Escape");
       await expect(page.locator(".wf-editor-body")).toHaveClass(/inspector-maximized/);
       if (mode === "Light") {
@@ -467,14 +476,26 @@ async function expectReadableCodeSurface(surface: Locator, options: { focused?: 
           selectionBackground?.every((channel, index) => channel === accentRgba[index]) &&
           foreground.every((channel, index) => channel === onAccentRgba[index]) };
     });
-    const bounds = element.getBoundingClientRect();
+    // CodeMirror's single-line content may be wider than its clipped viewport. Measure
+    // the actual code viewport, not the intrinsic text box; other surfaces keep their own bounds.
+    const codeScroller = element.matches(".cm-content") ? element.closest(".cm-scroller") : null;
+    const bounds = (codeScroller ?? element).getBoundingClientRect();
+    const contentBounds = element.getBoundingClientRect();
     const pane = element.closest(".wf-properties");
     const paneBounds = pane?.getBoundingClientRect();
     const editor = element.closest(".cm-editor");
+    const scrollGeometry = (node: Element | null) => {
+      if (!node) return null;
+      const rectangle = node.getBoundingClientRect();
+      return { left: rectangle.left, right: rectangle.right, clientWidth: node.clientWidth,
+        scrollWidth: node.scrollWidth, scrollLeft: node.scrollLeft, overflowX: getComputedStyle(node).overflowX };
+    };
     const focusSurface = editor ?? element.closest(".studio-code-editor-preview");
     const focusStyle = focusSurface && getComputedStyle(focusSurface);
     return {
       ratios, left: bounds.left, right: bounds.right, viewportWidth: window.innerWidth,
+      contentOverflows: !!codeScroller && (contentBounds.left < bounds.left - 1 || contentBounds.right > bounds.right + 1),
+      editorGeometry: scrollGeometry(editor), scrollerGeometry: scrollGeometry(element.closest(".cm-scroller")),
       pane: pane && paneBounds ? { left: paneBounds.left, right: paneBounds.right,
         scrollWidth: pane.scrollWidth, clientWidth: pane.clientWidth } : null,
       focus: focusSurface && focusStyle ? { width: parseFloat(focusStyle.outlineWidth), style: focusStyle.outlineStyle,
@@ -492,7 +513,14 @@ async function expectReadableCodeSurface(surface: Locator, options: { focused?: 
     }
   }
   expect(measurements.left).toBeGreaterThanOrEqual(-1);
-  expect(measurements.right).toBeLessThanOrEqual(measurements.viewportWidth + 1);
+  expect(measurements.right, JSON.stringify({ left: measurements.left, right: measurements.right,
+    viewportWidth: measurements.viewportWidth, editor: measurements.editorGeometry,
+    scroller: measurements.scrollerGeometry, pane: measurements.pane }))
+    .toBeLessThanOrEqual(measurements.viewportWidth + 1);
+  if (measurements.contentOverflows) {
+    expect(["auto", "scroll", "hidden"]).toContain(measurements.scrollerGeometry?.overflowX);
+    expect(measurements.editorGeometry?.scrollWidth).toBeLessThanOrEqual((measurements.editorGeometry?.clientWidth ?? 0) + 1);
+  }
   if (measurements.pane) {
     expect(measurements.pane.left).toBeGreaterThanOrEqual(-1);
     expect(measurements.pane.right).toBeLessThanOrEqual(measurements.viewportWidth + 1);
@@ -503,6 +531,36 @@ async function expectReadableCodeSurface(surface: Locator, options: { focused?: 
     expect(measurements.focus?.width).toBeGreaterThanOrEqual(2);
     expect(measurements.focus?.contrast).toBeGreaterThanOrEqual(3);
   }
+}
+
+async function expectHorizontalEditorNavigation(editor: Locator, source: string) {
+  const scroller = editor.locator("xpath=ancestor::*[contains(@class, 'cm-scroller')][1]");
+  const overflows = await scroller.evaluate(element => element.scrollWidth > element.clientWidth + 1);
+  expect(overflows, "The long Liquid source must exercise horizontal navigation").toBe(true);
+  const caretPosition = () => editor.evaluate(element => {
+    const selection = window.getSelection();
+    const viewport = element.closest(".cm-scroller")?.getBoundingClientRect();
+    if (!selection?.isCollapsed || !selection.rangeCount || !element.contains(selection.anchorNode) || !viewport) return null;
+    const range = selection.getRangeAt(0);
+    const caret = range.getBoundingClientRect();
+    const prefix = document.createRange();
+    prefix.selectNodeContents(element);
+    prefix.setEnd(range.startContainer, range.startOffset);
+    return { offset: prefix.toString().length,
+      visible: caret.height > 0 && caret.left >= viewport.left - 1 && caret.right <= viewport.right + 1 };
+  });
+  // A restored session may already have its caret at the end; move it before requesting End.
+  await editor.press("Home");
+  await expect.poll(caretPosition).toEqual({ offset: 0, visible: true });
+  const initialScroll = await scroller.evaluate(element => element.scrollLeft);
+  await editor.press("End");
+  await expect.poll(caretPosition).toEqual({ offset: source.length, visible: true });
+  await expect.poll(() => scroller.evaluate(element => element.scrollLeft)).toBeGreaterThan(initialScroll);
+  const endScroll = await scroller.evaluate(element => element.scrollLeft);
+  await editor.press("Home");
+  await expect.poll(caretPosition).toEqual({ offset: 0, visible: true });
+  await expect.poll(() => scroller.evaluate(element => element.scrollLeft)).toBeLessThan(endScroll);
+  await expect.poll(() => readEditorSource(editor)).toBe(source);
 }
 
 async function openWorkflowDraft(page: Page, pair: NormalHostPair, draft: PersistedExpressionDraft) {
