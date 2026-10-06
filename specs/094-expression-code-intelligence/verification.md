@@ -119,8 +119,9 @@ comments and no unresolved review threads. Its default docstring-coverage warnin
 explicitly recorded, not silently passed; that advisory is not a required repository gate,
 and existing focused helper comments explain the non-obvious proof boundaries. No bulk
 documentation boilerplate is added. This is completed bot review evidence, not a GitHub
-APPROVED review or human acceptance. Copilot is requested but actual request/review/inline
-arrays remain empty after the window; no Greptile review is claimed.
+APPROVED review or human acceptance. Explicit Copilot request attempts return CLI success,
+but no persisted request or completed Copilot review is evidenced: actual request/review/
+inline arrays remain empty after the window. No Greptile review is claimed.
 
 Primary root logs: `/private/tmp/elsa-577-root-normal-host-b4083bd4.log`,
 `/private/tmp/elsa-577-root-ci-b4083bd4-pass.log`,
