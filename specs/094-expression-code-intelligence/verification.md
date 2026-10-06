@@ -8,13 +8,39 @@ Retained CI558/37532060674 fails3/4 normal-host cases at the obsolete `.wf-statu
 
 ## Retained historical checkpoints
 
-Last reconciled: 2026-10-03 for Program #2310 M2 local conformance verification; committed-head CI/review, delivery and final human acceptance pending
+Last reconciled: 2026-10-03 for Program #2310 exact-head M2 automated gate and M3 spike exit; delivery and final human acceptance pending
 
 ## Program #2310 status
 
-T026-T029 pass at the exact M1 pair below. T030-T031 are implemented with the local M2 evidence below; their committed-head CI/review gate is pending. Deeper language help, three-theme presentation, formatting and current-head manual accessibility/continuity acceptance (T032-T038) remain open. The 2026-07-28 evidence remains historical. All program PRs remain draft and unmerged; final human acceptance is outstanding.
+T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head automated M2 gate under the documented unavailable-external-review fallback. Studio spike #553 / T035 settles the technical decision: reject the current deeper-service candidate and retain the baseline path. No dependency or production integration is adopted. Deeper language help, three-theme presentation, formatting and current-head manual accessibility/continuity acceptance (T032-T034, T036-T038) remain open. The 2026-07-28 evidence remains historical. All program PRs remain draft and unmerged; final human acceptance is outstanding.
 
 ## Passing evidence
+
+### M3 optional service spike exit, 2026-10-03
+
+Root reviews the isolated prototype based on Studio `00677684dcd32d5152f16df5b5fafd644df85d9a` and Foundation profile `7457b7a4564892bab4b28bd0d07fac9709462d56`, then independently runs `node tools/prototypes/javascript-service-spike/run.mjs` in `/private/tmp/elsa-553-worker.3l1Jcr`. The final rebuilt Chromium scenario passes 1/1 in 6.1 seconds with Node 25.8.0, TypeScript 5.9.3, Vite 7.3.5, Playwright 1.61.1 and Chromium 149.0.7827.55. Root log: `/private/tmp/elsa-553-root-spike-final.log`; runner log: `/private/tmp/elsa-553-worker-evidence-S9IpPO/run.log`. Prototype source and raw evidence are retained locally, not shipped in this docs change.
+
+| Adoption gate | Actual evidence | Decision boundary |
+|---|---|---|
+| Runtime declarations | Curated manual fixture, `noLib`/`noResolve`, actual `Classic` enum, two virtual files, closed resolver hooks, no forbidden declarations or `Math.random`, zero unmapped reads in tested inputs | Pass for the bounded fixture only; no generated/custom-host parity or authored-import proof |
+| Worker and cancellation | Real browser Worker, cancellation before analysis and synthetic in-flight stale-result rejection | Partial/unproved: no interruption of synchronous TypeScript analysis |
+| Lazy loading and bundles | Worker loads only after prototype activation; emitted worker is 3,593,746 raw / 1,028,419 gzip bytes | Scratch application of unchanged 500,000-byte chunk ceiling fails; no shipping integration pass |
+| Completion/accessibility | Nested/local-object members, callback quick info, callable signature and browser keyboard filtering/acceptance | Real screen-reader and current expression-only normal-host non-regression remain unproved |
+| Disable/fallback | Baseline completions continue; source and cursor are exact after disabling | Pass for this synthetic fixture; no undo or persisted-workflow acceptance inferred |
+
+The unchanged production command `pnpm check:bundle:workflows` passes in the worker worktree: entry 127.47/127.50 kB, Definitions total 376.92/384.50 kB, upgrades total 366.93/375.50 kB, largest existing chunk 263.18/500.00 kB. Root verifies that the scratch checker is byte-identical to the production checker (SHA-256 `a3d29de448835168b722362fd59815814188befee7cafc819144df6049bfabd0`) and its manifest changes no baseline entry, adding only the actual worker as a deferred entry. After rebuilding the corrected final prototype asset, root runs `node /private/tmp/elsa-553-workflows-gate-scratch-hczwsL/src/essentials/Elsa.Studio.Workflows/Client/scripts/check-bundle-size.mjs`; it exits 1 with only the 3,593.75/500.00 kB worker-chunk overage, retaining every baseline budget. Final log: `/private/tmp/elsa-553-root-scratch-gate-final.log`. This is checker/asset evidence, not a production integration or CI failure.
+
+Earlier wrong language-service offsets and nonexistent `ModuleResolutionKind.None` labeling are corrected before the final root rerun. A separate synthetic `import("node:fs")` query times out after 30 seconds; it is not in the passing scenario, its cause is not inferred, and authored-import behavior stays unproved. No authored source is evaluated; only synthetic data is used. No prototype dependency, production file, lockfile, SDK or wire field is adopted. Decision 16 rejects the candidate because not every binary gate passes. T035's technical decision permits baseline M3 refinement; it is not M3 completion, final assistive-technology acceptance or delivery.
+
+### M2 final exact-head automated gate, 2026-10-03
+
+Studio `00677684dcd32d5152f16df5b5fafd644df85d9a` passes every job in [CI 37138361061](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37138361061), including generic Chromium 67/67 and rebuilt normal-host Chromium 4/4 against its immutable Foundation pin `7457b7a4564892bab4b28bd0d07fac9709462d56`. Foundation passes [full CI 37137966461](https://github.com/elsa-workflows/elsa-foundation/actions/runs/37137966461), including all selected EF suites, full Architecture and Core-only gates, plus [Maps 37137968339](https://github.com/elsa-workflows/elsa-foundation/actions/runs/37137968339).
+
+Root independently runs `ELSA_FOUNDATION_WORKTREE=/private/tmp/elsa-2351-foundation pnpm test:browser:expression-normal-host` against these final heads and passes 4/4 in 2.8 minutes after rebuilding both applications. Actual authentication, isolated fresh SQLite, persisted exact-source/fresh-revision assertions, negative composition controls and owned teardown remain intact. Evidence is retained at `/private/tmp/elsa-552-root-normal-host-final.log`. Final producer local suites, real Workbench 3/3 and fresh JavaScript REST 10/10 are recorded in the next checkpoint. Full local Architecture is not claimed separately from the hosted full gate.
+
+Copilot's last actual reviewed heads remain Studio `54fceb950e29d9f09d667bcb809aae4a73b0a9ac` (review 5401220606) and Foundation `59ef03004cb514520686de00467a425e340b11aa` (review 5401237320). Findings are corrected; final-head re-review requests still produce no new start/current-head review event. Root reviews the precise subsequent deltas: Studio test assertions, controlled stale-loader regression, popover sequencing harness, immutable producer pins and evidence; Foundation provider proof boundaries, native-error attribution guards, regression/real-host coverage and evidence. Final independent producer delta review is clean. This documented review plus complete final gates exercises the program-lead unavailable-review fallback, not Copilot or other external approval.
+
+The automated M2 dependency is satisfied. Studio #553's subsequent disposable language-service spike rejects the current candidate under the five binary Decision 16 gates, as recorded above; no prototype code or dependency ships. M3 production leaves remain open for baseline-path refinement and implementation; M4 remains Not Ready. Human acceptance, current-head manual assistive-technology evidence, arbitrary Foundation-main compatibility, merges and delivery remain unclaimed. Earlier pending/failing checkpoints below are historical, not current gate state.
 
 ### M2 final immutable producer correction, 2026-10-03
 
