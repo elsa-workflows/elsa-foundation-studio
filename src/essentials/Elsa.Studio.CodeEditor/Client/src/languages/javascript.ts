@@ -10,6 +10,10 @@ export const javaScriptLanguageAdapter: StudioCodeLanguageAdapter = {
   async loadSupport() {
     return { language: "javascript" };
   },
+  async loadFormatter() {
+    const module = await import("./javascriptFormatting");
+    return module.formatJavaScript;
+  },
   async loadPreviewHighlighter(grammarProfile) {
     const module = await import("../engines/javascriptPreview");
     return module.createJavaScriptPreviewHighlighter(grammarProfile);

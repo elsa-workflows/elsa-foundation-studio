@@ -1,6 +1,7 @@
 import { autocompletion, closeCompletion, completionStatus, insertCompletionText, pickedCompletion, snippetCompletion, type Completion, type CompletionSource } from "@codemirror/autocomplete";
+import { temporarilySetTabFocusMode } from "@codemirror/commands";
 import { StateEffect, StateField, type Extension } from "@codemirror/state";
-import { EditorView, hoverTooltip, panels, showPanel, ViewPlugin, type ViewUpdate } from "@codemirror/view";
+import { EditorView, hoverTooltip, panels, showPanel, ViewPlugin, type Panel, type ViewUpdate } from "@codemirror/view";
 import { sanitizeStudioCodeMarkdown } from "../StudioCodeDocumentation";
 import type {
   StudioCodeCompletion,
@@ -9,6 +10,7 @@ import type {
   StudioCodeHover,
   StudioCodeHoverProvider,
   StudioCodeSignature,
+  StudioCodeSignatureInfo,
   StudioCodeSignatureProvider
 } from "../types";
 
@@ -147,14 +149,77 @@ function createKeyboardHoverPanel(hover: StudioCodeHover) {
 
 const setSignature = StateEffect.define<StudioCodeSignature | null>();
 const signatureHelpRequests = new WeakMap<EditorView, AbortController>();
+const selectedSignatures = new WeakMap<EditorView, { identity: string; index: number }>();
 const signatureField = StateField.define<StudioCodeSignature | null>({
   create: () => null,
   update(value, transaction) {
     for (const effect of transaction.effects) if (effect.is(setSignature)) return effect.value;
-    return transaction.docChanged ? null : value;
+    return transaction.docChanged || transaction.selection !== undefined ? null : value;
   },
-  provide: field => showPanel.from(field, signature => signature ? createSignaturePanel(signature) : null)
+  provide: field => showPanel.from(field, signature => signature ? signaturePanel : null)
 });
+
+const signaturePanel = (view: EditorView): Panel => {
+  const dom = document.createElement("div");
+  dom.className = "studio-code-editor-signature";
+  dom.setAttribute("role", "status");
+  dom.setAttribute("aria-live", "polite");
+  const label = document.createElement("span");
+  label.className = "studio-code-editor-signature-label";
+  const documentation = document.createElement("span");
+  documentation.className = "studio-code-editor-signature-documentation";
+  const parameter = document.createElement("div");
+  parameter.className = "studio-code-editor-signature-parameter";
+  const navigation = document.createElement("div");
+  navigation.className = "studio-code-editor-signature-navigation";
+  const previous = document.createElement("button");
+  previous.type = "button";
+  previous.className = "studio-code-editor-signature-previous";
+  previous.setAttribute("aria-label", "Previous signature");
+  previous.textContent = "Previous";
+  const count = document.createElement("span");
+  count.className = "studio-code-editor-signature-count";
+  const next = document.createElement("button");
+  next.type = "button";
+  next.className = "studio-code-editor-signature-next";
+  next.setAttribute("aria-label", "Next signature");
+  next.textContent = "Next";
+  navigation.append(previous, count, next);
+  dom.append(label, documentation, parameter, navigation);
+
+  const move = (delta: number) => moveSignature(view, delta);
+  previous.addEventListener("click", () => move(-1));
+  next.addEventListener("click", () => move(1));
+  navigation.addEventListener("keydown", event => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      returnCodeMirrorFocusForExit(view);
+      return;
+    }
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    move(event.key === "ArrowLeft" ? -1 : 1);
+  });
+
+  const panel: Panel = {
+    dom,
+    top: false,
+    update: () => renderSignaturePanel(view, { label, documentation, parameter, navigation, previous, count, next })
+  };
+  renderSignaturePanel(view, { label, documentation, parameter, navigation, previous, count, next });
+  return panel;
+};
+
+interface SignaturePanelElements {
+  label: HTMLSpanElement;
+  documentation: HTMLSpanElement;
+  parameter: HTMLDivElement;
+  navigation: HTMLDivElement;
+  previous: HTMLButtonElement;
+  count: HTMLSpanElement;
+  next: HTMLButtonElement;
+}
 
 function createSignatureHelpExtensions(options: StudioCodeIntelligenceOptions): Extension[] {
   return [
@@ -173,21 +238,38 @@ function createSignatureHelpExtensions(options: StudioCodeIntelligenceOptions): 
         const controller = signatureHelpRequests.get(this.view);
         controller?.abort();
         signatureHelpRequests.delete(this.view);
+        selectedSignatures.delete(this.view);
       }
 
       private async refresh(view: EditorView) {
         signatureHelpRequests.get(view)?.abort();
         const controller = new AbortController();
         signatureHelpRequests.set(view, controller);
+        const source = view.state.doc.toString();
+        const position = view.state.selection.main.head;
         try {
           const signature = await options.signatureProvider!(
-            { ...options.document, value: view.state.doc.toString() },
-            view.state.selection.main.head,
+            { ...options.document, value: source },
+            position,
             controller.signal
           );
-          if (!controller.signal.aborted) view.dispatch({ effects: setSignature.of(signature) });
+          if (controller.signal.aborted || signatureHelpRequests.get(view) !== controller ||
+              view.state.doc.toString() !== source || view.state.selection.main.head !== position) return;
+          const normalized = normalizeSignature(signature);
+          if (!normalized) {
+            view.dispatch({ effects: setSignature.of(null) });
+            return;
+          }
+          const identity = signatureCatalogKey(options.document, normalized);
+          const remembered = selectedSignatures.get(view);
+          const selectedIndex = remembered?.identity === identity ? remembered.index : normalized.activeSignature ?? 0;
+          const selected = selectSignature(normalized, selectedIndex);
+          selectedSignatures.set(view, { identity, index: selected.activeSignature ?? 0 });
+          view.dispatch({ effects: setSignature.of(selected) });
         } catch {
-          if (!controller.signal.aborted) view.dispatch({ effects: setSignature.of(null) });
+          if (!controller.signal.aborted && signatureHelpRequests.get(view) === controller) {
+            view.dispatch({ effects: setSignature.of(null) });
+          }
         } finally {
           if (signatureHelpRequests.get(view) === controller) signatureHelpRequests.delete(view);
         }
@@ -196,17 +278,122 @@ function createSignatureHelpExtensions(options: StudioCodeIntelligenceOptions): 
   ];
 }
 
-function createSignaturePanel(signature: StudioCodeSignature) {
-  return () => {
-    const dom = document.createElement("div");
-    dom.className = "studio-code-editor-signature";
-    dom.setAttribute("role", "status");
-    dom.setAttribute("aria-live", "polite");
-    dom.textContent = signature.documentation
-      ? `${signature.label} — ${sanitizeStudioCodeMarkdown(signature.documentation.markdown)}`
-      : signature.label;
-    return { dom, top: false };
+function renderSignaturePanel(view: EditorView, elements: SignaturePanelElements) {
+  const signature = view.state.field(signatureField, false);
+  if (!signature) return;
+  const signatures = signature.signatures;
+  const index = signature.activeSignature ?? 0;
+  const selected = signatures?.[index] ?? signature;
+  elements.label.textContent = selected.label;
+  elements.documentation.textContent = selected.documentation
+    ? sanitizeStudioCodeMarkdown(selected.documentation.markdown)
+    : "";
+  const activeParameter = validActiveParameter(selected);
+  const parameterInfo = activeParameter === undefined ? undefined : selected.parameters?.[activeParameter];
+  elements.parameter.textContent = parameterInfo
+    ? parameterInfo.documentation
+      ? `${parameterInfo.name} — ${sanitizeStudioCodeMarkdown(parameterInfo.documentation)}`
+      : parameterInfo.name
+    : "";
+  const count = signatures?.length ?? 1;
+  const hasNavigation = count > 1;
+  elements.navigation.hidden = !hasNavigation;
+  // Native disabled buttons drop focus in Chromium and would release compact editing.
+  // Keep the same focusable controls; the bounded move handler makes unavailable actions no-ops.
+  elements.previous.setAttribute("aria-disabled", String(index <= 0));
+  elements.next.setAttribute("aria-disabled", String(index >= count - 1));
+  elements.count.textContent = `${index + 1} of ${count}`;
+}
+
+function moveSignature(view: EditorView, delta: number) {
+  const current = view.state.field(signatureField, false);
+  if (!current) return;
+  const signatures = current.signatures;
+  if (!signatures || signatures.length < 2) return;
+  const index = current.activeSignature ?? 0;
+  const nextIndex = Math.max(0, Math.min(signatures.length - 1, index + delta));
+  if (nextIndex === index) return;
+  const selected = selectSignature(current, nextIndex);
+  selectedSignatures.set(view, {
+    identity: selectedSignatures.get(view)?.identity ?? "",
+    index: nextIndex
+  });
+  view.dispatch({ effects: setSignature.of(selected) });
+}
+
+function normalizeSignature(signature: StudioCodeSignature | null): StudioCodeSignature | null {
+  if (!signature) return null;
+  if (signature.signatures && signature.signatures.length === 0) return null;
+  const signatures = signature.signatures?.map(normalizeSignatureInfo);
+  const activeSignature = signatures
+    ? Number.isInteger(signature.activeSignature) && signature.activeSignature! >= 0 && signature.activeSignature! < signatures.length
+      ? signature.activeSignature
+      : 0
+    : undefined;
+  const selected = signatures?.[activeSignature ?? 0] ?? normalizeSignatureInfo(signature);
+  return {
+    ...selected,
+    ...(signatures ? { signatures, activeSignature } : {}),
+    ...(signature.callableId === undefined ? {} : { callableId: signature.callableId })
   };
+}
+
+function normalizeSignatureInfo(signature: StudioCodeSignatureInfo): StudioCodeSignatureInfo {
+  const activeParameter = validActiveParameter(signature);
+  return {
+    label: signature.label,
+    parameters: signature.parameters,
+    returnShapeId: signature.returnShapeId,
+    documentation: signature.documentation,
+    ...(activeParameter === undefined ? {} : { activeParameter })
+  };
+}
+
+function validActiveParameter(signature: StudioCodeSignatureInfo) {
+  return Number.isInteger(signature.activeParameter) && signature.activeParameter! >= 0 &&
+    signature.activeParameter! < (signature.parameters?.length ?? 0)
+    ? signature.activeParameter
+    : undefined;
+}
+
+function selectSignature(signature: StudioCodeSignature, index: number): StudioCodeSignature {
+  const signatures = signature.signatures;
+  if (!signatures?.length) return signature;
+  const selectedIndex = Math.max(0, Math.min(signatures.length - 1, Number.isInteger(index) ? index : 0));
+  const selected = signatures[selectedIndex]!;
+  return {
+    ...selected,
+    signatures,
+    activeSignature: selectedIndex,
+    ...(signature.callableId === undefined ? {} : { callableId: signature.callableId })
+  };
+}
+
+function signatureCatalogKey(document: Pick<StudioCodeDocument, "uri" | "language">, signature: StudioCodeSignature) {
+  const infos = signature.signatures ?? [normalizeSignatureInfo(signature)];
+  return JSON.stringify([
+    document.uri,
+    document.language,
+    signature.callableId ?? signature.label,
+    infos.map(info => ({
+      label: info.label,
+      documentation: info.documentation?.markdown,
+      returnShapeId: info.returnShapeId,
+      parameters: info.parameters?.map(parameter => ({
+        name: parameter.name,
+        documentation: parameter.documentation,
+        shapeId: parameter.shapeId,
+        optional: parameter.optional
+      }))
+    }))
+  ]);
+}
+
+/** Returns an internal action's focus to the editor and lets the next native Tab leave. */
+export function returnCodeMirrorFocusForExit(view: EditorView) {
+  dismissCodeMirrorIntelligence(view);
+  view.focus();
+  temporarilySetTabFocusMode(view);
 }
 
 /** Dismisses completion, keyboard-hover, or signature UI before Escape arms Tab-focus escape. */
@@ -234,6 +421,7 @@ export function dismissCodeMirrorIntelligence(view: EditorView) {
   }
   if (view.state.field(signatureField, false)) {
     effects.push(setSignature.of(null));
+    selectedSignatures.delete(view);
     dismissed = true;
   }
   if (effects.length > 0) view.dispatch({ effects });
@@ -249,6 +437,14 @@ export function cancelCodeMirrorIntelligence(view: EditorView) {
   keyboardHoverRequests.delete(view);
   signatureHelpRequests.get(view)?.abort();
   signatureHelpRequests.delete(view);
+  selectedSignatures.delete(view);
+  if (view.state.field(signatureField, false)) {
+    try {
+      view.dispatch({ effects: setSignature.of(null) });
+    } catch {
+      // The view may already be in teardown; its state field is about to disappear.
+    }
+  }
   for (const controller of pointerHoverRequests.get(view) ?? []) controller.abort();
   pointerHoverRequests.delete(view);
 }

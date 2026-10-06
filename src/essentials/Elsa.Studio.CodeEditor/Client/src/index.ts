@@ -14,9 +14,11 @@ export {
 } from "./sessions/studioCodeEditorSessions";
 export {
   createStudioCodeToolingProjection,
-  projectStudioCodeDiagnostics
+  projectStudioCodeDiagnostics,
+  projectStudioCodeToolingSignature
 } from "./toolingProjection";
 export { createLiquidCursorClassifier } from "./languages/liquidCursor";
+export { createJavaScriptCallSignatureClassifier } from "./languages/javascriptCallSignature";
 export type {
   StudioCodeLiquidCursorClassifier,
   StudioCodeLiquidCursorContext,
@@ -33,6 +35,7 @@ export type {
   StudioCodeToolingProjectionOptions,
   StudioCodeToolingResult,
   StudioCodeToolingSignature,
+  StudioCodeToolingSignatureContext,
   StudioCodeToolingSymbol
 } from "./toolingProjection";
 export type {

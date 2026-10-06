@@ -21,6 +21,7 @@ describe("JavaScript expression editor module", () => {
     expect(contribution.metadata?.toolingCapabilities).toMatchObject({
       highlighting: true,
       signatures: true,
+      formatting: true,
       localDiagnostics: true
     });
     expect(contribution.sourceRenderer?.compact).toBe(JavaScriptSourceRenderer);
@@ -187,6 +188,38 @@ describe("JavaScript expression editor module", () => {
       source.length, new AbortController().signal
     )).resolves.toMatchObject(signature);
     expect(getCatalog).toHaveBeenCalledWith(expect.anything(), expect.anything(), "Math.abs", undefined, expect.anything());
+  });
+
+  it("projects authorized overloads with parser-proven active arguments per actual signature", async () => {
+    const signatures = [
+      { label: "Math.pow(base, exponent)", parameters: [{ name: "base" }, { name: "exponent" }], returnShapeId: "number" },
+      { label: "Math.pow(value)", parameters: [{ name: "value" }], returnShapeId: "number" }
+    ];
+    const projection = createStudioCodeToolingProjection({
+      document: { source: "" },
+      authoringContext: {},
+      tooling: { getCatalog: vi.fn().mockResolvedValue({ state: "ready", data: { symbols: [
+        { id: "catalog:math.pow", name: "Math.pow", signatures }
+      ] } }) },
+      languageProjection: javaScriptToolingProjection
+    });
+    const source = "Math.pow(2, 3)";
+    const position = source.indexOf("3") + 1;
+
+    await expect(projection.signatureProvider(
+      { uri: "test://math-pow", language: "javascript", value: source, version: 1 },
+      position,
+      new AbortController().signal
+    )).resolves.toMatchObject({
+      label: "Math.pow(base, exponent)",
+      signatures: [
+        { label: "Math.pow(base, exponent)", activeParameter: 1 },
+        { label: "Math.pow(value)" }
+      ],
+      activeSignature: 0,
+      activeParameter: 1,
+      callableId: "catalog:math.pow"
+    });
   });
 
   it.each([

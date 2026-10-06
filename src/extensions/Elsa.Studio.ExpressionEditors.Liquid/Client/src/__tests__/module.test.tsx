@@ -20,6 +20,7 @@ describe("Liquid expression editor module", () => {
     expect(contribution.metadata?.toolingCapabilities).toMatchObject({
       highlighting: true,
       signatures: true,
+      formatting: true,
       localDiagnostics: true
     });
     expect(contribution.sourceRenderer?.compact).toBe(LiquidSourceRenderer);

@@ -1,5 +1,6 @@
 import {
   createLiquidCursorClassifier,
+  projectStudioCodeToolingSignature,
   type StudioCodeCompletion,
   type StudioCodeCompletionRequest,
   type StudioCodeHover,
@@ -120,20 +121,23 @@ export function createLiquidToolingProjection(options: LiquidToolingProjectionOp
 
   const signatureProvider = async (document: StudioCodeToolingDocument & { value: string }, position: number, signal: AbortSignal): Promise<StudioCodeSignature | null> => {
     const cursor = await classifyCursor(document.value, position);
-    if (signal.aborted || options.authoringContext?.capabilities?.signatures === false || (cursor.region !== "filter" && cursor.region !== "tag")) return null;
-    const symbols = await getCatalog(document.value, cursor.prefix || tokenAt(document.value, position), signal);
+    const context = cursor.signatureContext;
+    if (signal.aborted || options.authoringContext?.capabilities?.signatures === false || !context) return null;
+    const symbols = await getCatalog(document.value, context.callableName, signal);
     if (!symbols || signal.aborted) return null;
-    const kind = cursor.region;
-    const name = tokenAt(document.value, position);
-    const signature = symbols.find(symbol => symbol.kind === kind && symbol.name === name)?.signatures?.[0];
-    return signature
-      ? {
-          label: signature.label,
-          documentation: signature.documentation ? { markdown: signature.documentation } : undefined,
-          parameters: signature.parameters,
-          returnShapeId: signature.returnShapeId
-        }
-      : null;
+    const symbol = symbols.find(candidate => candidate.kind === context.kind && candidate.name === context.callableName);
+    const signatures = symbol?.signatures;
+    if (!symbol || !signatures || signatures.length === 0) return null;
+    const projected = signatures.map(signature => projectStudioCodeToolingSignature(
+      signature,
+      context.kind === "filter" ? context.argumentOrdinal : undefined
+    ));
+    return {
+      ...projected[0]!,
+      signatures: projected,
+      activeSignature: 0,
+      callableId: symbol.id ?? symbol.name
+    };
   };
 
   async function membersForPath(path: readonly string[], symbols: readonly StudioCodeToolingSymbol[], source: string, signal: AbortSignal) {

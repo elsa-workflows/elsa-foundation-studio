@@ -1,12 +1,76 @@
 # Expression Code Intelligence — Verification
 
-Last reconciled: 2026-10-06 for Program #2310 final automated M3 proof and M4 Task#568 verification corrections; all PRs draft/unmerged, current-head manual AT and human acceptance pending
+Last reconciled: 2026-10-06 for Program #2310 T036 acceptance and in-progress T037 integration; all PRs draft/unmerged, current-head manual AT and human acceptance pending
 
 ## Program #2310 status
 
 T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head automated M2 gate under the documented unavailable-external-review fallback. Studio spike #553 / T035 settles the technical decision: reject the current deeper-service candidate and retain the baseline path. No deeper-service dependency is adopted. T032-T034 pass their final exact-head automated M3 gate below. T036 passes its immutable bc305150/5cd44d63 automated gate; Task#572 / Decision20 now owns T037 signature/formatting implementation. T037-T038 and current-head manual accessibility/human acceptance/delivery remain open. The 2026-07-28 evidence remains historical. All program PRs remain draft and unmerged.
 
 ## Verification evidence
+
+### Initial T037 checkpoint — not accepted
+
+Current in-progress integration resolves native-action focus boundaries, URI/session identity,
+render-time async provider generation and layout-phase source/provider invalidation. Initial
+passive formatter cleanup after lazy mounting could cancel the first action: localized with a
+value-free stack diagnostic, then moved into layout phase; temporary diagnostics are removed.
+Final affected suites pass240/240 (CodeEditor196, JavaScript16, Liquid28), including
+program-grammar controls and focus recovery before signature-authority refresh removes its
+focused native control. Owning TypeScript checks, changed-source ESLint, CSS Stylelint and
+diff check pass. Log: `/private/tmp/elsa-572-root-final-affected-units.log`.
+
+Actual registered-runtime parity passes ten synthetic fixtures against clean pinned Foundation5cd44d63:
+meaningfully changed JavaScript expression/program and Liquid filter output, opaque tokens/ASI,
+undefined versus JSON null and exact quiet Liquid text/tag/raw/comment/trim outputs.
+An intentional changed arithmetic output fails the actual runtime golden; it is restored.
+Removing overlap/same-position/ordering validation makes three real atomic-edit tests fail;
+that mutation is also restored. Logs: `/private/tmp/elsa-572-root-runtime-parity.log`,
+`/private/tmp/elsa-572-root-runtime-parity-mutation.log`,
+`/private/tmp/elsa-572-root-atomic-edit-mutation.log`.
+
+The final integration rerun also passes all ten fixtures after the program-grammar guard;
+log: `/private/tmp/elsa-572-root-runtime-parity-final.log`. This is actual registered runtime
+proof, not a substitute for the still-pending rebuilt normal-host and exact-head CI gates.
+
+The first coherent integration rebuild finishes4/5 (4.5m): the existing theme/fresh-hover,
+Activity Definition and both missing-module/provider paths pass. The persisted workflow case
+proves changed formatting source persisted, then fails because autosave erases its completed
+live announcement. Root keeps completed announcements through host acknowledgements but still
+cancels pending work and clears status on new source/selection edits. Targeted announcement/
+native-boundary controls reproduce RED2failed/37passed then GREEN39/39. Chromium separately
+confirms disabling the focused native button loses focus; navigation now uses bounded no-op
+`aria-disabled` actions without disabling/removing that control. Explicit format/overload
+Escape-to-editor/native-Tab controls reproduce RED2failed then GREEN2/2. Corrected coherent
+host proof remains pending. Logs: `/private/tmp/elsa-572-root-normal-host-integration.log`,
+`/private/tmp/elsa-572-root-status-focus-red.log`,
+`/private/tmp/elsa-572-root-status-focus-green.log`,
+`/private/tmp/elsa-572-root-control-exit-red.log`,
+`/private/tmp/elsa-572-root-control-exit-green.log`.
+
+Program formatting additionally declines JSX/TypeScript/module constructs accepted by the
+broader legacy authoring grammar but unsupported by the registered runtime. JSX/TypeScript
+quiet controls reproduce two failures; installed plain-parser checks alone miss a TypeAnnotation,
+so the selected-tree feature-node guard is also required. Final affected-suite verification
+passes; corrected coherent rebuilt-host verification remains pending. Independent source-only review confirms the earlier
+old-entry/pinned-dirty-source gaps are closed; it does not claim hosted/runtime acceptance.
+
+DraftPR#574 starts at Studio `863e55ef712e62cb6023b659a6efd4d83bd3122b`
+on immutable Foundation `5cd44d6312d9de85b13f4619fc7aa972a557d033`.
+[CI37408723729](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37408723729)
+is terminal failed: generic Chromium passes; the units job has two failing synthetic-blur
+tests (118 pass), and normal hosts pass four cases but fail the theme journey's fresh-hover
+revision assertion at line203 after its unchanged30s limit (6.1m).
+Log: `/private/tmp/elsa-572-root-ci-863e55ef-failed.log`.
+
+The two unit fixtures dispatch a synthetic blur without moving native focus outside the
+editor. The corrected fixtures use actual native blur and retain their parked-view and
+repeated-activation assertions. Current root wrapper/controller suites pass68/68, including
+internal native-button focus, explicit button/shortcut formatting, atomic selection/edit
+validation, late-result rejection and one-step undo. Log:
+`/private/tmp/elsa-572-root-engine-wrapper-tests-final.log`.
+This is focused in-progress evidence, not acceptance. The hosted fresh-hover failure remains
+unaccepted until a coherent rebuilt run proves the current integration. T037 implementation,
+production-runtime formatting parity, T038, manual AT and human acceptance remain open.
 
 ### Final T036 automated technical gate, 2026-10-06
 

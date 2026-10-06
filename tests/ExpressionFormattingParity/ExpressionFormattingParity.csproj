@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="$(ElsaFoundationRoot)/src/essentials/Expressions/Elsa.Expressions.csproj" />
+    <ProjectReference Include="$(ElsaFoundationRoot)/src/essentials/Expressions/Core/Elsa.Expressions.Core.csproj" />
+    <ProjectReference Include="$(ElsaFoundationRoot)/src/essentials/Expressions/JavaScript/Elsa.Expressions.JavaScript.csproj" />
+    <ProjectReference Include="$(ElsaFoundationRoot)/src/essentials/Expressions/JavaScript/Core/Elsa.Expressions.JavaScript.Core.csproj" />
+    <ProjectReference Include="$(ElsaFoundationRoot)/src/essentials/Expressions/JavaScript/Jint/Elsa.Expressions.JavaScript.Jint.csproj" />
+    <ProjectReference Include="$(ElsaFoundationRoot)/src/essentials/Expressions/Liquid/Elsa.Expressions.Liquid.csproj" />
+  </ItemGroup>
+  <Target Name="RequirePinnedFoundation" BeforeTargets="Restore;Build">
+    <Error Condition="'$(ElsaFoundationRoot)' == ''" Text="ElsaFoundationRoot must identify the verified pinned Foundation checkout." />
+  </Target>
+</Project>

@@ -21,6 +21,36 @@
   padding: 0.5rem;
 }
 
+.studio-code-editor-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-family: var(--studio-font-ui);
+  font-size: var(--studio-label-size);
+}
+
+.studio-code-editor-actions button,
+.studio-code-editor-signature-navigation button {
+  background: var(--studio-surface-raised);
+  border: 1px solid var(--studio-border);
+  border-radius: var(--studio-radius-sm);
+  color: var(--studio-text);
+}
+
+.studio-code-editor-actions button:focus-visible,
+.studio-code-editor-signature-navigation button:focus-visible {
+  outline: 2px solid var(--studio-focus-strong, var(--studio-text));
+  outline-offset: 2px;
+}
+
+.studio-code-editor-signature-navigation {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
 .studio-code-editor-rich .cm-editor,
 .studio-code-editor-input {
   background: var(--studio-surface-muted);

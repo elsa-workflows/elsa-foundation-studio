@@ -10,15 +10,16 @@ import {
 } from "@codemirror/commands";
 import { bracketMatching, foldGutter, indentOnInput, syntaxHighlighting } from "@codemirror/language";
 import { Compartment, EditorState, Prec, Transaction } from "@codemirror/state";
-import { EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type KeyBinding } from "@codemirror/view";
-import { useEffect, useRef } from "react";
+import { EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type KeyBinding, type ViewUpdate } from "@codemirror/view";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { applyCodeMirrorDiagnostics } from "./codeMirrorDiagnostics";
 import { collectCodeMirrorSyntaxDiagnostics } from "./codeMirrorSyntaxDiagnostics";
 import {
   cancelCodeMirrorIntelligence,
   createCodeMirrorCodeIntelligenceExtensions,
   dismissCodeMirrorIntelligence,
-  requestCodeMirrorKeyboardHover
+  requestCodeMirrorKeyboardHover,
+  returnCodeMirrorFocusForExit
 } from "./codeMirrorCodeIntelligence";
 import { loadCodeMirrorLanguageExtensions } from "./codeMirrorLanguages";
 import {
@@ -28,6 +29,7 @@ import {
 } from "../sessions/studioCodeEditorSessions";
 import type { StudioCodeDiagnostic, StudioCodeEditorEngineProps } from "../types";
 import { studioCodeHighlightStyle } from "./syntaxHighlightStyle";
+import { CodeMirrorFormatter } from "./codeMirrorFormatting";
 
 interface CodeMirrorSessionEntry {
   state: EditorState;
@@ -42,6 +44,8 @@ interface CodeMirrorRuntime {
   lastEmittedValue?: string;
   tabEscapeArmed?: boolean;
   languageLoadGeneration: number;
+  intelligenceGeneration: number;
+  formatting?: CodeMirrorFormatter;
 }
 
 // Compact fields are mutually exclusive. Parking the outgoing view until React mounts the incoming
@@ -49,6 +53,7 @@ interface CodeMirrorRuntime {
 // field switch. A microtask disposal still releases it when focus truly leaves the compact surface.
 let parkedCompactView: { view: EditorView; disposeTimer: ReturnType<typeof setTimeout> } | undefined;
 const activeCodeMirrorViews = new Set<EditorView>();
+const formattingControllers = new WeakMap<EditorView, CodeMirrorFormatter>();
 let authorizationGeneration = 0;
 
 subscribeToStudioCodeEditorSessionRevocation(() => {
@@ -64,12 +69,14 @@ export function CodeMirrorStudioCodeEditor(props: StudioCodeEditorEngineProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | undefined>(undefined);
   const entryRef = useRef<CodeMirrorSessionEntry | undefined>(undefined);
+  const [formatStatus, setFormatStatus] = useState("");
 
   const entry = resolveEntry(props);
-  entry.runtime.props = props;
+  if (entryRef.current && entryRef.current !== entry) entryRef.current.runtime.intelligenceGeneration++;
+  updateRuntimeProps(entry.runtime, props);
   entryRef.current = entry;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     const mountedAuthorizationGeneration = authorizationGeneration;
@@ -77,6 +84,10 @@ export function CodeMirrorStudioCodeEditor(props: StudioCodeEditorEngineProps) {
     const view = claimCompactView(entry, props.profile, container)
       ?? new EditorView({ state: entry.state, parent: container });
     activeCodeMirrorViews.add(view);
+    const formatting = new CodeMirrorFormatter(view, () => entry.runtime.props,
+      () => activeCodeMirrorViews.has(view) && entryRef.current === entry, setFormatStatus);
+    entry.runtime.formatting = formatting;
+    formattingControllers.set(view, formatting);
     viewRef.current = view;
     view.dispatch({
       effects: entry.presentation.reconfigure(presentationExtensions(props.profile))
@@ -86,6 +97,9 @@ export function CodeMirrorStudioCodeEditor(props: StudioCodeEditorEngineProps) {
     void loadLanguageSupport(view, props.document.language, props.grammarProfile, entry);
 
     return () => {
+      formatting.invalidate();
+      if (entry.runtime.formatting === formatting) entry.runtime.formatting = undefined;
+      cancelCodeMirrorIntelligence(view);
       entry.runtime.tabEscapeArmed = false;
       entry.runtime.languageLoadGeneration++;
       entry.state = view.state;
@@ -102,10 +116,11 @@ export function CodeMirrorStudioCodeEditor(props: StudioCodeEditorEngineProps) {
   // A session survives profile remounts. A changed URI/session intentionally mounts a new view.
   }, [entry, props.autoFocus, props.document.language, props.document.uri, props.grammarProfile, props.profile, props.session]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const view = viewRef.current;
     const current = entryRef.current;
     if (!view || !current) return;
+    current.runtime.formatting?.invalidate(true);
 
     if (props.document.value !== view.state.doc.toString() && props.document.value !== current.runtime.lastEmittedValue) {
       view.dispatch({
@@ -125,25 +140,48 @@ export function CodeMirrorStudioCodeEditor(props: StudioCodeEditorEngineProps) {
     });
   }, [props.ariaLabel, props.readOnly]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    entry.runtime.formatting?.invalidate(true);
+  }, [entry, props.document.version, props.loadFormatter, props.readOnly]);
+
+  useLayoutEffect(() => {
     const view = viewRef.current;
     if (!view) return;
+    entryRef.current?.runtime.formatting?.invalidate(true);
+    const focused = view.dom.ownerDocument.activeElement;
+    if (focused && view.dom.querySelector(".studio-code-editor-signature")?.contains(focused)) view.focus();
+    cancelCodeMirrorIntelligence(view);
     closeCompletion(view);
     // Signature help is selection-driven. Re-dispatch the current selection when a delayed
     // authoring context replaces the initial local-only providers so the visible document can
     // immediately acquire the newly available signature.
     view.dispatch({ selection: view.state.selection });
-  }, [props.completionProvider, props.completions, props.hoverProvider, props.signatureProvider]);
+  }, [props.completionProvider, props.completions, props.document.value, props.document.version, props.hoverProvider, props.signatureProvider]);
 
   return (
-    <div
-      ref={containerRef}
-      aria-label={props.ariaLabel}
-      className={`studio-code-editor-rich studio-code-editor-rich-${props.profile}`}
-      data-profile={props.profile}
-      data-theme={props.theme}
-      style={{ minHeight: props.minHeight }}
-    />
+    <>
+      {props.loadFormatter ? <div className="studio-code-editor-actions">
+        <button type="button" disabled={props.readOnly} onClick={() => void entry.runtime.formatting?.request()}
+          onKeyDown={event => {
+            const view = viewRef.current;
+            if (event.key !== "Escape" || !view) return;
+            event.preventDefault();
+            event.stopPropagation();
+            entry.runtime.formatting?.invalidate();
+            returnCodeMirrorFocusForExit(view);
+          }}
+          aria-label="Format source" title="Format source (Alt Shift F)">Format</button>
+        <span role="status" aria-live="polite">{formatStatus}</span>
+      </div> : null}
+      <div
+        ref={containerRef}
+        aria-label={props.ariaLabel}
+        className={`studio-code-editor-rich studio-code-editor-rich-${props.profile}`}
+        data-profile={props.profile}
+        data-theme={props.theme}
+        style={{ minHeight: props.minHeight }}
+      />
+    </>
   );
 }
 
@@ -160,6 +198,7 @@ function claimCompactView(entry: CodeMirrorSessionEntry, profile: StudioCodeEdit
 }
 
 function parkCompactView(view: EditorView) {
+  cancelCodeMirrorIntelligence(view);
   if (parkedCompactView) {
     clearTimeout(parkedCompactView.disposeTimer);
     destroyCodeMirrorView(parkedCompactView.view);
@@ -185,6 +224,8 @@ export function destroyParkedCompactView() {
 function destroyCodeMirrorView(view: EditorView) {
   // CodeMirror's destroy releases editor resources but intentionally leaves its DOM in place.
   // Removing it first guarantees source disappears synchronously on authorization revocation.
+  formattingControllers.get(view)?.invalidate();
+  formattingControllers.delete(view);
   cancelCodeMirrorIntelligence(view);
   view.dom.remove();
   view.destroy();
@@ -203,7 +244,7 @@ function resolveEntry(props: StudioCodeEditorEngineProps): CodeMirrorSessionEntr
     return existing;
   }
 
-  const runtime: CodeMirrorRuntime = { props, languageLoadGeneration: 0 };
+  const runtime: CodeMirrorRuntime = { props, languageLoadGeneration: 0, intelligenceGeneration: 0 };
   const presentation = new Compartment();
   const editability = new Compartment();
   const language = new Compartment();
@@ -221,11 +262,13 @@ function resolveEntry(props: StudioCodeEditorEngineProps): CodeMirrorSessionEntr
         Prec.highest(keymap.of(editorKeymap(runtime))),
         createCodeMirrorCodeIntelligenceExtensions({
           document: props.document,
-          completionProvider: request => runtime.props.completionProvider
-            ? runtime.props.completionProvider(request)
-            : runtime.props.completions ?? null,
-          hoverProvider: (document, position, signal) => runtime.props.hoverProvider?.(document, position, signal) ?? null,
-          signatureProvider: (document, position, signal) => runtime.props.signatureProvider?.(document, position, signal) ?? null
+          completionProvider: request => runCurrentIntelligence(runtime, request.signal, () => runtime.props.completionProvider
+            ? runtime.props.completionProvider({ ...request, document: { ...runtime.props.document, value: request.document.value } })
+            : runtime.props.completions ?? null),
+          hoverProvider: (document, position, signal) => runCurrentIntelligence(runtime, signal,
+            () => runtime.props.hoverProvider?.({ ...runtime.props.document, value: document.value }, position, signal) ?? null),
+          signatureProvider: (document, position, signal) => runCurrentIntelligence(runtime, signal,
+            () => runtime.props.signatureProvider?.({ ...runtime.props.document, value: document.value }, position, signal) ?? null)
         }),
         EditorView.domEventHandlers({
           focus: () => {
@@ -254,6 +297,24 @@ function resolveEntry(props: StudioCodeEditorEngineProps): CodeMirrorSessionEntr
   return entry;
 }
 
+function updateRuntimeProps(runtime: CodeMirrorRuntime, props: StudioCodeEditorEngineProps) {
+  const previous = runtime.props;
+  // Invalidate responses at render time, before passive cleanup can run. Equal-source ABA and
+  // changed authority must not briefly publish old metadata between commit and that cleanup.
+  if (previous.document.uri !== props.document.uri || previous.document.language !== props.document.language ||
+      previous.document.version !== props.document.version || previous.document.value !== props.document.value ||
+      previous.session !== props.session || previous.readOnly !== props.readOnly || previous.grammarProfile !== props.grammarProfile ||
+      previous.completionProvider !== props.completionProvider || previous.completions !== props.completions ||
+      previous.hoverProvider !== props.hoverProvider || previous.signatureProvider !== props.signatureProvider) runtime.intelligenceGeneration++;
+  runtime.props = props;
+}
+
+async function runCurrentIntelligence<T>(runtime: CodeMirrorRuntime, signal: AbortSignal, request: () => T | Promise<T>): Promise<T | null> {
+  const generation = runtime.intelligenceGeneration;
+  const result = await request();
+  return signal.aborted || runtime.intelligenceGeneration !== generation ? null : result;
+}
+
 function presentationExtensions(profile: StudioCodeEditorEngineProps["profile"]) {
   return profile === "expanded" ? [lineNumbers(), foldGutter(), highlightActiveLineGutter(), highlightActiveLine()] : [];
 }
@@ -277,13 +338,22 @@ function editorKeymap(runtime: CodeMirrorRuntime): KeyBinding[] {
       if (!runtime.props.hoverProvider) return false;
       void requestCodeMirrorKeyboardHover(view, {
         document: runtime.props.document,
-        hoverProvider: runtime.props.hoverProvider
+        hoverProvider: (document, position, signal) => runCurrentIntelligence(runtime, signal,
+          () => runtime.props.hoverProvider?.(document, position, signal) ?? null)
       });
       return true;
     }
   }));
   return [
     ...hoverHelp,
+    {
+      key: "Alt-Shift-f",
+      run: () => {
+        if (!runtime.props.loadFormatter || runtime.props.readOnly || !runtime.formatting) return false;
+        void runtime.formatting.request();
+        return true;
+      }
+    },
     {
       key: "Enter",
       run: view => {
@@ -320,9 +390,11 @@ function editorKeymap(runtime: CodeMirrorRuntime): KeyBinding[] {
   ];
 }
 
-function handleUpdate(update: { state: EditorState; docChanged: boolean; changes: { iterChanges(callback: (fromA: number, toA: number, fromB: number, toB: number, inserted: { toString(): string }) => void): void } }, entry: CodeMirrorSessionEntry) {
+function handleUpdate(update: ViewUpdate, entry: CodeMirrorSessionEntry) {
   entry.state = update.state;
   const { runtime } = entry;
+  if (update.docChanged || update.selectionSet) runtime.formatting?.invalidate(
+    !update.docChanged && update.startState.selection.eq(update.state.selection));
   if (!update.docChanged) return;
 
   let insertedNewline = false;
