@@ -8,7 +8,40 @@ T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head autom
 
 ## Verification evidence
 
-### Initial T037 checkpoint — not accepted
+### T037 integration dd6bc1aa — complete gate pending
+
+Studio `dd6bc1aa7ff591ffdb6f4a66ec6a7e8922e5a459` / clean immutable Foundation
+`5cd44d6312d9de85b13f4619fc7aa972a557d033` pass root canonical coherent rebuilt normal
+hosts5/5 (9.4m, initially under high machine load). Actual compact/expanded JS/Liquid button
+and shortcut formatting, persisted source, completed announcement, same editor and one-step
+undo pass. The theme journey additionally proves the Liquid match-start is horizontally clipped
+while the native caret remains visible on the same visual row, then completion stays visible.
+Activity Definition and both independent missing-module/provider paths pass. Log:
+`/private/tmp/elsa-572-root-normal-host-dd6bc1aa.log`.
+
+Exact-head CI37412147300 fails the layout gate because the new paired-runtime harness was
+not registered in `Elsa.Studio.slnx`; generic Chromium passes, paired-host job remains running
+at this reconciliation. The solution registration correction uses explicit `Build=false`,
+not a layout exception: paired CI still obligatorily builds/runs the harness directly. Native
+SDK10.0.300 scratch solution restore/build both prove this excludes the harness without a
+Foundation root. Logs: `/private/tmp/elsa-572-parity-solution-restore-probe.log`,
+`/private/tmp/elsa-572-parity-solution-build-probe.log`,
+`/private/tmp/elsa-572-root-ci-dd6bc1aa-static.log`. The corrected actual Studio solution
+restore/build passes without a Foundation root (0 warnings/errors), and the unchanged layout
+guard passes20 projects/20 packages/19 module roots. Logs:
+`/private/tmp/elsa-572-root-solution-registration.log`,
+`/private/tmp/elsa-572-root-layout-registration.log`. Successor exact-head CI remains pending;
+this checkpoint does not accept T037.
+
+Full repository lint passes with48 pre-existing warnings/0errors, and full workspace typecheck
+passes after registration. Logs: `/private/tmp/elsa-572-root-full-lint-registration.log`,
+`/private/tmp/elsa-572-root-full-typecheck-registration.log`.
+
+Independent latest-delta source review finds no blocker in native control focus, cancellation,
+status preservation or conservative formatters, and flags the solution restore risk above.
+Root retains final integration/QA; this review is not browser/runtime/human acceptance.
+
+### Earlier T037 checkpoints — not accepted
 
 Current in-progress integration resolves native-action focus boundaries, URI/session identity,
 render-time async provider generation and layout-phase source/provider invalidation. Initial

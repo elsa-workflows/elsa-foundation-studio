@@ -28,5 +28,10 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Elsa.Studio.Tests/Elsa.Studio.Tests.csproj" />
+    <!-- Paired-runtime proof is built explicitly by CI with its pinned Foundation root;
+         ordinary Studio-only solution restore/build must not require that checkout. -->
+    <Project Path="tests/ExpressionFormattingParity/ExpressionFormattingParity.csproj">
+      <Build Project="false" />
+    </Project>
   </Folder>
 </Solution>
