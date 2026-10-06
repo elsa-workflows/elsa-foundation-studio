@@ -4,6 +4,14 @@ Elsa Foundation Studio is a modular React studio shell hosted by ASP.NET Core. T
 
 For a current map of the host, shell, modules, routing, API boundaries, and authentication flow, see the [architecture tour](docs/architecture-tour.md).
 
+For operator guidance on current run health and following incidents to exact runtime evidence, see [Workflow run incidents](docs/workflow-run-incidents.md).
+
+These repositories develop the Elsa 4 preview. Elsa 3 uses the separate [elsa-core](https://github.com/elsa-workflows/elsa-core) and [elsa-studio](https://github.com/elsa-workflows/elsa-studio) repositories.
+
+- **Try Elsa 4:** [run Workbench and Studio from published Docker images](https://github.com/elsa-workflows/elsa-foundation/blob/main/docker/compose/README.md#quick-start--published-images-no-clone-or-build).
+- **Contribute to the server:** follow the [Elsa Foundation contribution guide](https://github.com/elsa-workflows/elsa-foundation/blob/main/CONTRIBUTING.md).
+- **Contribute to Studio:** follow the [Elsa Foundation Studio contribution guide](CONTRIBUTING.md).
+
 The host is composed from independently enabled Studio capabilities:
 
 - `Elsa.Studio.Core` defines manifests, diagnostics, and the manifest collection event.
@@ -88,6 +96,11 @@ configured, and the backend must expose the Extension Builder surface. Against a
 explicit "backend management unavailable" state.
 
 ## Build
+
+> **Source setup status:** The central `ConsoleLogStreaming.AspNetCore` pin now uses `1.1.0`.
+> [Studio #579](https://github.com/elsa-workflows/elsa-foundation-studio/issues/579) records a restore with isolated package-cache, HTTP-cache, and CLI-home paths, a Studio.Web build, and affected console-stream/host tests for this correction.
+> The complete source-development and paired browser journey remains tracked in [Studio #566](https://github.com/elsa-workflows/elsa-foundation-studio/issues/566).
+> The `.NET` commands below are existing developer commands; the scoped checks do not establish a complete fresh-machine setup or source-edit journey.
 
 ```bash
 pnpm install
@@ -174,3 +187,8 @@ docker run --rm -p 8080:8080 \
 See [`docs/docker.md`](docs/docker.md) for the full runtime configuration surface
 (environment variables, `shells.json` mounting, the optional `packages/` feed volume, and
 a compose snippet).
+
+## License
+
+Elsa-owned material in this repository is licensed under the MIT License; see [LICENSE](LICENSE).
+Third-party code, assets, and dependencies retain their respective license terms and notices.
