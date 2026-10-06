@@ -151,6 +151,19 @@ describe("StudioCodeEditor", () => {
     unmount();
   });
 
+  it.each([
+    [["warning", "error", "error"], 1],
+    [["info", "warning", "warning"], 1],
+    [["info", "info"], 0]
+  ] as const)("keeps the first highest-priority compact diagnostic for %j", (severities, expectedIndex) => {
+    const { container } = renderEditor({
+      profile: "compact",
+      diagnostics: severities.map((severity, index) => ({ severity, message: `Diagnostic ${index}` }))
+    });
+    expect(container.querySelectorAll(".studio-code-editor-diagnostic")).toHaveLength(1);
+    expect(container.querySelector(".studio-code-editor-diagnostic")?.textContent).toBe(`Diagnostic ${expectedIndex}`);
+  });
+
   it("uses language adapter metadata without exposing engine-specific details", () => {
     const { container, unmount } = renderEditor({
       languageAdapter: {

@@ -8,6 +8,42 @@ T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head autom
 
 ## Passing evidence
 
+### M4 T036 packaging correction checkpoint — Studio #568 / draft #569 (not accepted)
+
+The initial integrated head `08d1b31c1fe5e6152c26252eb1dab1bb502fa69e` passes root
+CodeEditor108, JavaScript15, Liquid25 and Workflows1504, configured workspace typecheck,
+full lint (zero errors,48 existing warnings) and app-token Stylelint. Its canonical rebuilt-host
+command stops before browser execution: the unchanged primary Workflows budget is129.93/127.50kB.
+CI37390942400 confirms failed lint/typecheck/bundle and normal-host jobs; generic Chromium passes.
+These are rejected checkpoints, not theme/contrast acceptance.
+
+Root moves only the static preview presentation into a lazy leaf. The eager shell retains the
+same button, focus, current escaped plaintext and authorization boundary, including a failed-chunk
+fallback. Existing session listeners are grouped without changing order or handlers, the existing
+restoration event is shared privately, duplicate guidance/session/multiline calculations are
+reused, and stable diagnostic priority is preserved without copying/sorting. No public SDK/wire,
+JSON consumer, authority policy, source wording or bundle threshold changes.
+Independent production review finds no remaining actionable finding. The presentation leaf may
+load for any mounted compact preview, including JSON/offscreen; the language parser/highlighter
+still loads only for a supported, bounded, actually visible preview. No editor session is created.
+
+The scoped rebuilt bundle passes at127.44/127.50kB, definitions379.63/384.50kB,
+upgrades369.63/375.50kB, stylesheet144.85/185kB and largest chunk263.18/500kB.
+Root complete CodeEditor112/112 in eight files, package typecheck/build and scoped ESLint pass;
+new controls cover stable diagnostic priority and presentation-chunk failure with current escaped
+source, stationary focused button and revocation. The lazy fallback's initial TypeScript mismatch
+is corrected before the passing typecheck. Removing only the late parsed-result guard again
+fails all six old-source/URI/version/session/language/offscreen controls after the lazy correction;
+the guard is restored. Logs: `/private/tmp/elsa-568-root-deferred-preview-bundle-fourth.log`,
+`/private/tmp/elsa-568-root-editor-deferred-final.log`,
+`/private/tmp/elsa-568-root-deferred-typecheck.log`,
+`/private/tmp/elsa-568-root-deferred-lint.log`,
+`/private/tmp/elsa-568-root-deferred-stale-guard-red.log`.
+
+The corrected canonical rebuilt-host run, exact-head CI and final browser interaction review remain
+pending. T036 is unchecked; T037 is not assigned. All PRs remain draft/unmerged, and current-head
+manual AT, human acceptance and delivery remain open.
+
 ### M4 T036 readiness/red checkpoint — Studio #568, 2026-10-06 (not accepted)
 
 Root integration starts at `69ee8e08` (spec reconciliation only; production remains473cf1a9).

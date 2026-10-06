@@ -20,7 +20,7 @@ interface StudioCodePreviewSyntaxOptions {
 }
 
 export function useStudioCodePreviewSyntax(
-  previewRef: RefObject<HTMLButtonElement | null>,
+  previewRef: RefObject<HTMLElement | null>,
   options: StudioCodePreviewSyntaxOptions
 ) {
   const [spans, setSpans] = useState<readonly StudioCodeSyntaxSpan[]>([]);
