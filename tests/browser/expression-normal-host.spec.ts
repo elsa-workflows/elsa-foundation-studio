@@ -76,7 +76,7 @@ completeTest("persisted workflow drafts use live JavaScript and Liquid assistanc
   expect(consoleErrors).toEqual([]);
 });
 
-completeTest("normal-host expression previews and help remain readable in Light, Dark and Dim at narrow width", async ({ page, hostPair, signInToStudio, recordSafeBackendTraffic, recordSafeConsoleErrors }) => {
+completeTest("normal-host expression previews and help remain readable in Light, Dark and Dim at narrow width", async ({ page, headless, hostPair, signInToStudio, recordSafeBackendTraffic, recordSafeConsoleErrors }) => {
   const traffic = recordSafeBackendTraffic(page, hostPair);
   const consoleErrors = recordSafeConsoleErrors(page);
   await signInToStudio(page, hostPair);
@@ -250,7 +250,7 @@ completeTest("normal-host expression previews and help remain readable in Light,
         const pasteText = language === "JavaScript" ? " + 1\n  + 2 " : "\n  exact\t whitespace  \n";
         multilineSource = source + pasteText;
         await moveEditorCursor(editor, source, source.length);
-        await pasteFromIsolatedTestClipboard(page, editor, pasteText);
+        await pasteFromIsolatedTestClipboard(page, editor, pasteText, headless);
       } else {
         multilineSource = `${source}\n`;
         await replacePersistedWorkflowSource(page, hostPair, editor, draft, traffic, language, multilineSource);
@@ -934,10 +934,11 @@ async function exerciseExplicitFormatting(page: Page, pair: NormalHostPair, edit
   await nativeEditor?.dispose();
 }
 
-async function pasteFromIsolatedTestClipboard(page: Page, editor: Locator, text: string) {
+async function pasteFromIsolatedTestClipboard(page: Page, editor: Locator, text: string, headless: boolean) {
   // Headless Chromium uses an in-memory clipboard. Never run this helper on the
   // user's headed browser or read the platform clipboard to preserve/restore it.
-  expect(await page.evaluate(() => navigator.userAgent.includes("HeadlessChrome/")),
+  // Desktop device presets override userAgent even when the browser is headless.
+  expect(headless,
     "Synthetic clipboard paste requires the isolated headless browser").toBe(true);
   const origin = new URL(page.url()).origin;
   await page.context().grantPermissions(["clipboard-write"], { origin });

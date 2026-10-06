@@ -194,14 +194,14 @@ export const test = base.extend<NormalHostFixtures>({
   }
 });
 
-export const completeTest = test.extend<{ hostVariant: NormalHostVariant }>({
-  hostVariant: ["complete", { option: true }]
+export const completeTest = test.extend({
+  hostVariant: "complete"
 });
-export const missingJavaScriptEditorTest = test.extend<{ hostVariant: NormalHostVariant }>({
-  hostVariant: ["missing-javascript-editor", { option: true }]
+export const missingJavaScriptEditorTest = test.extend({
+  hostVariant: "missing-javascript-editor"
 });
-export const missingLiquidProviderTest = test.extend<{ hostVariant: NormalHostVariant }>({
-  hostVariant: ["missing-liquid-provider", { option: true }]
+export const missingLiquidProviderTest = test.extend({
+  hostVariant: "missing-liquid-provider"
 });
 
 /** Seeds a real SQLite-backed draft using the authenticated host's live activity catalog. */

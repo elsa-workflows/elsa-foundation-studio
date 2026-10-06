@@ -36,13 +36,37 @@ incorrect. The corrected test selects the exact formatter status, also measures 
 and observes native Shift+Tab reactivation directly. This failed run remains retained in
 `/private/tmp/elsa-577-root-normal-host-candidate.log`; the corrected complete gate is pending.
 
+Committed `cadd58ba` passes4/5 (8.6m): the persisted-workflow/Activity Definition and both
+independent degradation cases pass. The narrow case reaches native paste but the added
+clipboard guard incorrectly infers headless mode from a user agent overridden by the
+Desktop Chrome device profile. It refuses the write before touching clipboard data.
+The correction uses Playwright's resolved built-in `headless` fixture instead; headed
+execution remains refused. Log: `/private/tmp/elsa-577-root-normal-host-cadd58ba.log`.
+CI37415408459 passes static/workspace and generic Chromium jobs; its paired job remains
+pending here, not accepted. An explicit manual CodeRabbit request starts actual review of
+`cadd58ba` while keeping the PR draft; this is distinct from the initial draft skip.
+
+The extra strict browser-harness typecheck also exposes three pre-existing variant alias
+type errors (redeclaring an already registered option fixture). Bare value overrides preserve
+the pinned Playwright1.61.1 option metadata and exact host variants, without dependency or
+host behavior changes. The rerun uses the existing bundled Node declarations, not a new
+repository package or weakened compiler option. Both raw failures are retained in
+`/private/tmp/elsa-577-root-harness-typecheck.log` and
+`/private/tmp/elsa-577-root-harness-typecheck-bundled.log`. Corrected strict compilation
+passes with no diagnostics in `/private/tmp/elsa-577-root-harness-typecheck-corrected.log`;
+changed-harness ESLint, five-case collection and diff checks pass.
+
 The native preflight confirms VoiceOver is not running and macOS UI automation is
 available, without changing accessibility settings. The connected Chrome browser is
 extension-backed, not the isolated Playwright context. Its initial native binding unexpectedly
 exposed an unrelated existing window; that content was not used and no unrelated action was
 taken. The owned blank tab was focused and a new Incognito window was then created and
 verified before further native QA. No personal credentials or clipboard contents are read,
-and no native announcement has been counted. Synthetic automated paste is guarded to
+and no native announcement has been counted. Both owned browser surfaces are closed after
+preflight. The VoiceOver utility process opens but repeated native observation attempts fail
+with a timeout and capture-stream failure, with no utility window exposed in the native
+inventory. No VoiceOver/caption setting was changed; this is an observation limitation,
+not current-head AT acceptance. Synthetic automated paste is guarded to
 headless Chromium, whose [platform-independent clipboard implementation](https://chromium.googlesource.com/chromium/src/+/HEAD/components/headless/clipboard/headless_clipboard.cc)
 is installed by both headless Chrome and the headless shell; no platform clipboard restore/read
 is used by the test.
