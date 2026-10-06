@@ -163,3 +163,42 @@ jobs:
 
       - name: Prove actual formatter production-runtime parity
         run: pnpm test:expression-formatting:parity
+
+      - name: Build the paired Workbench for the owned REST journey
+        working-directory: .normal-host-foundation
+        run: dotnet build src/apps/Elsa.Workbench/Elsa.Workbench.csproj -c Debug -p:RestoreLockedMode=true
+
+      - name: Prove JavaScript expressions through fresh HTTP and persistence
+        shell: pwsh
+        env:
+          EXPECTED_FOUNDATION_REVISION: ${{ steps.foundation-revision.outputs.revision }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $foundation = $env:ELSA_FOUNDATION_WORKTREE
+          $revision = & git -C $foundation rev-parse HEAD
+          if ($LASTEXITCODE -ne 0 -or $revision -cne $env:EXPECTED_FOUNDATION_REVISION) {
+            throw 'The REST producer must match the immutable paired Foundation revision.'
+          }
+          Write-Host "REST producer revision: $revision"
+          . "$foundation/e2e-tests/_ServerLifecycle.ps1"
+          $serverBaseUrl = Resolve-ElsaServerBaseUrl
+          $contentRoot = New-ElsaContentRoot -Prefix 'elsa-expression-js-rest'
+          $ownedProcess = $null
+          try {
+            Start-OwnedElsaServer -BaseUrl $serverBaseUrl -ContentRoot $contentRoot
+            $ownedProcess = $script:OwnedElsaServer.Process
+            . "$foundation/e2e-tests/javascript/Test-JavaScriptExpressions.ps1" -BaseUrl $serverBaseUrl
+            if ($cases.Count -ne 10 -or $pass -ne $cases.Count) {
+              throw "JavaScript REST gate failed: $pass/$($cases.Count) cases passed; expected 10."
+            }
+          } finally {
+            if (-not $ownedProcess -and $script:OwnedElsaServer) {
+              $ownedProcess = $script:OwnedElsaServer.Process
+            }
+            Remove-OwnedElsaServer -ContentRoot $contentRoot -KeepContentRoot
+            if ($ownedProcess -and -not $ownedProcess.HasExited) {
+              throw 'The owned REST server did not exit during cleanup.'
+            }
+            Assert-PortFree -Port (Get-ElsaServerPort -BaseUrl $serverBaseUrl)
+          }
+          Write-Host 'All 10 REST cases passed; the owned process exited and its port is free.'
