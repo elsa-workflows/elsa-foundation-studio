@@ -8,6 +8,18 @@ T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head autom
 
 ## Passing evidence
 
+### M4 T036 viewport precondition checkpoint — committed `da83976b` (not accepted)
+
+The third canonical rebuilt-host run gets past the actual theme control but the new case finds no
+syntax spans after resizing to390px. The first normal-host case and initial desktop preview succeed;
+the new case does not establish narrow contrast or focus acceptance. Log:
+`/private/tmp/elsa-568-root-normal-host-third.log`. Offscreen preview work is deliberately cancelled,
+so root adds ordinary `scrollIntoViewIfNeeded` plus an explicit `toBeInViewport` precondition before
+checking narrow tokens. This is a visibility hypothesis until the focused actual-host run proves it,
+not a claimed product fix or permission to bypass IntersectionObserver. No production changes,
+forced click, reduced assertion or timing/budget change. Root narrows the next diagnostic run to the
+new case; final all-five committed-head normal-host/CI proof still remains required.
+
 ### M4 T036 normal-host harness correction — packaging head `aa29c973` (not accepted)
 
 The second canonical command rebuilds both applications successfully against the corrected tree,

@@ -105,6 +105,9 @@ completeTest("normal-host expression previews and help remain readable in Light,
       await page.getByRole("radiogroup", { name: "Colour mode" }).getByRole("radio", { name: mode, exact: true }).click();
       await expect(page.locator("html")).toHaveAttribute("data-theme-appearance", mode.toLowerCase());
       await page.setViewportSize({ width: 390, height: 844 });
+      // Highlighting deliberately stops offscreen; bring the actual property into the viewport.
+      await preview.scrollIntoViewIfNeeded();
+      await expect(preview).toBeInViewport();
       await expect(preview.locator("[class*='studio-code-token-']").first()).toBeVisible();
       await expectReadableCodeSurface(preview);
       await expect.poll(() => readPersistedSource(page, hostPair, draft)).toBe(source);
