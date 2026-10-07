@@ -209,3 +209,6 @@ jobs:
             Assert-PortFree -Port (Get-ElsaServerPort -BaseUrl $serverBaseUrl)
           }
           Write-Host 'All 10 REST cases passed; the owned process exited and its port is free.'
+          # The final successful free-port probe uses lsof, whose no-listener result is 1.
+          # All suite/ownership assertions above must succeed before declaring shell success.
+          exit 0
