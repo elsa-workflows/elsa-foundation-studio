@@ -2920,6 +2920,12 @@ textarea:focus {
     overflow-x: auto;
     overflow-y: hidden;
     padding: 8px 12px;
+    scroll-padding-inline: var(--spacing-sm);
+  }
+
+  .sidebar > * {
+    flex-shrink: 0;
+    transition-property: background-color, color, border-color, box-shadow;
   }
 
   /* Keep every navigation group on the same compact, horizontally scrollable row so

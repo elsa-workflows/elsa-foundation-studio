@@ -113,6 +113,37 @@ version bump and a migration note.
 | `--studio-text-muted` | secondary/label foreground |
 | `--studio-border` | hairline border/divider |
 
+### Syntax foregrounds
+
+CodeEditor uses these foreground-only roles for the matching semantic syntax classes in both its
+rich editor and unfocused static preview. They do not supply token backgrounds or theme-specific
+editor palettes. The central token layer selects values from the exact
+`data-theme-appearance="light"`, `"dark"` and `"dim"` modes; High contrast and unrecognized
+hosts resolve to `--studio-text`. CodeEditor CSS also falls back to `--studio-text` when a host
+does not provide an individual role.
+
+| Token | Syntax role |
+| --- | --- |
+| `--studio-syntax-keyword` | keywords and control words |
+| `--studio-syntax-operator` | operators and punctuation |
+| `--studio-syntax-literal` | boolean, null and other literals |
+| `--studio-syntax-number` | numeric literals |
+| `--studio-syntax-string` | strings, characters and regular expressions |
+| `--studio-syntax-comment` | comments |
+| `--studio-syntax-variable` | variable names |
+| `--studio-syntax-property` | properties and attributes |
+| `--studio-syntax-function` | function names |
+| `--studio-syntax-type` | type, class and namespace names |
+| `--studio-syntax-tag` | markup tag names |
+
+These roles paint text on the editor and preview surfaces, not the status-chip or accent fills.
+Keep each mode's foreground legible against the actual theme-provided code surface when changing
+the central palette, and verify in a rendered host; do not infer contrast from the token name or
+mode alone. High-contrast hosts use primary text rather than decorative syntax colors.
+Expanded code active-line and active-gutter fills use `--studio-accent-soft`; gutter text,
+surface and border use the corresponding Studio semantic roles. Do not leave the editor
+engine's light-only default overlays or gutter palette over a host-selected dark surface.
+
 ### Accent & focus
 
 | Token | Meaning |
@@ -120,7 +151,13 @@ version bump and a migration note.
 | `--studio-accent` | selection/primary accent fill |
 | `--studio-accent-text` | foreground ON the accent fill |
 | `--studio-accent-soft` | low-opacity accent wash (hover/selected rows) |
-| `--studio-focus` | focus-ring colour |
+| `--studio-focus` | existing soft chrome focus-ring colour |
+| `--studio-focus-strong` | opaque focus outline for code input/preview surfaces; defaults to primary text |
+
+CodeEditor consumes the strong role (with a primary-text fallback), not the translucent chrome
+ring. Keep its rendered outline at least 3:1 against adjacent surfaces in Light, Dark and Dim;
+the soft ring is not sufficient evidence of a visible outline. The shared role remains
+theme-owned and may be remapped centrally; no component-local palette is introduced.
 
 ### Semantic status
 

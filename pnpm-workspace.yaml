@@ -26,3 +26,5 @@ allowBuilds:
 onlyBuiltDependencies:
   - esbuild
 verifyDepsBeforeRun: false
+patchedDependencies:
+  '@codemirror/autocomplete@6.20.3': patches/@codemirror__autocomplete@6.20.3.patch

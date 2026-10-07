@@ -444,7 +444,22 @@ export function ShellFrame({
 
   return (
     <div className={navCollapsed && !topNav ? "studio-shell sidebar-collapsed" : "studio-shell"}>
-      <aside className="sidebar">
+      <aside
+        className="sidebar"
+        onFocus={event => {
+          const sidebar = event.currentTarget;
+          const target = event.target;
+          if (
+            sidebar.scrollWidth <= sidebar.clientWidth ||
+            !(target instanceof HTMLElement) ||
+            !target.matches(":focus-visible")
+          ) {
+            return;
+          }
+
+          target.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
+        }}
+      >
         <div className="sidebar-top">
           <a className="brand" href="/" onClick={event => { event.preventDefault(); onNavigate("/"); }}>
             <span className="brand-mark" aria-hidden="true">

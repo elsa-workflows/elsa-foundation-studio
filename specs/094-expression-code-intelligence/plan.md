@@ -119,6 +119,18 @@ only the bounded code/tests. Existing JavaScript/program behavior, SDK/wire/depe
 and meaningful Liquid whitespace stay unchanged. T033 acceptance requires final paired-host,
 affected complete-suite, unchanged bundle and current-head CI/review evidence.
 
+### T036 implementation boundary — Studio Task#568
+
+Decision19 starts from the exact passing M3 pair (`473cf1a9` / `5cd44d63`). The shared CodeEditor
+owns bounded plain-span static highlighting, escaped lightweight previews and the same category
+mapping in the lazy rich engine. The central UI token contract owns syntax-foreground roles for
+Light/Dark/Dim; module CSS remains `--studio-*`-only. No collapsed field may create an editor
+session just to highlight its preview. Source/language/authorization/unmount changes reject late
+spans and preserve the existing source-hiding boundary. Root verifies actual normal-host themes,
+computed contrast, narrow interaction and exact persistence, without changing retained-source or
+timing/bundle policies. Active parameters, actual overloads and formatting require their separate
+T037 contract. Current-head manual AT and human acceptance remain explicitly open.
+
 ## Complexity Tracking
 
 No constitution violations require justification.

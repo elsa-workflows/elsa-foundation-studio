@@ -1,0 +1,56 @@
+diff --git a/dist/index.cjs b/dist/index.cjs
+index 28d0aad4b3ad90d3074fea0955334677b15294ac..78933a0ee4a8fb46df1f2f96fb6f2ce73c6c8340 100644
+--- a/dist/index.cjs
++++ b/dist/index.cjs
+@@ -553,6 +553,23 @@ class CompletionTooltip {
+         this.showOptions(options, cState.id);
+     }
+     mount() { this.updateSel(); }
++    getCoords(pos) {
++        let start = this.view.coordsAtPos(pos), selection = this.view.state.selection.main;
++        if (!start || !selection.empty)
++            return start;
++        let { left, right } = this.view.scrollDOM.getBoundingClientRect();
++        if (start.right >= left && start.left <= right)
++            return start;
++        // Preserve the match/replacement range. Only its horizontally clipped anchor
++        // may follow a visible, same-row caret still covered by this active result.
++        let active = this.view.state.field(this.stateField).active;
++        if (!active.some(source => source.hasResult() && source.from == pos &&
++            selection.head >= source.from && selection.head <= source.to))
++            return start;
++        let caret = this.view.coordsAtPos(selection.head);
++        return caret && Math.abs(caret.top - start.top) < 1 && Math.abs(caret.bottom - start.bottom) < 1 &&
++            caret.right >= left && caret.left <= right ? caret : start;
++    }
+     showOptions(options, id) {
+         if (this.list)
+             this.list.remove();
+diff --git a/dist/index.js b/dist/index.js
+index 4810a1e5077e38fc049ab44d10cb79dae5fab736..a0a0155cf568614c1de432456cb4d2fc80325a61 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -551,6 +551,23 @@ class CompletionTooltip {
+         this.showOptions(options, cState.id);
+     }
+     mount() { this.updateSel(); }
++    getCoords(pos) {
++        let start = this.view.coordsAtPos(pos), selection = this.view.state.selection.main;
++        if (!start || !selection.empty)
++            return start;
++        let { left, right } = this.view.scrollDOM.getBoundingClientRect();
++        if (start.right >= left && start.left <= right)
++            return start;
++        // Preserve the match/replacement range. Only its horizontally clipped anchor
++        // may follow a visible, same-row caret still covered by this active result.
++        let active = this.view.state.field(this.stateField).active;
++        if (!active.some(source => source.hasResult() && source.from == pos &&
++            selection.head >= source.from && selection.head <= source.to))
++            return start;
++        let caret = this.view.coordsAtPos(selection.head);
++        return caret && Math.abs(caret.top - start.top) < 1 && Math.abs(caret.bottom - start.bottom) < 1 &&
++            caret.right >= left && caret.left <= right ? caret : start;
++    }
+     showOptions(options, id) {
+         if (this.list)
+             this.list.remove();

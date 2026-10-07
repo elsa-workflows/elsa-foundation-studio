@@ -51,7 +51,10 @@ export type {
   StudioCodeHoverProvider,
   StudioCodeLanguageAdapter,
   StudioCodeLanguageSupport,
+  StudioCodePreviewHighlighter,
   StudioCodeSignature,
   StudioCodeSignatureParameter,
-  StudioCodeSignatureProvider
+  StudioCodeSignatureProvider,
+  StudioCodeSyntaxKind,
+  StudioCodeSyntaxSpan
 } from "./types";

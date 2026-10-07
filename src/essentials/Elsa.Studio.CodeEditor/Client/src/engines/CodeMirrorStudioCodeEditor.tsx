@@ -8,7 +8,7 @@ import {
   temporarilySetTabFocusMode,
   toggleTabFocusMode
 } from "@codemirror/commands";
-import { bracketMatching, defaultHighlightStyle, foldGutter, indentOnInput, syntaxHighlighting } from "@codemirror/language";
+import { bracketMatching, foldGutter, indentOnInput, syntaxHighlighting } from "@codemirror/language";
 import { Compartment, EditorState, Prec, Transaction } from "@codemirror/state";
 import { EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type KeyBinding } from "@codemirror/view";
 import { useEffect, useRef } from "react";
@@ -27,6 +27,7 @@ import {
   subscribeToStudioCodeEditorSessionRevocation
 } from "../sessions/studioCodeEditorSessions";
 import type { StudioCodeDiagnostic, StudioCodeEditorEngineProps } from "../types";
+import { studioCodeHighlightStyle } from "./syntaxHighlightStyle";
 
 interface CodeMirrorSessionEntry {
   state: EditorState;
@@ -49,6 +50,99 @@ interface CodeMirrorRuntime {
 let parkedCompactView: { view: EditorView; disposeTimer: ReturnType<typeof setTimeout> } | undefined;
 const activeCodeMirrorViews = new Set<EditorView>();
 let authorizationGeneration = 0;
+
+const codeMirrorBaseTheme = EditorView.theme({
+  "&.cm-editor": {
+    background: "var(--studio-surface-muted)",
+    border: "1px solid var(--studio-border)",
+    borderRadius: "var(--studio-radius-sm)",
+    color: "var(--studio-text)",
+    fontFamily: "var(--studio-font-mono)",
+    inlineSize: "100%"
+  },
+  "&.cm-editor:focus-within": {
+    outline: "2px solid var(--studio-focus-strong, var(--studio-text))",
+    outlineOffset: "2px"
+  },
+  "& .cm-scroller": {
+    fontFamily: "var(--studio-font-mono)"
+  },
+  "&.cm-editor .cm-activeLine, &.cm-editor .cm-activeLineGutter": {
+    background: "var(--studio-accent-soft)"
+  },
+  "&.cm-editor .cm-gutters": {
+    background: "var(--studio-surface-muted)",
+    borderColor: "var(--studio-border)",
+    color: "var(--studio-text-muted)"
+  },
+  "& .cm-content::selection, & .cm-content ::selection": {
+    background: "var(--studio-accent)",
+    color: "var(--studio-accent-text)"
+  },
+  "& .cm-tooltip": {
+    background: "var(--studio-surface-raised)",
+    border: "1px solid var(--studio-border)",
+    boxSizing: "border-box",
+    color: "var(--studio-text)",
+    maxInlineSize: "min(32rem, calc(100vw - 2rem))",
+    overflowWrap: "anywhere",
+    whiteSpace: "normal"
+  },
+  "&.cm-editor .cm-panels": {
+    background: "var(--studio-surface-raised)",
+    borderColor: "var(--studio-border)",
+    color: "var(--studio-text)"
+  },
+  "& .cm-panel, & .studio-code-editor-hover": {
+    color: "var(--studio-text)",
+    maxBlockSize: "min(18rem, 50vh)",
+    maxInlineSize: "min(32rem, calc(100vw - 2rem))",
+    overflow: "auto",
+    overflowWrap: "anywhere",
+    whiteSpace: "normal"
+  },
+  "& .cm-tooltip-autocomplete ul": {
+    maxBlockSize: "min(16rem, 40vh)",
+    maxInlineSize: "min(32rem, calc(100vw - 2rem))",
+    minInlineSize: "0",
+    overflow: "auto",
+    whiteSpace: "normal"
+  },
+  "& .cm-tooltip-autocomplete li": {
+    overflowWrap: "anywhere",
+    textOverflow: "clip",
+    whiteSpace: "normal"
+  },
+  '& .cm-tooltip-autocomplete li[aria-selected="true"]': {
+    background: "var(--studio-accent)",
+    color: "var(--studio-accent-text)"
+  },
+  '& .cm-tooltip-autocomplete li[aria-selected="true"] :is(.cm-completionDetail, .cm-completionMatchedText)': {
+    color: "inherit"
+  },
+  "& .cm-completionSection": {
+    borderColor: "var(--studio-border)",
+    color: "var(--studio-text-muted)"
+  },
+  "& .cm-tooltip-hover, & .cm-completionInfo": {
+    maxBlockSize: "min(18rem, 50vh)",
+    maxInlineSize: "min(32rem, calc(100vw - 2rem))",
+    overflow: "auto",
+    overflowWrap: "anywhere",
+    whiteSpace: "normal"
+  }
+});
+
+const codeMirrorCompactTheme = EditorView.theme({
+  // CodeMirror replaces only one ampersand per selector. Explicit classes preserve CSS specificity.
+  "&.cm-editor.cm-editor": {
+    minBlockSize: "2.25rem"
+  },
+  "&.cm-editor .cm-scroller": {
+    maxBlockSize: "2.25rem",
+    overflow: "hidden"
+  }
+});
 
 subscribeToStudioCodeEditorSessionRevocation(() => {
   authorizationGeneration++;
@@ -216,7 +310,7 @@ function resolveEntry(props: StudioCodeEditorEngineProps): CodeMirrorSessionEntr
         language.of([]),
         indentOnInput(),
         bracketMatching(),
-        syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+        syntaxHighlighting(studioCodeHighlightStyle, { fallback: true }),
         Prec.highest(keymap.of(editorKeymap(runtime))),
         createCodeMirrorCodeIntelligenceExtensions({
           document: props.document,
@@ -254,7 +348,12 @@ function resolveEntry(props: StudioCodeEditorEngineProps): CodeMirrorSessionEntr
 }
 
 function presentationExtensions(profile: StudioCodeEditorEngineProps["profile"]) {
-  return profile === "expanded" ? [lineNumbers(), foldGutter(), highlightActiveLineGutter(), highlightActiveLine()] : [];
+  return [
+    codeMirrorBaseTheme,
+    ...(profile === "expanded"
+      ? [lineNumbers(), foldGutter(), highlightActiveLineGutter(), highlightActiveLine()]
+      : [codeMirrorCompactTheme])
+  ];
 }
 
 function editabilityExtensions(readOnly: boolean, ariaLabel: string) {

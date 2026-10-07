@@ -67,7 +67,7 @@ export function useSidePanelLayout(storageKeys: SidePanelLayoutStorageKeys = wor
     if (!maximizedSidePanel) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMaximizedSidePanel(null);
+      if (event.key === "Escape" && !event.defaultPrevented) setMaximizedSidePanel(null);
     };
 
     window.addEventListener("keydown", handleKeyDown);

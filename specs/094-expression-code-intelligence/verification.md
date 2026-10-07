@@ -6,15 +6,538 @@ The existing Studio expression stack is being synchronized with qualified main `
 
 Retained CI558/37532060674 fails3/4 normal-host cases at the obsolete `.wf-status` locator; the Activity Definition case passes. Main's toolbar exposes the same autosave messages through `.wf-editor-save-status`, an atomic polite live status. The helper correction preserves Autosaving/Autosaved, exact persisted-source, successful fresh PUT and post-save revision/assistance assertions. Corrected `a3fefdc7` passes every job in [CI37534033046](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37534033046), including rebuilt normal hosts; no production toolbar or timing/assertion relaxation is introduced. That checkpoint does not establish the newly synchronized head's CI/review or final pair, which remain pending.
 
+### Theme-size correction candidate
+
+Source checkpoint `c2924337` moves only rich CodeMirror presentation into the existing lazy engine's `EditorView.theme` extensions. Fallback input, lightweight preview, shell and syntax-token CSS remain eager; host style discovery, manifest loading, bundler, dependencies and unchanged bundle budgets are untouched. Installed esbuild 0.27.7 minifies the owning stylesheet from 5623 to 3397 bytes (minus 2226); this is not a full-bundle result. Root and independent source review find no concrete defect and confirm profile-specific presentation reconfiguration, but the new expanded-to-compact-to-expanded regression has not passed locally: its final run times out at the unchanged 20-second limit under extreme shared load. The clean baseline fails the new theme assertion as intended. No timeout/assertion is relaxed. Fresh exact-head unit, full-bundle and integrated browser gates remain required; this candidate is not accepted.
+
+Hosted `4dfec0b3` [CI37544730647](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37544730647) establishes a real failed candidate: CodeEditor119/120, generic Chromium80/81 with a serious scrollable-region accessibility finding, and normal-host4/5 with dotted rather than required solid focus indication. Its build reports Definitions383.62/384.50kB, but unit/browser gates fail; no acceptance is claimed. Installed CodeMirror6.43.6 replaces only the first ampersand in a theme selector. A direct installed-package control emits invalid `.generated&&` and `.generated& .cm-scroller`; explicit editor classes emit valid selectors with the original specificity. Root corrects every repeated-ampersand selector without changing style values, lifecycle, focus behavior, tests, timeouts, accessibility rules or budgets. Independent source review confirms the correction. Fresh complete hosted proof is pending; the failed checkpoint remains retained.
+
+### Assistance provenance correction candidate
+
+Supported-selector head `a0820157` passes units, generic Chromium/accessibility and bundle gates in [CI37546611911](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37546611911), but normal-host verification fails 4/5 at the later fresh-assistance assertion. The exact failing traffic was not retained by the hosted workflow, so its cause is not proved. The formatting descendant `68365f14` passes all CI jobs, normal-host 5/5 and actual formatter/runtime parity in [CI37547035176](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37547035176); this is not a waiver of the earlier failure.
+
+Root and independent source review identify a separate reproducible predicate defect: catalog paging shares the context route and can incorrectly replace the latest authoring snapshot. Sixteen pure controls first produce 13 passes and three failures, including a catalog-only false positive. Excluding catalog requests from latest-authoring-context selection then passes all 16 controls. Every existing outcome, exact location, document/context request-response match, freshness bound and direct-assistance success requirement remains intact. A pending or newer authoring request still rejects an older successful pair. CI now runs these controls. No production behavior, timeouts, budgets or browser assertions change. Fresh exact-head hosted gates remain pending.
+
 ## Retained historical checkpoints
 
-Last reconciled: 2026-10-06 for Program #2310 M3 accessor correction and Liquid integration candidate; baseline pair green, Liquid paired-host failure under correction, delivery and human acceptance pending
+Last reconciled: 2026-10-06 for Program #2310 final automated M3 proof and M4 Task#568 verification corrections; all PRs draft/unmerged, current-head manual AT and human acceptance pending
 
 ## Program #2310 status
 
-T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head automated M2 gate under the documented unavailable-external-review fallback. Studio spike #553 / T035 settles the technical decision: reject the current deeper-service candidate and retain the baseline path. No dependency or production integration is adopted. Deeper language help, three-theme presentation, formatting and current-head manual accessibility/continuity acceptance (T032-T034, T036-T038) remain open. The 2026-07-28 evidence remains historical. All program PRs remain draft and unmerged; final human acceptance is outstanding.
+T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head automated M2 gate under the documented unavailable-external-review fallback. Studio spike #553 / T035 settles the technical decision: reject the current deeper-service candidate and retain the baseline path. No deeper-service dependency is adopted. T032-T034 pass their final exact-head automated M3 gate below, permitting assigned M4 Task#568 / T036. Three-theme presentation, active parameters/overloads, formatting and current-head manual accessibility/continuity acceptance (T036-T038) remain open. The 2026-07-28 evidence remains historical. All program PRs remain draft and unmerged; final human acceptance is outstanding.
 
-## Passing evidence
+## Verification evidence
+
+### M4 T036 guarded completion-anchor candidate (not accepted)
+
+Root reviews the independent tests-first and source-review inputs and applies a reproducible
+pnpm patch to installed autocomplete6.20.3, without upgrading any resolved dependency version.
+The identical17-line ESM/CommonJS addition uses the documented TooltipView.getCoords hook:
+retain the match-start anchor normally; only a horizontally clipped start may fall back to
+the visible collapsed main caret still inside that same active result and visual row (under1px
+coordinate tolerance). Native effective-margin/window/vertical clipping remains in force.
+No result.from/to/filter/apply, editor scroll, source, selection or undo mutation is added.
+Decision19 records this bounded presentation seam; no T037 semantics are assigned.
+
+Focused original-dependency RED is2failed/12passed: both left/right clipped-prefix anchors
+remain offscreen. Installed-patch GREEN is14/14. Seven geometry controls include normal visible
+start, both clipped edges/fractional row, offscreen caret, different row, missing caret coords,
+and missing start coords despite a visible caret. Successful fallback preserves the descriptor
+position and exact source/selection, then full-token replacement and undo. Geometry alone is
+stubbed in jsdom; real CodeMirror completion/selection/history/tooltip state remain in use.
+Complete final CodeEditor119/119 (eight files,14.32s), owning package tsc, changed-test ESLint,
+diff check and frozen/offline pnpm install pass. Patch hash/lock references are regenerated by
+pnpm and reviewed: no unrelated resolved version changes. Logs:
+`/private/tmp/elsa-568-root-completion-anchor-red.log`,
+`/private/tmp/elsa-568-root-completion-anchor-green.log`,
+`/private/tmp/elsa-568-root-completion-anchor-editor-units.log`,
+`/private/tmp/elsa-568-root-completion-anchor-editor-typecheck.log`,
+`/private/tmp/elsa-568-root-completion-anchor-frozen-install.log`.
+
+The normal-host harness additionally requires the exact native collapsed caret and its full
+physical viewport visibility before and after completion opens. Its existing Home/End/Home
+measurement is extracted into the same helper, retaining all source, scroll and readability
+assertions. Temporary diagnostics/no-build config remain removed. Coherent rebuilt all-five,
+successor exact-head CI and review reconciliation remain required; this candidate is not T036
+acceptance. Foundation stays immutable5cd44d63 and all program PRs remain draft/unmerged.
+
+### M4 T036 committed9cf43b4c — completion anchor localized (not accepted)
+
+Root canonical coherent all-five rebuild at Studio9cf43b4c / immutable Foundation5cd44d63
+finishes4pass/1fail (5.7m). The real one-horizontal-row navigation assertion and full physical
+code-scroller intersection pass. JavaScript Light/Dark/Dim journeys pass; Liquid Light's
+selected completion still has viewport-intersection ratio0 for the unchanged30s assertion.
+The independently valid narrow-shell correction does not resolve this popup failure.
+Log: `/private/tmp/elsa-568-root-all-five-9cf43b4c.log`.
+Exact-head CI37405108191 is terminal failed at the same selected-completion ratio0, with
+the original4passing (6.2m). Static/full workspace units, three Workflows shuffle seeds,
+lint/typecheck/bundles and generic Chromium pass, not the theme gate. Retained CI log:
+`/private/tmp/elsa-568-root-ci-9cf43b4c-failure.log`. Canonical rebuilt budgets remain
+primary127.44/127.50kB, stylesheet145.19/185kB, definitions379.97/384.50kB,
+upgrades369.97/375.50kB, largest263.18/500kB, eight heavy surfaces deferred.
+
+Fresh owned-host diagnosis reuses only that immediately preceding coherent build, not an
+acceptance rebuild. Native caret is collapsed at offset24, x5.281/y486.281..503.281;
+the actual code scroller is x0..365/y478.281..512.469 with scrollLeft198. The matched token's
+start18 is x-41.547: horizontally clipped while the caret remains visible. The pinned
+autocomplete6.20.3 anchors its tooltip at the minimum result.from; the pinned view correctly
+hides that offscreen anchor at top-10000. Bottom panels start at y512.469, outside the physical
+scroller, rather than covering this caret. This localizes the completion failure independently
+of the earlier ancestor-height hypothesis. No source/authority data is logged, and temporary
+geometry/no-build configuration are removed. Log:
+`/private/tmp/elsa-568-root-liquid-anchor-geometry.log`. Correction and coherent acceptance
+remain pending; no filtering/replacement/clipping assertion is relaxed.
+
+### M4 T036 committed9041ad35 — completion visibility failure (not accepted)
+
+Root commits/pushes `9041ad355dae29acafefa892d1dc5707e5471273`, including the scoped atomic
+preview-color correction and independently reviewed long-source/scroller measurement fixes.
+Complete CodeEditor112/112, changed CSS Stylelint, harness ESLint and diff check pass. A fresh
+canonical coherent rebuild passes primary127.44/127.50kB, stylesheet145.19/185kB,
+definitions379.97/384.50kB, upgrades369.97/375.50kB, largest263.18/500kB; eight heavy surfaces
+remain deferred. Foundation stays immutable5cd44d63. Temporary diagnostics are removed before
+this commit; Copilot is explicitly re-requested but actual review requests/reviews remain empty.
+
+Canonical all-five finishes4pass/1fail in5.3m. The new theme case progresses through JavaScript
+Light/Dark/Dim and Liquid Light preview, long-source native caret/scroll, signature and keyboard
+hover checks. Liquid's selected completion is present but has native viewport-intersection
+ratio0 for the full unchanged30s assertion. Root diagnoses actual popup bounds/clipping in a
+fresh owned host pair reusing only this immediately preceding coherent build; diagnosis is
+not acceptance. No visibility assertion is weakened or replaced with forced scrolling.
+Log: `/private/tmp/elsa-568-root-all-five-9041ad35.log`. Exact-head CI37404019028 is terminal
+failed with the same selected-completion ratio0 and original4passing (6.3m). Full workspace
+units/three Workflows shuffle seeds/lint/typecheck/bundles and generic Chromium pass; these
+do not accept the failed theme gate. CI log: `/private/tmp/elsa-568-root-ci-9041ad35-failure.log`.
+T036 is open; T037 is unassigned; manual AT/human/delivery gates remain open, all PRs draft.
+
+Fresh-host geometry confirms the selected popup is intentionally parked at top-10000, not
+mispositioned by an ancestor transform (all are none). Actual editor y765.391..825.578;
+inspector-tab-panel y780.391..804.391/clientHeight24/scrollTop56; its flex tab-panels height0;
+inspector-content height73, inspector113, main frame318. The nominal horizontal navigation
+strip still occupies486px because its nested navigation sections/children retain vertical
+grid layouts. This is a real independent narrow-height defect and an upstream clipping
+candidate, not yet a localized explanation for CodeMirror's hidden-anchor sentinel. Root
+reads the pinned engine implementation: it compares the actual tooltip anchor with its own
+code-scroller rect and window bounds, not directly with every inspector ancestor. Corrected
+native viewport and popup proof remains required; no causal success is inferred from CSS.
+A tests-first actual
+one-row navigation assertion fails430px vertical link span against the largest actual link
+height90.813 (+1px tolerance), preserving every existing real-Tab/full-viewport/link-order and
+route-continuity assertion. Root takes the bounded existing narrow-layout correction, not
+popup coordinates, hidden links, fixed dimensions or a redesigned workbench. Actual code
+scroller readability also requires full native viewport intersection (rather than partial
+line visibility). Logs: `/private/tmp/elsa-568-root-liquid-completion-geometry.log`,
+`/private/tmp/elsa-568-root-horizontal-nav-row-red.log`. Temporary ancestor geometry is removed;
+corrected canonical proof remains pending.
+
+Root reviews the narrow-only14-line CSS correction: the sidebar aligns its strip contents,
+navigation sections/groups/children become non-shrinking horizontal flex containers, and
+heading/child block margins reset while existing inline grouping, gaps, all links, DOM order,
+route handling, search and focus rules remain. Complete Web445/445 (36files), direct changed
+app CSS Stylelint, harness ESLint and diff check pass. Log:
+`/private/tmp/elsa-568-root-horizontal-strip-web-units.log`. No new build or host proof is yet
+claimed; temporary no-build config and full ancestor geometry probe are removed before commit.
+
+### M4 T036 scrollable-content boundary correction (not accepted)
+
+At committed Studio `d4f4362fd26e9c111321eea95e9bc5650d157c99`, the canonical all-five
+run passes the original four cases and progresses through JavaScript Light/Dark/Dim including
+expanded/gutter contrast and multiline continuity. It fails in Liquid Light because the helper
+compares the intrinsic single-line `.cm-content` box with the screen boundary. A fresh-host
+diagnostic reusing that immediately preceding coherent build shows: content right399.734px;
+actual editor/scroller/inspector left0/right365px on a390px screen; editor and inspector
+scrollWidth/clientWidth365; scroller scrollWidth400/clientWidth365/overflow-x:hidden.
+The viewport is clipped/contained, not a whole-editor or inspector overflow.
+
+The harness now uses the code scroller's bounds only for `.cm-content`. All other surfaces keep
+their actual bounds, text contrast remains measured on every actual text parent, and the existing
+inspector/viewport containment checks remain. Overflowing source additionally requires an actual
+clipping/scrolling policy and contained editor width. End/Home keyboard checks prove horizontal
+scroll movement in both directions and visible collapsed carets at the exact source end/start;
+source/persistence assertions remain exact. No production layout, assertion threshold, timeout
+or forced scroll changes. Corrected proof remains pending. Logs:
+`/private/tmp/elsa-568-root-all-five-d4f4362f.log`,
+`/private/tmp/elsa-568-root-liquid-content-geometry.log`.
+
+Exact-head CI37401854948 is terminal: full workspace units, three Workflows shuffle seeds,
+lint/typecheck/bundles and generic Chromium pass. Normal hosts reproduce the same Liquid
+content-box boundary failure (right406 vs390px screen), with the original four cases passing.
+Retained log: `/private/tmp/elsa-568-root-ci-d4f4362f-failure.log`. This is not theme acceptance.
+
+The first navigation diagnostic observes scrollLeft0 after End; it does not prove actual caret
+movement. Its failure is retained at `/private/tmp/elsa-568-root-liquid-viewport-navigation.log`.
+The independent source review recommends Home before End, then Home again, because a restored
+caret may already be at the end. That sequence also observes scrollLeft0 and remains failed at
+`/private/tmp/elsa-568-root-liquid-home-end-navigation.log`. Root is measuring native selection
+offsets and bounded geometry before inferring a key or product defect. The check also asserts
+exact editor source after navigation; no unsuccessful diagnostic is labeled passing.
+
+The key-position diagnostic confirms the keys work: Home moves the native collapsed caret to
+offset0/x16, End moves it to offset32/x265.719, both within the365px viewport. The short actual
+text fits even though the logical content has a400px minimum width; it needs no scrolling.
+Root replaces only the new case's Liquid string argument with genuinely long representative
+source to prove horizontal navigation, keeping the actual append metadata/help and exact-source
+checks. Temporary selection-offset/platform console diagnostics are removed. Log:
+`/private/tmp/elsa-568-root-liquid-navigation-keys.log`. Long-source proof remains pending.
+
+The first long-source diagnostic reaches a visible end caret and scrolls horizontally, then
+fails the return-Home assertion: scrollLeft11 rather than exactly0. Requiring an exact native
+padding offset is not the accessibility contract. The corrected check requires genuine
+overflow, exact start/end native selection offsets, visible carets and scroll movement in
+both directions, plus unchanged exact source. It cannot silently skip a non-overflowing
+fixture. Log: `/private/tmp/elsa-568-root-long-liquid-navigation.log`. Proof remains pending.
+
+The revised long-source navigation passes its actual start/end caret and bidirectional-scroll
+assertions, then the Liquid Light completion readability path times out inside its combined
+interaction/readability retry. The selected append completion is present in the native snapshot.
+Root separates surface readability from the existing bounded hotkey retry so a geometry or
+contrast failure is reported directly rather than hidden by that retry; thresholds and wait
+limits are unchanged. Log: `/private/tmp/elsa-568-root-long-liquid-caret-boundaries.log`.
+
+The next run catches a real theme-switch contrast dip in the static Liquid preview:
+Light string foreground `[23,96,32]` on an intermediate surface `[187,190,196]` gives
+4.129539:1, below4.5. The global button rule animates all properties for0.15s; static syntax
+roles change immediately. An actual native computed-style red confirms the preview inherits
+`transition-property:all; transition-duration:0.15s`. The bounded production correction makes
+only this code-preview button's foreground/background change atomically (`transition:none`),
+without palette changes, injected waits, global motion-policy changes or relaxed contrast.
+The browser check now guards that invariant in all six language/appearance paths. Logs:
+`/private/tmp/elsa-568-root-liquid-completion-readability.log`,
+`/private/tmp/elsa-568-root-preview-transition-red.log`. Canonical corrected proof is pending.
+
+### M4 T036 committed-head reconciliation — multiline journey correction (not accepted)
+
+At Studio `966d823e2b50b09339c31e5be72152ff823e0e96`, local all-five actual-host
+verification and CI37399634010 both pass the original four cases and fail only the added
+theme case at line211. The newline is persisted exactly; the compact engine intentionally
+opens the expanded editor when a newline is inserted. The test incorrectly presses Escape
+on the now-unmounted compact editor. The correction asserts the actual expanded focus/source,
+closes that dialog, and enters the unchanged multiline-preview Shift+Tab/Enter assertions
+from the syntax control. It does not change production behavior, timeouts or source checks.
+Logs: `/private/tmp/elsa-568-root-normal-host-all-five-966d823e.log`,
+`/private/tmp/elsa-568-root-ci-966-failure.log`. Corrected actual-host proof is pending.
+
+The next canonical theme run progresses through the corrected multiline journey and fails
+Dark expanded-source continuity: actual function-token contrast4.364519 is below the unchanged
+4.5 threshold. A fresh-host diagnostic reusing only that immediately preceding coherent build
+confirms foreground `[168,193,255]` against composited background
+`[73.2,83.46666666666667,91.46666666666667]`. Expanded-only `highlightActiveLine` retains
+CodeMirror's light default `#cceeff44`; no Studio active-line/gutter overrides exist. This
+is not a reason to lighten the syntax palette or lower the assertion. The bounded correction
+maps active-line/gutter fills and gutter chrome to existing Studio semantic tokens; expanded
+continuity also checks actual gutter text contrast. Logs:
+`/private/tmp/elsa-568-root-multiline-canonical-fix.log`,
+`/private/tmp/elsa-568-root-expanded-contrast-confirmation.log`.
+
+An intervening diagnostic fails because `closeExpanded` deliberately restores the expand-button
+focus on the next animation frame after the test focuses syntax. The test now awaits that actual
+button focus before the syntax/Shift+Tab entry; it does not add sleep, force-click or retries.
+That failed diagnostic is retained at `/private/tmp/elsa-568-root-expanded-contrast-diagnostic.log`.
+
+Root reviews the11-line shared-CSS correction, gives its scoped selectors greater specificity
+than the engine's base theme selectors, removes the diagnostic no-build configuration, and
+passes the complete112-test/eight-file CodeEditor suite plus changed CSS Stylelint, harness
+ESLint and diff check. Log: `/private/tmp/elsa-568-root-expanded-editor-units.log`.
+Fresh canonical all-five actual-host and successor committed-head CI remain pending; these
+source/static/unit checks alone do not accept the corrected theme gate.
+
+Configured recursive workspace typecheck passes. Root CodeEditor112/112 and Web445/445 pass.
+The complete local Workflows run reports1505pass/1fail in unchanged activity-definition
+diagnostic navigation; it is retained as failed, not renamed green. The same case passes
+unchanged in isolation, then its whole48-case file plus both new Escape cases passes50/50.
+The machine reaches load248 on8cores during the complete local run. Exact-head CI37399634010
+passes the full workspace units, all three Workflows shuffle seeds, lint/typecheck/bundles and
+generic Chromium; its normal-host job fails as described above. These rechecks reconcile the
+unit failure without claiming load as a proven cause. Logs:
+`/private/tmp/elsa-568-root-responsive-workflows-units.log`,
+`/private/tmp/elsa-568-root-authoring-recheck.log`,
+`/private/tmp/elsa-568-root-authoring-whole-file-recheck.log`,
+`/private/tmp/elsa-568-root-responsive-workspace-typecheck.log`.
+
+Copilot was explicitly requested on966d823e; no actual review feedback or approval is visible.
+T036 remains unaccepted/ReviewRequired/VerificationRunning; T037 is unassigned and current-head
+manual AT, human acceptance and delivery remain open. All program PRs are draft/unmerged.
+
+### M4 T036 canonical responsive run — further viewport precondition (not accepted)
+
+The twenty-fourth canonical command rebuilds both actual hosts and passes unchanged budgets
+(primary entry127.44/127.50kB, stylesheet144.88/185kB, definitions379.66/384.50kB,
+upgrades369.66/375.50kB). With all diagnostic injection removed, actual keyboard traversal passes
+every sidebar link's ratio1 assertion. The case reaches diagnostics without a preceding failure
+in preview/editor focus, selection tokens, signature/hover/completion or consumed-Escape/maximize
+checks. It then fails the diagnostic viewport precondition (ratio0): the static-flow diagnostic
+is below the narrow inspector fold. Root adds only ordinary `scrollIntoViewIfNeeded` for that
+surface before the same visibility, containment and contrast assertions. Floating help surfaces
+still require actual in-view rendering without that scroll precondition. This is not all-theme
+or T036 acceptance. Log: `/private/tmp/elsa-568-root-responsive-canonical-twentyfourth.log`.
+
+An additional standalone Web-project TypeScript check, which is not the configured recursive CI
+typecheck command, fails with diagnostics outside the changed focus handler (including the
+unchanged PNG import, auth/Weaver mock types and React DOM vendor version declaration). That
+extra check is not reported as green or used to widen this task into project-configuration work.
+Log: `/private/tmp/elsa-568-root-web-responsive-typecheck.log`. At this earlier checkpoint,
+configured workspace typecheck, complete affected suites, all-five rebuilt-host proof and
+committed-head CI were pending; the later committed-head reconciliation above supersedes it.
+
+Root restores the complete CodeEditor112/112 (eight files) and Web445/445 (36files) suites on
+the correction tree with one worker; Workflows' full affected suite was still running. Logs:
+`/private/tmp/elsa-568-root-responsive-editor-units.log`,
+`/private/tmp/elsa-568-root-responsive-web-units.log`. These do not substitute for all-theme,
+all-five normal-host, configured workspace typecheck or committed-head CI acceptance.
+
+### M4 T036 responsive-strip review round (not accepted)
+
+The twelfth canonical rebuilt-host run passes compilation and unchanged bundle budgets, then
+fails the added navigation check before expression contrast. Fresh-host diagnostics13-19 reuse
+those coherent application assets only for diagnosis. Font readiness, visible overflow, a
+single-frame focus reveal and a fixed search width do not correct the movement and are rejected;
+none is adopted in production. The nineteenth run records actual active-element/class and child
+geometry: Search modules grows from70px to235px while its `flex-shrink` interpolates to0 through
+the existing150ms `transition:all`, moving the focused Dashboard link fromx239.6875 tox404.6875
+without sidebar scrolling. Logs: `/private/tmp/elsa-568-root-narrow-canonical-twelfth.log`,
+`/private/tmp/elsa-568-root-nav-children-nineteenth.log`.
+
+A twentieth diagnostic waiting for that actual computed CSS state confirms native Tab scrolls
+Dashboard fully into view; it still fails at Modules (ratio0.6639702916145325), so it is not a
+passing navigation or T036 gate. The responsive strip's existing non-shrink rule now limits
+transitions to paint roles only (`background-color`, `color`, `border-color`, `box-shadow`),
+retaining visual transitions while making flex geometry immediate. That correction still needs
+canonical rebuilt-host proof. Temporary preconditions, geometry output and no-build configuration
+must be removed before committed-head acceptance. No focus handler, forced scroll, changed
+viewport ratio, budget or retention policy is adopted. T036 stays open; T037 is unassigned.
+Log: `/private/tmp/elsa-568-root-settled-nav-twentieth.log`.
+
+The twenty-first run separates the remaining Modules failure: x295.09375/width142.9375
+extends48px outside the390px strip, while its y97.796875/height90.796875 is vertically visible.
+Native Tab leaves it partially clipped. The twenty-second synchronous nearest-focus probe leaves
+only0.03125px right-edge clipping because the browser scroll offset is integral. A shared-spacing
+scroll gutter in the twenty-third probe passes every navigation link's unchanged ratio1 check,
+then fails the expression viewport precondition: the selected property is below the inspector fold.
+That is not a passing theme gate. The harness now uses the same ordinary property scroll action
+already required later in the case before asserting its viewport presence.
+Logs: `/private/tmp/elsa-568-root-modules-geometry-twentyfirst.log`,
+`/private/tmp/elsa-568-root-full-focus-reveal-twentysecond.log`,
+`/private/tmp/elsa-568-root-focus-gutter-twentythird.log`.
+
+The actual shell focus handler is limited to horizontally overflowing, `:focus-visible`
+HTMLElement targets and nearest/instant reveal; it does not click, prevent default, navigate or
+touch authority. Responsive scroll padding uses the existing shared spacing token. Independent
+source review finds no actionable defect. Root scoped ESLint passes with zero errors/five existing
+App warnings; direct Stylelint of all three changed stylesheets and diff check pass. Temporary
+CSS injection, focus handler, CSS-state wait, geometry output and no-build configuration are
+removed from the test tree. Canonical rebuilt-host/current-head proof remains pending. Shared
+machine load peaks above370 on8cores; any timing-shaped failure needs lower-load reconciliation.
+
+### M4 T036 rejected reduced-build diagnostic
+
+The eleventh local diagnostic passes scoped compilation/bundle checks but fails before expression
+setup at the console-stream-ready precondition. Its reduced build order is incoherent: Web's
+`vite.config.ts` uses `emptyOutDir:true` on the shared `wwwroot/studio` directory and was rebuilt
+after Workflows, removing the independent module/vendor artifacts. The canonical recursive build
+orders the host and module outputs coherently. This is rejected diagnostic setup, not product red
+or a passing narrow/contrast gate. Logs: `/private/tmp/elsa-568-root-narrow-scoped-build.log`,
+`/private/tmp/elsa-568-root-narrow-focused-eleventh.log`.
+Root removes the temporary no-build diagnostic configuration and returns to the canonical rebuilt
+host command. No build policy, assertion, timing or retention setting is changed.
+
+### M4 T036 keyboard geometry and consumed-Escape checkpoint (not accepted)
+
+The ninth canonical rebuilt-host run catches a horizontal navigation regression introduced by
+retaining the strip: the Modules link is focused through actual Tab but only0.9761136770248413
+of it is in view. The unchanged full-visibility check fails. The tenth local diagnostic reuses
+the just-built applications (no rebuild, not acceptance evidence) with fresh owned hosts and
+records only numeric/class geometry. The navigation column shrinks to72.609375px while its
+link needs105px, and its right edge is clipped. The bounded next correction stops the horizontal
+strip's direct children shrinking; it does not reduce the viewport ratio or force scrolling/clicks.
+Logs: `/private/tmp/elsa-568-root-focus-ninth.log`,
+`/private/tmp/elsa-568-root-nav-diagnostic-tenth.log`.
+
+The corrected nested-control hook fixture now reproduces two real failures (palette and inspector)
+when consumed Escape still restores the panel. Root adds only `!event.defaultPrevented` to the
+existing global Escape condition; both tests pass, including fresh unconsumed outside Escape
+restoring the panel. Scoped hook/test/harness ESLint passes. Logs:
+`/private/tmp/elsa-568-root-panel-escape-focused-red.log`,
+`/private/tmp/elsa-568-root-panel-escape-green.log`,
+`/private/tmp/elsa-568-root-panel-escape-lint.log`.
+Independent source review finds no focus-token ownership blocker; actual runtime contrast remains
+pending. Custom textured/material surfaces and current-head manual AT are not proven by the
+solid-background helper. Temporary diagnostic configuration/output must be removed before final
+committed-head all-five rebuilt-host/CI acceptance. T036 remains open; all PRs draft/unmerged.
+
+### M4 T036 opaque-focus red checkpoint (not accepted)
+
+The eighth rebuilt-host run, after the one-line phone sidebar correction, passes actual390px
+preview visibility, syntax and text contrast, then fails focused rich-editor outline contrast:
+1.4246653928201924 against the unchanged3:1 requirement. Log:
+`/private/tmp/elsa-568-root-narrow-shell-eighth.log`. Root adds central
+`--studio-focus-strong` defaulting to opaque primary text and consumes it only in the existing
+shared code input/preview focus rule, retaining2px solid/2px offset and the primary-text fallback.
+The global soft chrome ring and its material/high-contrast recipes remain unchanged. Central
+token documentation and Decision19 record the distinction. Scoped harness ESLint and direct
+changed CSS/token Stylelint pass; actual rebuilt-host contrast/Escape proof remains pending.
+
+The harness now also requires real Tab traversal from brand through Search modules and every
+navigation link at390px, each fully in view without changing route, and retains inspector maximize
+after consumed help/completion Escape. Temporary numeric geometry output is removed. A new owning
+hook-test fixture initially imports CodeMirror without a Workflows direct dependency and fails to
+load; that is rejected fixture setup, not behavioral red. The original1504 cases pass in that run,
+but the overall suite fails. The fixture is being corrected without dependency or engine-coupling
+changes. No complete affected-suite or T036 acceptance is claimed from that checkpoint.
+
+### M4 T036 narrow-shell geometry red checkpoint (not accepted)
+
+Hosted CI37393109900 at pushed `da83976b` passes full lint/typecheck/unit/shuffled/bundle
+and generic Chromium. Its normal-host gate reproduces the new narrow preview failure while
+all four original cases pass; it is not a passing theme gate. Local focused fourth/fifth runs
+fail the explicit viewport precondition, including after the real Maximize inspector action.
+The seventh rebuilt-host diagnostic also uses the existing Collapse bottom panel action and
+records only bounded numeric geometry/computed styles, not authored source or authority data.
+At390x844 the shell rows are804px/0px/40px; main-frame/content/workflow editor are all zero-height.
+The phone sidebar's column override consumes the auto row and starves the workflow viewport.
+Logs: `/private/tmp/elsa-568-root-theme-focused-fourth.log`,
+`/private/tmp/elsa-568-root-theme-focused-fifth.log`,
+`/private/tmp/elsa-568-root-theme-geometry-seventh.log`.
+
+The next bounded correction preserves the already intended horizontal navigation strip below
+640px instead of introducing a new responsive workbench. Root keeps actual inspector-maximize
+and bottom-panel-collapse setup, viewport/contrast/focus/source/undo assertions and all budgets.
+Temporary geometry output must be removed before final acceptance. Independent review, rebuilt
+focused proof, final all-five committed-head normal-host and CI proof remain required. T036
+stays open; T037 is unassigned; manual AT/human acceptance and delivery remain open. All PRs draft.
+
+### M4 T036 viewport precondition checkpoint — committed `da83976b` (not accepted)
+
+The third canonical rebuilt-host run gets past the actual theme control but the new case finds no
+syntax spans after resizing to390px. The first normal-host case and initial desktop preview succeed;
+the new case does not establish narrow contrast or focus acceptance. Log:
+`/private/tmp/elsa-568-root-normal-host-third.log`. Offscreen preview work is deliberately cancelled,
+so root adds ordinary `scrollIntoViewIfNeeded` plus an explicit `toBeInViewport` precondition before
+checking narrow tokens. This is a visibility hypothesis until the focused actual-host run proves it,
+not a claimed product fix or permission to bypass IntersectionObserver. No production changes,
+forced click, reduced assertion or timing/budget change. Root narrows the next diagnostic run to the
+new case; final all-five committed-head normal-host/CI proof still remains required.
+
+### M4 T036 normal-host harness correction — packaging head `aa29c973` (not accepted)
+
+The second canonical command rebuilds both applications successfully against the corrected tree,
+then passes all four original cases. The new theme case fails before contrast measurement: the
+existing bottom panel intercepts the shell's Colour mode control at390px. It is not a syntax-color
+failure or a passing theme gate. The command begins before the source-equivalent `aa29c973` commit
+is created; it does not substitute for committed-head CI. Owned hosts stop through fixture teardown.
+Log: `/private/tmp/elsa-568-root-normal-host-second.log`.
+
+Root corrects only the new harness: choose each mode through its actual desktop UI, then shrink to
+390px before every preview/editor/help/diagnostic/selection and narrow expanded measurement.
+No forced click, shell change, assertion removal or timing/budget/retention relaxation. The shell's
+phone-width colour-control overlap remains outside this task and is not claimed fixed. Independent
+browser review also adds a real keyboard-focused multiline preview control: exact persisted source,
+no editor mount, actual `:focus-visible` outline/contrast, Enter expansion and source restoration.
+Scoped browser ESLint, five-case discovery and diff check pass. Corrected real-host/CI proof remains
+pending; T036 is unchecked and T037 unassigned. Manual AT and human acceptance remain open.
+Independent final harness-delta review finds no remaining material defect; it is source review only.
+Root restored full CodeEditor112/112 and package build/typecheck pass at committed `aa29c973`.
+Logs: `/private/tmp/elsa-568-root-editor-deferred-restored-final.log`,
+`/private/tmp/elsa-568-root-deferred-restored-typecheck.log`,
+`/private/tmp/elsa-568-root-theme-harness-correction-lint.log`,
+`/private/tmp/elsa-568-root-theme-harness-correction-list.log`.
+
+### M4 T036 packaging correction checkpoint — Studio #568 / draft #569 (not accepted)
+
+The initial integrated head `08d1b31c1fe5e6152c26252eb1dab1bb502fa69e` passes root
+CodeEditor108, JavaScript15, Liquid25 and Workflows1504, configured workspace typecheck,
+full lint (zero errors,48 existing warnings) and app-token Stylelint. Its canonical rebuilt-host
+command stops before browser execution: the unchanged primary Workflows budget is129.93/127.50kB.
+CI37390942400 confirms failed lint/typecheck/bundle and normal-host jobs; generic Chromium passes.
+These are rejected checkpoints, not theme/contrast acceptance.
+
+Root moves only the static preview presentation into a lazy leaf. The eager shell retains the
+same button, focus, current escaped plaintext and authorization boundary, including a failed-chunk
+fallback. Existing session listeners are grouped without changing order or handlers, the existing
+restoration event is shared privately, duplicate guidance/session/multiline calculations are
+reused, and stable diagnostic priority is preserved without copying/sorting. No public SDK/wire,
+JSON consumer, authority policy, source wording or bundle threshold changes.
+Independent production review finds no remaining actionable finding. The presentation leaf may
+load for any mounted compact preview, including JSON/offscreen; the language parser/highlighter
+still loads only for a supported, bounded, actually visible preview. No editor session is created.
+
+The scoped rebuilt bundle passes at127.44/127.50kB, definitions379.63/384.50kB,
+upgrades369.63/375.50kB, stylesheet144.85/185kB and largest chunk263.18/500kB.
+Root complete CodeEditor112/112 in eight files, package typecheck/build and scoped ESLint pass;
+new controls cover stable diagnostic priority and presentation-chunk failure with current escaped
+source, stationary focused button and revocation. The lazy fallback's initial TypeScript mismatch
+is corrected before the passing typecheck. Removing only the late parsed-result guard again
+fails all six old-source/URI/version/session/language/offscreen controls after the lazy correction;
+the guard is restored. Logs: `/private/tmp/elsa-568-root-deferred-preview-bundle-fourth.log`,
+`/private/tmp/elsa-568-root-editor-deferred-final.log`,
+`/private/tmp/elsa-568-root-deferred-typecheck.log`,
+`/private/tmp/elsa-568-root-deferred-lint.log`,
+`/private/tmp/elsa-568-root-deferred-stale-guard-red.log`.
+
+The corrected canonical rebuilt-host run, exact-head CI and final browser interaction review remain
+pending. T036 is unchecked; T037 is not assigned. All PRs remain draft/unmerged, and current-head
+manual AT, human acceptance and delivery remain open.
+
+### M4 T036 readiness/red checkpoint — Studio #568, 2026-10-06 (not accepted)
+
+Root integration starts at `69ee8e08` (spec reconciliation only; production remains473cf1a9).
+The new actual-host Light/Dark/Dim/narrow journey fails on the unchanged implementation exactly
+at the missing collapsed JavaScript `studio-code-token-*` span. Both hosts are rebuilt and their
+owned processes stop after the failure. Log: `/private/tmp/elsa-568-root-theme-browser-red.log`.
+The preceding setup-only invocation with missing node_modules is not feature red evidence;
+frozen offline installation succeeds without dependency changes before the real red run.
+
+The final test adds actual Colour mode controls, lazy first-preview/no rich mount, keyboard
+activation, actual-text-parent foreground contrast on composited backgrounds, nonzero/contrasting
+focus outline, property-pane containment, version-matched hover/catalog help, diagnostics,
+actual native select-all with readable computed `::selection` colors that exactly match shared
+accent/on-fill tokens, single undo restoring exact persisted source and shared compact/expanded continuity. Independent
+harness review catches a diagnostic-container false-positive; root changes measurement to every
+actual text parent's foreground and adds focus/pane checks. Final source re-review finds no
+material test defect. That review is not runtime proof. Scoped browser ESLint and diff check pass.
+The final selection review's possible browser-default false-positive is closed by normalizing
+the pseudo colors and central token values through the same canvas and comparing their RGBA bytes.
+Existing M3 assertions, bundle/timing budgets and trace/screenshot/video policies are unchanged.
+
+The isolated presentation writer owns unit tests-first implementation. Final integrated browser,
+affected complete suites, exact-head CI/review, manual AT and human acceptance remain pending;
+T036 is unchecked and all PRs remain draft/unmerged. T037 refinement is separate, not an assigned
+formatter implementation or new dependency adoption.
+
+### Final M3 automated gate — Studio #560/#561 and Foundation #2379, 2026-10-06
+
+Final integrated Studio `473cf1a9f9622c5abd3091b846e91037e7da55c6` (draft#565,
+stacked on baseline `5ac5d71de80aa27ef6ed71bb0c3bae6fe003b6fd`, draft#562) pairs with
+Foundation `5cd44d6312d9de85b13f4619fc7aa972a557d033` (draft#2380).
+Root rebuilt normal hosts pass4/4 in3.2 minutes, including actual Liquid output-member help,
+compact/expanded mid-token filter/tag application, signatures, explicit interpolation,
+exact persisted source and undo, JavaScript help, activity-definition editing and independent
+missing-editor/provider controls. No assertion, timing budget or retained-source policy was relaxed.
+Log: `/private/tmp/elsa-561-root-normal-host-third.log`.
+
+Studio CI37384606857 passes all three jobs at exact473cf: lint/typecheck, complete/shuffled
+units, client builds and unchanged bundle budgets; generic Chromium; rebuilt paired normal hosts.
+Baseline Studio CI37377085581 also passes all three jobs at exact5ac5d7. Foundation CI37376029424
+and Maps37376054285 pass at exact5cd44d. Root Foundation scopes pass catalog27, Expressions236,
+Design534, DesignAPI143, Publishing714, Jint126 and architecture17; authenticated rebuilt
+Workbench3 and freshly rebuilt Debug JavaScript REST10 pass. Full local architecture is not
+claimed: its full hosted gate passes. REST log: `/private/tmp/elsa-2379-root-rest-accessor-final.log`.
+
+Root complete CodeEditor93/93, Liquid25/25, JavaScript15/15, CodeEditor typecheck/build,
+scoped ESLint and diff checks pass. Removing the mid-token authoritative-ownership guard makes
+the local-completion suffix control fail1/1 (the authoritative collision control still passes).
+Root restores the guard, verifies the production diff is empty, and reruns all93 successfully.
+Logs: `/private/tmp/elsa-565-root-midtoken-ownership-red.log`,
+`/private/tmp/elsa-565-root-editor-ownership-restored-final.log`. Earlier red controls and paired-host
+failures below are historical diagnostic checkpoints, not current failures or accepted heads.
+
+Independent restored/final production and browser-harness review finds no actionable remaining
+finding. Copilot CLI requests return success, but GitHub reports no current-head review or review
+request for any M3 draft; this is not external approval. The documented unavailable-external-review
+fallback applies only after the local, independent and hosted gates above pass. Last actual Copilot
+reviews belong to predecessor M2 heads, not this pair. The automated M3 dependency is satisfied;
+current-head manual AT, human acceptance and delivery remain open. All PRs stay draft/unmerged.
+
+M4 Task#568 / Decision19 owns T036 on this immutable baseline; T037/T038 remain separate open gates.
 
 ### M3 Liquid mid-token completion correction — Studio #561, 2026-10-06
 

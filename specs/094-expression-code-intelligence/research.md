@@ -220,3 +220,56 @@ changes form one isolated worker slice. Root owns final integration and compact/
 proof, with controlled-removal or tests-first failures for adverse boundaries. M4 presentation and
 formatting remain separate. Final-head CI/review and manual acceptance are not inferred from the
 reviewed predecessor's local browser pass; all PRs stay draft and unmerged.
+
+## Decision 19: Bounded presentation-only syntax previews and shared theme roles
+
+**Decision**: Studio Task#568 owns T036, starting from the passing automated M3 pair
+Studio `473cf1a9` / Foundation `5cd44d63`. Add centrally defined, documented syntax-foreground
+roles to the shared `--studio-*` token contract. Existing accent/status fill and on-fill roles are
+not generic code foregrounds. Light, Dark and Dim foregrounds must meet 4.5:1 against the actual
+preview/editor background; unknown-host and high-contrast paths may use the primary text fallback.
+Module CSS consumes shared roles, not global theme identities or module-local palettes.
+
+An optional internal language-adapter highlighter returns only bounded plain `{ from, to, kind }`
+spans. Reuse installed JavaScript/Liquid parsers and one closed category/class mapping for rich
+editor and escaped React preview output. No engine node crosses the SDK or wire boundary; no
+language service, evaluation, metadata request or expression-source logging is introduced.
+
+The collapsed preview remains an immediate plain-text button and lazily acquires presentation
+spans without constructing an editor/state/history session. Bound source size and spans, skip
+offscreen or oversized content, and preserve exact authored source. Late results must be rejected
+after source/language change, unmount or authorization revocation; source and document identity
+remain hidden immediately on revocation. Completion, hover, signature and diagnostic surfaces
+retain accessible focus/selection and narrow wrapping in all three supported appearances.
+
+Actual T036 narrow-host checks expose two bounded integration needs: preserve the existing
+horizontal shell navigation strip at phone widths so the workflow viewport has nonzero height,
+with immediate flex sizing, shared scroll padding and overflow-gated keyboard focus reveal,
+and use a centrally owned opaque `--studio-focus-strong` outline rather than the translucent
+chrome ring. The strong role defaults to primary text; verify its actual adjacent-surface contrast
+at least3:1. Editor-consumed Escape must not restore an inspector maximized for narrow editing;
+an unconsumed Escape retains the existing panel restore action.
+
+Expanded-only active-line and gutter chrome must also consume Studio roles rather than
+CodeMirror's light default overlay and gutter palette. Actual Dark-host proof exposes a
+4.364519:1 function token on the stock active-line overlay. Keep the syntax foregrounds
+unchanged and map that fill to the existing soft accent; verify rendered gutter text as well.
+
+Long-source narrow proof also exposes an offscreen completion match-start anchor while the
+actual caret remains visible. A version-specific patch to installed autocomplete6.20.3 may use
+the documented [`TooltipView.getCoords`](https://codemirror.net/docs/ref/#view.TooltipView.getCoords)
+seam to anchor at that caret only when the match start
+is horizontally clipped, the collapsed main head remains in that same active result, and both
+positions occupy the same visual row. Keep normal visible anchors and null/different-row/
+offscreen-caret cases unchanged. Native tooltip clipping, result ranges, filtering, application,
+source, selection and undo remain authoritative; do not force scrolling or disable clipping.
+Apply identical ESM/CommonJS patches reproducibly through pnpm, with focused guard/replacement
+controls and the unchanged coherent normal-host gate. This adds no resolved dependency version
+or new dependency; reassess/remove the patch when the pinned implementation changes.
+
+**Consequences**: Root owns integration, actual normal-host color-mode/contrast/narrow proof and
+complete affected gates. The bounded worker owns presentation implementation/tests and central
+token documentation only. Active-argument/overload semantics and explicit behavior-preserving
+format actions remain T037; final manual AT and human acceptance remain T038. No runtime, catalog,
+SDK, wire, persistence, performance measurement or bundle-budget change is authorized by this seam.
+All PRs remain draft and unmerged.

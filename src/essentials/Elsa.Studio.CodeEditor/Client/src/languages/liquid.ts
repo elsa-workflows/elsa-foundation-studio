@@ -9,5 +9,9 @@ export const liquidLanguageAdapter: StudioCodeLanguageAdapter = {
   },
   async loadSupport() {
     return { language: "liquid" };
+  },
+  async loadPreviewHighlighter() {
+    const module = await import("../engines/liquidPreview");
+    return module.createLiquidPreviewHighlighter();
   }
 };

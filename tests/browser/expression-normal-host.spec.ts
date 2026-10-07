@@ -1,5 +1,6 @@
 import { completeTest, createPersistedExpressionDraft, discoverActivityVersion, expect, missingJavaScriptEditorTest, missingLiquidProviderTest, readActivityDefinitionDraft, readAuthenticatedBackendJson, type NormalHostPair, type PersistedExpressionDraft, type SafeBackendTraffic } from "./expression-normal-host-fixtures";
 import type { Locator, Page } from "@playwright/test";
+import { hasFreshAssistance, matchesDraftLocation } from "../../scripts/expression-assistance-traffic.mjs";
 
 completeTest("persisted workflow drafts use live JavaScript and Liquid assistance on the normal host", async ({ page, hostPair, signInToStudio, recordSafeBackendTraffic, recordSafeConsoleErrors }) => {
   const traffic = recordSafeBackendTraffic(page, hostPair);
@@ -69,6 +70,195 @@ completeTest("persisted workflow drafts use live JavaScript and Liquid assistanc
   }
   await expect.poll(() => hasSuccessfulRequest(traffic, "/capabilities")).toBe(true);
   await expect.poll(() => hasSuccessfulRequest(traffic, "/expression-tooling/descriptors")).toBe(true);
+  expect(consoleErrors).toEqual([]);
+});
+
+completeTest("normal-host expression previews and help remain readable in Light, Dark and Dim at narrow width", async ({ page, hostPair, signInToStudio, recordSafeBackendTraffic, recordSafeConsoleErrors }) => {
+  const traffic = recordSafeBackendTraffic(page, hostPair);
+  const consoleErrors = recordSafeConsoleErrors(page);
+  await signInToStudio(page, hostPair);
+  const draft = await createPersistedExpressionDraft(page, hostPair);
+  await openWorkflowDraft(page, hostPair, draft);
+  await selectWorkflowTarget(page, draft);
+  const syntax = page.getByRole("button", { name: `${draft.inputName} expression syntax` });
+  // A preview may load a static parser, but it must not create a rich editor session.
+  const firstPreview = page.getByRole("button", { name: "JavaScript expression. Activate to edit." });
+  await expect(firstPreview.locator("[class*='studio-code-token-']").first()).toBeVisible();
+  await expect(page.locator(".studio-code-editor-rich .cm-editor")).toHaveCount(0);
+  await page.getByRole("button", { name: "Collapse bottom panel", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Expand bottom panel", exact: true })).toBeVisible();
+  // Use the existing inspector-only UI instead of squeezing the desktop three-pane grid.
+  await page.getByRole("button", { name: "Maximize inspector panel", exact: true }).click();
+  await expect(page.locator(".wf-editor-body")).toHaveClass(/inspector-maximized/);
+  // The existing horizontal strip must keep every navigation control keyboard-reachable.
+  await page.setViewportSize({ width: 390, height: 844 });
+  const workflowUrl = page.url();
+  const sidebar = page.locator(".sidebar");
+  const brand = sidebar.locator(".brand");
+  await brand.focus();
+  await expect(brand).toBeInViewport({ ratio: 1 });
+  await page.keyboard.press("Tab");
+  const search = sidebar.getByRole("searchbox", { name: "Search modules" });
+  await expect(search).toBeFocused();
+  await expect(search).toBeInViewport({ ratio: 1 });
+  const navigationLinks = sidebar.locator(".nav-section a");
+  const navigationCount = await navigationLinks.count();
+  expect(navigationCount).toBeGreaterThan(0);
+  for (let index = 0; index < navigationCount; index++) {
+    await page.keyboard.press("Tab");
+    await expect(navigationLinks.nth(index)).toBeFocused();
+    await expect(navigationLinks.nth(index)).toBeInViewport({ ratio: 1 });
+  }
+  const navigationRow = await navigationLinks.evaluateAll(links => {
+    const boxes = links.map(link => link.getBoundingClientRect());
+    return { span: Math.max(...boxes.map(box => box.bottom)) - Math.min(...boxes.map(box => box.top)),
+      largestLink: Math.max(...boxes.map(box => box.height)) };
+  });
+  expect(navigationRow.span, "Narrow navigation must remain one horizontal row")
+    .toBeLessThanOrEqual(navigationRow.largestLink + 1);
+  expect(page.url()).toBe(workflowUrl);
+  await firstPreview.scrollIntoViewIfNeeded();
+  await expect(firstPreview).toBeInViewport();
+  await page.setViewportSize({ width: 1280, height: 720 });
+
+  for (const language of ["JavaScript", "Liquid"] as const) {
+    if (language === "Liquid") {
+      await syntax.click();
+      await page.getByRole("option", { name: language, exact: true }).click();
+    }
+    const preview = page.getByRole("button", { name: `${language} expression. Activate to edit.` });
+    await preview.click();
+    const editor = page.locator(".studio-code-editor-rich-compact .cm-content");
+    const source = language === "JavaScript" ? "Math.abs(-2)"
+      : "{{ customerName | append: 'theme-aware compact source remains readable at narrow inspector width' }}";
+    const sourcePhase = await replacePersistedWorkflowSource(page, hostPair, editor, draft, traffic, language, source);
+    // Leaving the compact editor returns to the same lazy preview without editing the value.
+    await syntax.focus();
+    await expect(preview).toBeVisible();
+    for (const mode of ["Light", "Dark", "Dim"] as const) {
+      // The existing bottom panel overlaps the shell's colour control at narrow width.
+      // Use its real desktop control, then measure every authoring surface at narrow width.
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await page.getByRole("radiogroup", { name: "Colour mode" }).getByRole("radio", { name: mode, exact: true }).click();
+      await expect(page.locator("html")).toHaveAttribute("data-theme-appearance", mode.toLowerCase());
+      await page.setViewportSize({ width: 390, height: 844 });
+      // Highlighting deliberately stops offscreen; bring the actual property into the viewport.
+      await preview.scrollIntoViewIfNeeded();
+      await expect(preview).toBeInViewport();
+      await expect(preview.locator("[class*='studio-code-token-']").first()).toBeVisible();
+      const previewTransition = await preview.evaluate(element => {
+        const style = getComputedStyle(element);
+        return { property: style.transitionProperty, duration: style.transitionDuration };
+      });
+      // Syntax roles switch immediately. An inherited button color/background transition
+      // would pair the new foreground with an intermediate old surface and lose contrast.
+      expect(previewTransition, "Preview theme colors must change atomically").toEqual({ property: "none", duration: "0s" });
+      await expectReadableCodeSurface(preview);
+      await expect.poll(() => readPersistedSource(page, hostPair, draft)).toBe(source);
+      await preview.focus();
+      await expect(editor).toBeVisible();
+      await expect(editor).toBeFocused();
+      await expect(editor.locator("[class*='studio-code-token-']").first()).toBeVisible();
+      await expectReadableCodeSurface(editor, { focused: true });
+      if (language === "Liquid") await expectHorizontalEditorNavigation(editor, source);
+      await editor.press("ControlOrMeta+A");
+      await expect.poll(() => editor.evaluate(element => {
+        const selection = window.getSelection();
+        return !!selection && !selection.isCollapsed && element.contains(selection.anchorNode);
+      })).toBe(true);
+      await expectReadableCodeSurface(editor, { focused: true, selected: true });
+
+      const position = language === "JavaScript" ? source.indexOf("abs") + 4 : source.indexOf("append") + 6;
+      await moveEditorCursor(editor, source, position);
+      const section = editor.locator("xpath=ancestor::section[@data-studio-code-editor='true'][1]");
+      const signature = section.locator(".studio-code-editor-signature");
+      await expect(signature).toContainText(language === "JavaScript" ? "abs(x): Number" : "append(value): String");
+      await expectReadableCodeSurface(signature);
+      await moveEditorCursor(editor, source, language === "JavaScript" ? source.indexOf("abs") + 3 : position);
+      await expect(async () => {
+        await editor.press("Alt+i");
+        const hover = page.getByRole("status", { name: "Hover information" });
+        await expect(hover).toBeVisible({ timeout: 1_000 });
+      }).toPass({ timeout: 15_000 });
+      await expectReadableCodeSurface(page.getByRole("status", { name: "Hover information" }));
+      await editor.press("Escape");
+      await expect(page.locator(".wf-editor-body")).toHaveClass(/inspector-maximized/);
+      const completionPosition = language === "JavaScript" ? source.indexOf("abs") + 2 : position;
+      await moveEditorCursor(editor, source, completionPosition);
+      await expect.poll(() => readNativeEditorCaret(editor)).toEqual({ offset: completionPosition, visible: true });
+      await expect(async () => {
+        await editor.press("Control+Space");
+        const menu = page.locator(".cm-tooltip-autocomplete");
+        await expect(menu).toBeVisible({ timeout: 1_000 });
+      }).toPass({ timeout: 15_000 });
+      await expectReadableCodeSurface(page.locator('.cm-tooltip-autocomplete [aria-selected="true"]'));
+      await expect.poll(() => readNativeEditorCaret(editor)).toEqual({ offset: completionPosition, visible: true });
+      await editor.press("Escape");
+      await expect(page.locator(".wf-editor-body")).toHaveClass(/inspector-maximized/);
+      if (mode === "Light") {
+        // Prove this language's current-source help is backed by successful version-matched
+        // assistance; later repeated help may legitimately reuse that authorized metadata.
+        await expect.poll(() => language === "Liquid"
+          ? hasFreshCatalog(traffic.slice(sourcePhase.start), draft, language, sourcePhase.previousRevision)
+          : hasFreshAssistance(traffic.slice(sourcePhase.start), draft, language,
+            "/expression-tooling/hover", sourcePhase.previousRevision)).toBe(true);
+      }
+      await expect.poll(() => readEditorSource(editor)).toBe(source);
+      await expect.poll(() => readPersistedSource(page, hostPair, draft)).toBe(source);
+      await replacePersistedWorkflowSource(page, hostPair, editor, draft, traffic, language,
+        language === "JavaScript" ? "if (" : "{{ customerName");
+      const diagnostics = section.locator(".studio-code-editor-diagnostics");
+      await expect(diagnostics).toContainText(`${language}/Syntax`);
+      await diagnostics.scrollIntoViewIfNeeded();
+      await expectReadableCodeSurface(diagnostics);
+      await editor.press("ControlOrMeta+Z");
+      await expect.poll(() => readEditorSource(editor)).toBe(source);
+      await expect.poll(() => readPersistedSource(page, hostPair, draft)).toBe(source);
+      // Actual keyboard exit is preserved even after help and completion were dismissed.
+      await editor.press("Escape");
+      await editor.press("Tab");
+      await expect(syntax).toBeFocused();
+      await expect(preview).toBeVisible();
+      await expectReadableCodeSurface(preview);
+      // Expanded rendering uses the same theme roles and exact source, not a separate engine.
+      await expectExpandedSourceContinuity(page, hostPair, draft, source);
+      await expect(preview).toBeVisible();
+      // A multiline preview stays a real button on keyboard focus rather than activating.
+      await preview.click();
+      await expect(editor).toBeVisible();
+      const multilineSource = `${source}\n`;
+      await replacePersistedWorkflowSource(page, hostPair, editor, draft, traffic, language, multilineSource);
+      // Inserting a newline intentionally expands compact editing. Close that real dialog
+      // before checking the multiline preview's non-activating keyboard focus.
+      const dialog = page.getByRole("dialog");
+      const expanded = dialog.locator(".studio-code-editor-rich-expanded .cm-content");
+      await expect(expanded).toBeFocused();
+      await expect.poll(() => readEditorSource(expanded)).toBe(multilineSource);
+      await dialog.getByRole("button", { name: `Close ${draft.inputName} editor` }).click();
+      await expect(dialog).toHaveCount(0);
+      // The row deliberately restores its expand button on the next animation frame.
+      await expect(page.getByRole("button", { name: `Open expanded ${draft.inputName} editor` })).toBeFocused();
+      await syntax.focus();
+      await expect(syntax).toBeFocused();
+      await syntax.press("Shift+Tab");
+      await expect(preview).toBeFocused();
+      await expect.poll(() => preview.evaluate(element => element.matches(":focus-visible"))).toBe(true);
+      await expect(page.locator(".studio-code-editor-rich .cm-editor")).toHaveCount(0);
+      await expectReadableCodeSurface(preview, { focused: true });
+      await expect.poll(() => readPersistedSource(page, hostPair, draft)).toBe(multilineSource);
+      await preview.press("Enter");
+      await expect(expanded).toBeFocused();
+      await expect.poll(() => readEditorSource(expanded)).toBe(multilineSource);
+      await replacePersistedWorkflowSource(page, hostPair, expanded, draft, traffic, language, source);
+      await page.getByRole("dialog").getByRole("button", { name: `Close ${draft.inputName} editor` }).click();
+      await expect(preview).toBeVisible();
+    }
+
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await expectExpandedSourceContinuity(page, hostPair, draft, source);
+    await expect(preview).toBeVisible();
+    await expect.poll(() => readPersistedSource(page, hostPair, draft)).toBe(source);
+  }
   expect(consoleErrors).toEqual([]);
 });
 
@@ -229,6 +419,169 @@ missingLiquidProviderTest("missing Liquid provider preserves authored Liquid and
   await expect.poll(() => readPersistedSource(page, hostPair, draft)).toEqual(preservedLiquid);
   expect(consoleErrors).toEqual([]);
 });
+
+async function expectExpandedSourceContinuity(page: Page, pair: NormalHostPair,
+  draft: PersistedExpressionDraft, source: string) {
+  await page.getByRole("button", { name: `Open expanded ${draft.inputName} editor` }).click();
+  const dialog = page.getByRole("dialog");
+  const expanded = dialog.locator(".studio-code-editor-rich-expanded .cm-content");
+  await expect.poll(() => readEditorSource(expanded)).toBe(source);
+  await expectReadableCodeSurface(expanded);
+  await expectReadableCodeSurface(dialog.locator(".cm-gutters"));
+  await dialog.getByRole("button", { name: `Close ${draft.inputName} editor` }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect.poll(() => readPersistedSource(page, pair, draft)).toBe(source);
+}
+
+async function expectReadableCodeSurface(surface: Locator, options: { focused?: boolean; selected?: boolean } = {}) {
+  await expect(surface).toBeVisible();
+  await expect(surface).toBeInViewport();
+  if (await surface.evaluate(element => element.matches(".cm-content"))) {
+    await expect(surface.locator("xpath=ancestor::*[contains(@class, 'cm-scroller')][1]"))
+      .toBeInViewport({ ratio: 1 });
+  }
+  const measurements = await surface.evaluate((element, selected) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 1;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) throw new Error("Canvas color conversion is unavailable.");
+    const rgba = (color: string) => {
+      context.clearRect(0, 0, 1, 1);
+      context.fillStyle = color;
+      context.fillRect(0, 0, 1, 1);
+      return Array.from(context.getImageData(0, 0, 1, 1).data);
+    };
+    const blend = (front: number[], back: number[]) => front.slice(0, 3)
+      .map((channel, index) => channel * front[3] / 255 + back[index] * (1 - front[3] / 255));
+    const luminance = (rgb: number[]) => rgb.slice(0, 3).map(channel => {
+      const normalized = channel / 255;
+      return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+    }).reduce((total, channel, index) => total + channel * [0.2126, 0.7152, 0.0722][index], 0);
+    const contrast = (foreground: number[], background: number[]) => {
+      const a = luminance(blend(foreground, background));
+      const b = luminance(background);
+      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    };
+    const backgroundOf = (node: Element) => {
+      const ancestors: Element[] = [];
+      for (let current: Element | null = node; current; current = current.parentElement) ancestors.push(current);
+      return ancestors.reverse().reduce((background, ancestor) =>
+        blend(rgba(getComputedStyle(ancestor).backgroundColor), background), [255, 255, 255]);
+    };
+    // Measure each actual text parent's foreground: diagnostics/docs may override the container.
+    // Read only colors and classes, never authored text, into the returned evidence.
+    const nodes = new Set<Element>();
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    for (let text = walker.nextNode(); text; text = walker.nextNode()) {
+      if (text.textContent?.trim() && text.parentElement) nodes.add(text.parentElement);
+    }
+    const ratios = [...nodes].map(node => {
+      const style = getComputedStyle(node, selected ? "::selection" : null);
+      const tokenStyle = selected ? getComputedStyle(node) : undefined;
+      const accent = tokenStyle?.getPropertyValue("--studio-accent").trim();
+      const onAccent = tokenStyle?.getPropertyValue("--studio-accent-text").trim();
+      const accentRgba = accent ? rgba(accent) : undefined;
+      const onAccentRgba = onAccent ? rgba(onAccent) : undefined;
+      const selectionBackground = selected ? rgba(style.backgroundColor) : undefined;
+      const foreground = rgba(style.color);
+      const background = selectionBackground ? blend(selectionBackground, backgroundOf(node)) : backgroundOf(node);
+      return { className: node.className, foreground, background, contrast: contrast(foreground, background),
+        selectionAlpha: selectionBackground?.[3],
+        selectionTokenOwned: selected && !!accentRgba && !!onAccentRgba &&
+          selectionBackground?.every((channel, index) => channel === accentRgba[index]) &&
+          foreground.every((channel, index) => channel === onAccentRgba[index]) };
+    });
+    // CodeMirror's single-line content may be wider than its clipped viewport. Measure
+    // the actual code viewport, not the intrinsic text box; other surfaces keep their own bounds.
+    const codeScroller = element.matches(".cm-content") ? element.closest(".cm-scroller") : null;
+    const bounds = (codeScroller ?? element).getBoundingClientRect();
+    const contentBounds = element.getBoundingClientRect();
+    const pane = element.closest(".wf-properties");
+    const paneBounds = pane?.getBoundingClientRect();
+    const editor = element.closest(".cm-editor");
+    const scrollGeometry = (node: Element | null) => {
+      if (!node) return null;
+      const rectangle = node.getBoundingClientRect();
+      return { left: rectangle.left, right: rectangle.right, clientWidth: node.clientWidth,
+        scrollWidth: node.scrollWidth, scrollLeft: node.scrollLeft, overflowX: getComputedStyle(node).overflowX };
+    };
+    const focusSurface = editor ?? element.closest(".studio-code-editor-preview");
+    const focusStyle = focusSurface && getComputedStyle(focusSurface);
+    return {
+      ratios, left: bounds.left, right: bounds.right, viewportWidth: window.innerWidth,
+      contentOverflows: !!codeScroller && (contentBounds.left < bounds.left - 1 || contentBounds.right > bounds.right + 1),
+      editorGeometry: scrollGeometry(editor), scrollerGeometry: scrollGeometry(element.closest(".cm-scroller")),
+      pane: pane && paneBounds ? { left: paneBounds.left, right: paneBounds.right,
+        scrollWidth: pane.scrollWidth, clientWidth: pane.clientWidth } : null,
+      focus: focusSurface && focusStyle ? { width: parseFloat(focusStyle.outlineWidth), style: focusStyle.outlineStyle,
+        contrast: contrast(rgba(focusStyle.outlineColor), backgroundOf(focusSurface.parentElement ?? focusSurface)) } : null
+    };
+  }, options.selected === true);
+  expect(measurements.ratios.length).toBeGreaterThan(0);
+  for (const measurement of measurements.ratios) {
+    expect(measurement.contrast, `Text contrast for ${measurement.className} (${JSON.stringify({
+      foreground: measurement.foreground, background: measurement.background
+    })})`).toBeGreaterThanOrEqual(4.5);
+    if (options.selected) {
+      expect(measurement.selectionAlpha).toBeGreaterThan(0);
+      expect(measurement.selectionTokenOwned, `Selection tokens for ${measurement.className}`).toBe(true);
+    }
+  }
+  expect(measurements.left).toBeGreaterThanOrEqual(-1);
+  expect(measurements.right, JSON.stringify({ left: measurements.left, right: measurements.right,
+    viewportWidth: measurements.viewportWidth, editor: measurements.editorGeometry,
+    scroller: measurements.scrollerGeometry, pane: measurements.pane }))
+    .toBeLessThanOrEqual(measurements.viewportWidth + 1);
+  if (measurements.contentOverflows) {
+    expect(["auto", "scroll", "hidden"]).toContain(measurements.scrollerGeometry?.overflowX);
+    expect(measurements.editorGeometry?.scrollWidth).toBeLessThanOrEqual((measurements.editorGeometry?.clientWidth ?? 0) + 1);
+  }
+  if (measurements.pane) {
+    expect(measurements.pane.left).toBeGreaterThanOrEqual(-1);
+    expect(measurements.pane.right).toBeLessThanOrEqual(measurements.viewportWidth + 1);
+    expect(measurements.pane.scrollWidth).toBeLessThanOrEqual(measurements.pane.clientWidth + 1);
+  }
+  if (options.focused) {
+    expect(measurements.focus?.style).toBe("solid");
+    expect(measurements.focus?.width).toBeGreaterThanOrEqual(2);
+    expect(measurements.focus?.contrast).toBeGreaterThanOrEqual(3);
+  }
+}
+
+async function expectHorizontalEditorNavigation(editor: Locator, source: string) {
+  const scroller = editor.locator("xpath=ancestor::*[contains(@class, 'cm-scroller')][1]");
+  const overflows = await scroller.evaluate(element => element.scrollWidth > element.clientWidth + 1);
+  expect(overflows, "The long Liquid source must exercise horizontal navigation").toBe(true);
+  const caretPosition = () => readNativeEditorCaret(editor);
+  // A restored session may already have its caret at the end; move it before requesting End.
+  await editor.press("Home");
+  await expect.poll(caretPosition).toEqual({ offset: 0, visible: true });
+  const initialScroll = await scroller.evaluate(element => element.scrollLeft);
+  await editor.press("End");
+  await expect.poll(caretPosition).toEqual({ offset: source.length, visible: true });
+  await expect.poll(() => scroller.evaluate(element => element.scrollLeft)).toBeGreaterThan(initialScroll);
+  const endScroll = await scroller.evaluate(element => element.scrollLeft);
+  await editor.press("Home");
+  await expect.poll(caretPosition).toEqual({ offset: 0, visible: true });
+  await expect.poll(() => scroller.evaluate(element => element.scrollLeft)).toBeLessThan(endScroll);
+  await expect.poll(() => readEditorSource(editor)).toBe(source);
+}
+
+async function readNativeEditorCaret(editor: Locator) {
+  return editor.evaluate(element => {
+    const selection = window.getSelection();
+    const viewport = element.closest(".cm-scroller")?.getBoundingClientRect();
+    if (!selection?.isCollapsed || !selection.rangeCount || !element.contains(selection.anchorNode) || !viewport) return null;
+    const range = selection.getRangeAt(0);
+    const caret = range.getBoundingClientRect();
+    const prefix = document.createRange();
+    prefix.selectNodeContents(element);
+    prefix.setEnd(range.startContainer, range.startOffset);
+    return { offset: prefix.toString().length,
+      visible: caret.height > 0 && caret.left >= viewport.left - 1 && caret.right <= viewport.right + 1 &&
+        caret.top >= viewport.top - 1 && caret.bottom <= viewport.bottom + 1 };
+  });
+}
 
 async function openWorkflowDraft(page: Page, pair: NormalHostPair, draft: PersistedExpressionDraft) {
   await page.goto(new URL(`/workflows/definitions?definition=${encodeURIComponent(draft.definitionId)}`, pair.studioUrl).toString());
@@ -476,11 +829,6 @@ async function exerciseJavaScriptConformance(page: Page, pair: NormalHostPair, e
   await expect(editor).toContainText(source);
 }
 
-function matchesDraftLocation(request: SafeBackendTraffic, draft: PersistedExpressionDraft, syntax: string) {
-  return request.workflowDraftId === draft.draftId && request.expressionType === syntax &&
-    request.nodeId === draft.targetNodeId && request.propertyKey === draft.propertyKey;
-}
-
 function hasFreshCatalog(traffic: SafeBackendTraffic[], draft: PersistedExpressionDraft, syntax: string, previousRevision: number) {
   const context = traffic.filter(request => request.path.endsWith("/expression-tooling/context") && request.isCatalogSearch &&
     matchesDraftLocation(request, draft, syntax)).at(-1);
@@ -497,22 +845,6 @@ function captureAssistancePhase(traffic: SafeBackendTraffic[], draft: PersistedE
       matchesDraftLocation(request, draft, syntax) && request.documentRevision !== undefined)
       .map(request => Number(request.documentRevision)).filter(Number.isFinite))
   };
-}
-
-function hasFreshAssistance(traffic: SafeBackendTraffic[], draft: PersistedExpressionDraft,
-  syntax: string, relation: string, previousRevision: number,
-  { diagnosticCode, allowSupportedEmpty = false }: { diagnosticCode?: string; allowSupportedEmpty?: boolean } = {}) {
-  const context = traffic.filter(request => request.path.endsWith("/expression-tooling/context") &&
-    matchesDraftLocation(request, draft, syntax)).at(-1);
-  return traffic.some(request => request.path.endsWith(relation) && request.status === 200 &&
-    (request.outcomeState === 0 || (allowSupportedEmpty && relation === "/expression-tooling/validate" && request.outcomeState === 1)) &&
-    matchesDraftLocation(request, draft, syntax) &&
-    request.contextRevision !== undefined && request.responseContextRevision === request.contextRevision &&
-    request.responseDocumentRevision === request.documentRevision && Number(request.documentRevision) > previousRevision &&
-    (diagnosticCode === undefined || request.diagnosticCodes?.includes(diagnosticCode)) &&
-    context?.status === 200 && context.outcomeState === 0 &&
-      context.responseDocumentRevision === request.documentRevision && context.documentRevision === request.documentRevision &&
-      context.responseContextRevision === request.contextRevision);
 }
 
 function hasSuccessfulRequest(traffic: SafeBackendTraffic[], relation: string, expressionType?: string) {

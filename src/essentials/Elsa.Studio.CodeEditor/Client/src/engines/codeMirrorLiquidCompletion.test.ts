@@ -1,7 +1,7 @@
 import { acceptCompletion, currentCompletions, setSelectedCompletion, startCompletion } from "@codemirror/autocomplete";
 import { history, undo } from "@codemirror/commands";
 import { EditorState, type Extension } from "@codemirror/state";
-import { EditorView } from "@codemirror/view";
+import { EditorView, getTooltip, showTooltip, type Rect, type Tooltip } from "@codemirror/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createCodeMirrorCodeIntelligenceExtensions } from "./codeMirrorCodeIntelligence";
 import type { StudioCodeCompletionProvider } from "../types";
@@ -130,6 +130,61 @@ describe("CodeMirror Liquid completion mapping", () => {
     expect(view.state.doc.toString()).toBe("Hello");
     expect(view.state.selection.main).toMatchObject({ anchor: 5, head: 5 });
   });
+
+  it.each([
+    { edge: "visible", wordStart: 40, wordStartTop: 24, caret: 60, caretTop: 24, expected: 40, expectedTop: 24 },
+    { edge: "left", wordStart: -41.5, wordStartTop: 24, caret: 5.3, caretTop: 24, expected: 5.3, expectedTop: 24 },
+    // RTL-like coordinates exercise a word start clipped at the opposite edge.
+    { edge: "right", wordStart: 400, wordStartTop: 24, caret: 350, caretTop: 24.75, expected: 350, expectedTop: 24.75 }
+  ])("uses the visible same-line $edge completion anchor without changing replacement behavior", async ({ wordStart, wordStartTop, caret, caretTop, expected, expectedTop }) => {
+    const source = "{{ customerName | upXX }}";
+    const from = source.indexOf("upXX");
+    const to = from + "upXX".length;
+    const position = from + 2;
+    const view = createView(source, position, () => [{ label: "upcase", apply: "upcase", range: { from, to } }]);
+    stubCompletionGeometry(view, new Map<number, Rect | null>([[from, at(wordStart, wordStartTop)], [position, at(caret, caretTop)]]));
+    const clock = vi.spyOn(Date, "now").mockReturnValue(1_000);
+    startCompletion(view);
+    await waitForCompletion(view);
+
+    const { tooltip, tooltipView } = activeCompletionTooltip(view);
+    const anchor = tooltipView.getCoords ? tooltipView.getCoords(tooltip.pos) : view.coordsAtPos(tooltip.pos);
+    expect(tooltip.pos).toBe(from);
+    expect(anchor).toMatchObject({ left: expected, top: expectedTop });
+    expect(view.state.doc.toString()).toBe(source);
+    expect(view.state.selection.main).toMatchObject({ anchor: position, head: position });
+
+    view.dispatch({ effects: setSelectedCompletion(0) });
+    clock.mockReturnValue(1_100);
+    expect(acceptCompletion(view)).toBe(true);
+    expect(view.state.doc.toString()).toBe("{{ customerName | upcase }}");
+    expect(undo(view)).toBe(true);
+    expect(view.state.doc.toString()).toBe(source);
+    expect(view.state.selection.main).toMatchObject({ anchor: position, head: position });
+  });
+
+  it.each([
+    { reason: "the caret is also horizontally offscreen", wordStart: at(-41.5), caret: at(400), expected: at(-41.5) },
+    { reason: "the caret is on another visual line", wordStart: at(-41.5), caret: at(5.3, 50), expected: at(-41.5) },
+    { reason: "the caret has no coordinates", wordStart: at(-41.5), caret: null, expected: at(-41.5) },
+    { reason: "the word start has no coordinates", wordStart: null, caret: at(5.3), expected: null }
+  ])("keeps native clipping when $reason", async ({ wordStart, caret, expected }) => {
+    const source = "{{ customerName | upXX }}";
+    const from = source.indexOf("upXX");
+    const position = from + 2;
+    const view = createView(source, position, () => [{ label: "upcase", range: { from, to: from + 4 } }]);
+    stubCompletionGeometry(view, new Map<number, Rect | null>([[from, wordStart], [position, caret]]));
+    startCompletion(view);
+    await waitForCompletion(view);
+
+    const { tooltip, tooltipView } = activeCompletionTooltip(view);
+    const anchor = tooltipView.getCoords ? tooltipView.getCoords(tooltip.pos) : view.coordsAtPos(tooltip.pos);
+    expect(tooltip.pos).toBe(from);
+    if (expected) expect(anchor).toMatchObject(expected);
+    else expect(anchor).toBeNull();
+    expect(view.state.doc.toString()).toBe(source);
+    expect(view.state.selection.main).toMatchObject({ anchor: position, head: position });
+  });
 });
 
 function createView(source: string, position: number, completionProvider: StudioCodeCompletionProvider, extensions: Extension[] = []) {
@@ -157,4 +212,25 @@ async function waitForCompletion(view: EditorView) {
     await new Promise(resolve => setTimeout(resolve, 5));
   }
   throw new Error("Timed out waiting for CodeMirror completion.");
+}
+
+function activeCompletionTooltip(view: EditorView) {
+  const tooltip = view.state.facet(showTooltip).find((candidate): candidate is Tooltip =>
+    candidate !== null && getTooltip(view, candidate)?.dom.classList.contains("cm-tooltip-autocomplete") === true
+  );
+  if (!tooltip) throw new Error("CodeMirror did not create a completion tooltip.");
+  const tooltipView = getTooltip(view, tooltip);
+  if (!tooltipView) throw new Error("CodeMirror did not mount the completion tooltip view.");
+  return { tooltip, tooltipView };
+}
+
+function stubCompletionGeometry(view: EditorView, positions: ReadonlyMap<number, Rect | null>) {
+  vi.spyOn(view, "coordsAtPos").mockImplementation(position =>
+    positions.has(position) ? positions.get(position) ?? null : at(100)
+  );
+  vi.spyOn(view.scrollDOM, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 0, 365, 120));
+}
+
+function at(left: number, top = 24): Rect {
+  return { left, right: left + 1, top, bottom: top + 20 };
 }

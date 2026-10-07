@@ -21,7 +21,6 @@
   padding: 0.5rem;
 }
 
-.studio-code-editor-rich .cm-editor,
 .studio-code-editor-input {
   background: var(--studio-surface-muted);
   border: 1px solid var(--studio-border);
@@ -31,24 +30,34 @@
   inline-size: 100%;
 }
 
-.studio-code-editor-rich .cm-editor:focus-within,
 .studio-code-editor-input:focus,
 .studio-code-editor-preview:focus-visible {
-  outline: 2px solid var(--studio-focus);
+  outline: 2px solid var(--studio-focus-strong, var(--studio-text));
   outline-offset: 2px;
 }
 
-.studio-code-editor-rich .cm-scroller {
-  font-family: var(--studio-font-mono);
+.studio-code-token-keyword { color: var(--studio-syntax-keyword, var(--studio-text)); }
+.studio-code-token-operator { color: var(--studio-syntax-operator, var(--studio-text)); }
+.studio-code-token-literal { color: var(--studio-syntax-literal, var(--studio-text)); }
+.studio-code-token-number { color: var(--studio-syntax-number, var(--studio-text)); }
+.studio-code-token-string { color: var(--studio-syntax-string, var(--studio-text)); }
+.studio-code-token-comment { color: var(--studio-syntax-comment, var(--studio-text)); }
+.studio-code-token-variable { color: var(--studio-syntax-variable, var(--studio-text)); }
+.studio-code-token-property { color: var(--studio-syntax-property, var(--studio-text)); }
+.studio-code-token-function { color: var(--studio-syntax-function, var(--studio-text)); }
+.studio-code-token-type { color: var(--studio-syntax-type, var(--studio-text)); }
+.studio-code-token-tag { color: var(--studio-syntax-tag, var(--studio-text)); }
+
+.studio-code-editor-input::selection {
+  background: var(--studio-accent);
+  color: var(--studio-accent-text);
 }
 
-.studio-code-editor-compact .studio-code-editor-rich .cm-editor,
 .studio-code-editor-input-compact,
 .studio-code-editor-preview {
   min-block-size: 2.25rem;
 }
 
-.studio-code-editor-compact .studio-code-editor-rich .cm-scroller,
 .studio-code-editor-input-compact {
   max-block-size: 2.25rem;
   overflow: hidden;
@@ -67,6 +76,7 @@
   justify-content: space-between;
   padding: 0.5rem;
   text-align: start;
+  transition: none;
   inline-size: 100%;
 }
 
@@ -82,7 +92,10 @@
   color: var(--studio-text-muted);
   font-family: var(--studio-font-mono);
   font-size: var(--studio-label-size);
+  max-inline-size: 100%;
+  overflow-wrap: anywhere;
   padding: 0.25rem 0.5rem;
+  white-space: normal;
 }
 
 .studio-code-editor-status,
@@ -108,6 +121,8 @@
 .studio-code-editor-diagnostic {
   color: var(--studio-text-muted);
   margin: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .studio-code-editor-diagnostic span,

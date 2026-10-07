@@ -5,7 +5,7 @@ const authorizationSessionEndedEvent = "elsa:auth-session-ended";
 const authorizationSessionStartedEvent = "elsa:auth-session-started";
 const expressionEditorSessionEndedEvent = "elsa:expression-editor-session-ended";
 const expressionToolingAuthorizationRevokedEvent = "elsa:expression-tooling-authorization-revoked";
-const expressionToolingAuthorizationRestoredEvent = "elsa:expression-tooling-authorization-restored";
+export const expressionToolingAuthorizationRestoredEvent = "elsa:expression-tooling-authorization-restored";
 const sessionScopeSeparator = "\u001f";
 const sessions = new Map<string, StudioCodeEditorSessionImpl>();
 const sourceBearingSessions = new Set<StudioCodeEditorSessionImpl>();
@@ -136,13 +136,11 @@ function createSessionId() {
   return `studio-code-editor-${Math.random().toString(36).slice(2)}`;
 }
 
-if (typeof window !== "undefined")
+if (typeof window !== "undefined") {
   window.addEventListener(authorizationSessionEndedEvent, clearAllStudioCodeEditorSessions);
-if (typeof window !== "undefined")
   window.addEventListener(authorizationSessionStartedEvent, () => {
     authorizationSessionRevoked = false;
   });
-if (typeof window !== "undefined")
   window.addEventListener(expressionEditorSessionEndedEvent, event => {
     const scope = (event as CustomEvent<{ scope?: unknown }>).detail?.scope;
     if (typeof scope === "string") {
@@ -150,7 +148,6 @@ if (typeof window !== "undefined")
       revokedSessionScopes.delete(scope);
     }
   });
-if (typeof window !== "undefined")
   window.addEventListener(expressionToolingAuthorizationRevokedEvent, event => {
     const scope = (event as CustomEvent<{ scope?: unknown }>).detail?.scope;
     if (typeof scope !== "string") {
@@ -161,8 +158,8 @@ if (typeof window !== "undefined")
     clearStudioCodeEditorSessionScope(scope);
     for (const listener of revocationListeners) listener(scope);
   });
-if (typeof window !== "undefined")
   window.addEventListener(expressionToolingAuthorizationRestoredEvent, event => {
     const scope = (event as CustomEvent<{ scope?: unknown }>).detail?.scope;
     if (typeof scope === "string") revokedSessionScopes.delete(scope);
   });
+}
