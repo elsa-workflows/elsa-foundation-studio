@@ -1,5 +1,6 @@
 import { completeTest, createPersistedExpressionDraft, discoverActivityVersion, expect, missingJavaScriptEditorTest, missingLiquidProviderTest, readActivityDefinitionDraft, readAuthenticatedBackendJson, type NormalHostPair, type PersistedExpressionDraft, type SafeBackendTraffic } from "./expression-normal-host-fixtures";
 import type { Locator, Page } from "@playwright/test";
+import { hasFreshAssistance, matchesDraftLocation } from "../../scripts/expression-assistance-traffic.mjs";
 
 completeTest("persisted workflow drafts use live JavaScript and Liquid assistance on the normal host", async ({ page, hostPair, signInToStudio, recordSafeBackendTraffic, recordSafeConsoleErrors }) => {
   const traffic = recordSafeBackendTraffic(page, hostPair);
@@ -1014,11 +1015,6 @@ async function exerciseJavaScriptConformance(page: Page, pair: NormalHostPair, e
   await expect(editor).toContainText(source);
 }
 
-function matchesDraftLocation(request: SafeBackendTraffic, draft: PersistedExpressionDraft, syntax: string) {
-  return request.workflowDraftId === draft.draftId && request.expressionType === syntax &&
-    request.nodeId === draft.targetNodeId && request.propertyKey === draft.propertyKey;
-}
-
 function hasFreshCatalog(traffic: SafeBackendTraffic[], draft: PersistedExpressionDraft, syntax: string, previousRevision: number) {
   const context = traffic.filter(request => request.path.endsWith("/expression-tooling/context") && request.isCatalogSearch &&
     matchesDraftLocation(request, draft, syntax)).at(-1);
@@ -1035,22 +1031,6 @@ function captureAssistancePhase(traffic: SafeBackendTraffic[], draft: PersistedE
       matchesDraftLocation(request, draft, syntax) && request.documentRevision !== undefined)
       .map(request => Number(request.documentRevision)).filter(Number.isFinite))
   };
-}
-
-function hasFreshAssistance(traffic: SafeBackendTraffic[], draft: PersistedExpressionDraft,
-  syntax: string, relation: string, previousRevision: number,
-  { diagnosticCode, allowSupportedEmpty = false }: { diagnosticCode?: string; allowSupportedEmpty?: boolean } = {}) {
-  const context = traffic.filter(request => request.path.endsWith("/expression-tooling/context") &&
-    matchesDraftLocation(request, draft, syntax)).at(-1);
-  return traffic.some(request => request.path.endsWith(relation) && request.status === 200 &&
-    (request.outcomeState === 0 || (allowSupportedEmpty && relation === "/expression-tooling/validate" && request.outcomeState === 1)) &&
-    matchesDraftLocation(request, draft, syntax) &&
-    request.contextRevision !== undefined && request.responseContextRevision === request.contextRevision &&
-    request.responseDocumentRevision === request.documentRevision && Number(request.documentRevision) > previousRevision &&
-    (diagnosticCode === undefined || request.diagnosticCodes?.includes(diagnosticCode)) &&
-    context?.status === 200 && context.outcomeState === 0 &&
-      context.responseDocumentRevision === request.documentRevision && context.documentRevision === request.documentRevision &&
-      context.responseContextRevision === request.contextRevision);
 }
 
 function hasSuccessfulRequest(traffic: SafeBackendTraffic[], relation: string, expressionType?: string) {
