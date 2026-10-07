@@ -12,6 +12,8 @@ Authoritative symbol metadata, source-aware completion/hover, semantic validatio
 
 Program #2310 now completes the baseline through four thin milestones: prove normal-host persisted-workflow integration; enforce installed-text-syntax and JavaScript-runtime conformance; deepen JavaScript and Liquid assistance with runtime-owned metadata; then finish theme, preview, signature, formatting, accessibility and continuity behavior. Historical fixture evidence remains regression evidence, not a substitute for the normal-host demonstration.
 
+**Owner scope amendment, 2026-10-06:** Actual current-head Chrome+VoiceOver and Safari+VoiceOver observation is **SKIPPED BY OWNER DECISION — NEVER PASSED**, not a required program acceptance gate. Native behavior remains unverified; historical manual-AT statements below retain their checkpoint meaning, not current acceptance. All other keyboard, automated accessibility, continuity, runtime, review and technical gates remain required. Final owner acceptance precedes Ready/merge; required green post-merge main and public completion records follow. See [verification](verification.md#owner-acceptance-scope-amendment--2026-10-06).
+
 ## Technical Context
 
 **Language/Version**: TypeScript 5.6, React 19, C# 13 / .NET 10
@@ -104,7 +106,7 @@ The Studio implementation can be built and tested against fixtures independently
 1. **Normally composed baseline**: run Studio and Foundation from matching reviewed heads; create a persisted workflow containing scoped inputs, variables and outputs; prove JavaScript/Liquid module discovery, syntax selection, compact/expanded editing, real authoring-context relations and explicit degraded states. Add normal-host regression coverage without duplicating the merged #545/#546 discovery guard.
 2. **Installed-syntax conformance**: add a shared readiness/conformance matrix for supported text Expression Types and align the JavaScript expression-editor parser with the runtime expression grammar while preserving general-purpose program editors. Local completion merging remains milestone 3, as scoped by task #552 and T032.
 3. **Language depth**: merge expression-safe local JavaScript completions with authorized workflow assistance; use Foundation runtime metadata for Liquid filters/tags and parser-position-aware Studio projection; deepen known JavaScript member/signature help. Run a bounded worker/service spike before any deeper JavaScript language-service dependency is adopted.
-4. **Experience polish**: project syntax/help surfaces onto shared theme tokens, render lightweight highlighted previews, show active parameters and overloads, add explicit behavior-preserving formatters, and complete real keyboard/screen-reader/continuity proof.
+4. **Experience polish**: project syntax/help surfaces onto shared theme tokens, render lightweight highlighted previews, show active parameters and overloads, add explicit behavior-preserving formatters, and complete real keyboard/continuity and automated accessibility proof. Current-head Chrome+VoiceOver and Safari+VoiceOver observation is skipped and never passed under the 2026-10-06 owner amendment; screen-reader usability remains a product requirement, not a verified delivery claim.
 
 Each milestone retains one integration lane and separate exact-head review and live-verification evidence. A failed live demonstration reopens the owning task and keeps the milestone incomplete.
 

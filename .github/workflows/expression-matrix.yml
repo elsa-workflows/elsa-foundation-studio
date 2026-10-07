@@ -1,0 +1,48 @@
+name: Expression acceptance matrix
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: expression-matrix-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  expression-matrix:
+    name: Expression matrix (Chromium, Firefox, WebKit, touch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout the tested head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Record exact source revision
+        run: git rev-parse HEAD
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install matrix browsers
+        run: pnpm exec playwright install --with-deps chromium firefox webkit
+
+      - name: Run the unchanged synthetic expression matrix
+        # This fixture uses synthetic data and its own rebuilt server. Keep traces off;
+        # this is neither native Safari nor a replacement for VoiceOver observation.
+        run: pnpm test:browser:expression-matrix --trace off

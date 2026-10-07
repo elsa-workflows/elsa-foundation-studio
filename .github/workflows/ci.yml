@@ -113,21 +113,6 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
-      - name: Checkout the paired Foundation checkpoint
-        uses: actions/checkout@v4
-        with:
-          repository: elsa-workflows/elsa-foundation
-          # Program #2310 M3 is stacked across repositories. Pin the reviewed producer source;
-          # neither moving branches nor arbitrary main prove this language-help pair.
-          ref: 5cd44d6312d9de85b13f4619fc7aa972a557d033
-          path: .normal-host-foundation
-          persist-credentials: false
-
-      - name: Record exact source revisions
-        run: |
-          git rev-parse HEAD
-          git -C "$ELSA_FOUNDATION_WORKTREE" rev-parse HEAD
-
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
@@ -136,6 +121,32 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+
+      - name: Read the immutable paired Foundation revision
+        id: foundation-revision
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync, readFileSync } from "node:fs";
+          const { revision } = JSON.parse(readFileSync(".github/expression-foundation.json", "utf8"));
+          if (typeof revision !== "string" || !/^[0-9a-f]{40}$/.test(revision))
+            throw new Error("Foundation revision must be an immutable full SHA");
+          appendFileSync(process.env.GITHUB_OUTPUT, `revision=${revision}\n`);
+          NODE
+
+      - name: Checkout the paired Foundation checkpoint
+        uses: actions/checkout@v4
+        with:
+          repository: elsa-workflows/elsa-foundation
+          # Program #2310 delivery pins the refreshed integrated producer source.
+          # The runtime-parity guard reads the same manifest; historical pins stay in the evidence.
+          ref: ${{ steps.foundation-revision.outputs.revision }}
+          path: .normal-host-foundation
+          persist-credentials: false
+
+      - name: Record exact source revisions
+        run: |
+          git rev-parse HEAD
+          git -C "$ELSA_FOUNDATION_WORKTREE" rev-parse HEAD
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -162,3 +173,45 @@ jobs:
 
       - name: Prove actual formatter production-runtime parity
         run: pnpm test:expression-formatting:parity
+
+      - name: Build the paired Workbench for the owned REST journey
+        working-directory: .normal-host-foundation
+        run: dotnet build src/apps/Elsa.Workbench/Elsa.Workbench.csproj -c Debug -p:RestoreLockedMode=true
+
+      - name: Prove JavaScript expressions through fresh HTTP and persistence
+        shell: pwsh
+        env:
+          EXPECTED_FOUNDATION_REVISION: ${{ steps.foundation-revision.outputs.revision }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $foundation = $env:ELSA_FOUNDATION_WORKTREE
+          $revision = & git -C $foundation rev-parse HEAD
+          if ($LASTEXITCODE -ne 0 -or $revision -cne $env:EXPECTED_FOUNDATION_REVISION) {
+            throw 'The REST producer must match the immutable paired Foundation revision.'
+          }
+          Write-Host "REST producer revision: $revision"
+          . "$foundation/e2e-tests/_ServerLifecycle.ps1"
+          $serverBaseUrl = Resolve-ElsaServerBaseUrl
+          $contentRoot = New-ElsaContentRoot -Prefix 'elsa-expression-js-rest'
+          $ownedProcess = $null
+          try {
+            Start-OwnedElsaServer -BaseUrl $serverBaseUrl -ContentRoot $contentRoot
+            $ownedProcess = $script:OwnedElsaServer.Process
+            . "$foundation/e2e-tests/javascript/Test-JavaScriptExpressions.ps1" -BaseUrl $serverBaseUrl
+            if ($cases.Count -ne 10 -or $pass -ne $cases.Count) {
+              throw "JavaScript REST gate failed: $pass/$($cases.Count) cases passed; expected 10."
+            }
+          } finally {
+            if (-not $ownedProcess -and $script:OwnedElsaServer) {
+              $ownedProcess = $script:OwnedElsaServer.Process
+            }
+            Remove-OwnedElsaServer -ContentRoot $contentRoot -KeepContentRoot
+            if ($ownedProcess -and -not $ownedProcess.HasExited) {
+              throw 'The owned REST server did not exit during cleanup.'
+            }
+            Assert-PortFree -Port (Get-ElsaServerPort -BaseUrl $serverBaseUrl)
+          }
+          Write-Host 'All 10 REST cases passed; the owned process exited and its port is free.'
+          # The final successful free-port probe uses lsof, whose no-listener result is 1.
+          # All suite/ownership assertions above must succeed before declaring shell success.
+          exit 0

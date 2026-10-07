@@ -1,6 +1,37 @@
 # Expression Code Intelligence — Verification
 
-## Current synchronized-head snapshot — 2026-10-07
+## Current paired candidate — 2026-10-07
+
+The executable checkpoint `d6bb378005682704cefb9ebaa9c52f92f31e2189` / Foundation `4c388b94e672e0334e577db4d959d38050527456` passes every job in [CI37551754993](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37551754993), including all five persisted-host cases, registered-runtime parity and the strict ten-case REST step with owned teardown. The exact-head synthetic matrix passes 16/16 in [37551754830](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37551754830). The subsequent documentation-only clarification below preserves historical pending/blocked statements while identifying their later resolution; executable source, tests, workflows and producer pin are unchanged. Fresh documentation-head CI/review remains required, not inferred from this checkpoint.
+
+The final Studio layer includes qualified main `aedaacc360099f8a12fb3fa968fe97d5cd9d7aa4`, the corrected save-status locator, raw-count catalog pagination, supported lazy CodeMirror theme selectors and the authoring-versus-catalog provenance correction from `deaa83c33dbffc68d15b18f787d8c71b3fe1432f`. The formatting parent is `8f95386b26859fc2909f709dc2dbb638ae8492ad`. Historical failures and passes below remain tied to their recorded heads; none establishes this integrated candidate's acceptance.
+
+The shared immutable producer pin is now `4c388b94e672e0334e577db4d959d38050527456`, qualified by full [CI37540394248](https://github.com/elsa-workflows/elsa-foundation/actions/runs/37540394248) and [Maps37540393180](https://github.com/elsa-workflows/elsa-foundation/actions/runs/37540393180). The other three synchronized Foundation heads also pass their exact CI and Maps. The paired host job now additionally builds this producer in Debug and invokes the unchanged canonical ten-case JavaScript REST suite through its existing fresh-SQLite/free-loopback/owned-process lifecycle. It verifies the exact producer SHA, requires all ten results, and asserts owned-process exit plus a free port even after failure. Root and independent review cover the workflow delta; actionlint passes. No external publishing, secrets or deployment are part of this test.
+
+The supported-selector theme head `a0820157` passes complete units, generic Chromium/accessibility and bundle checks in [CI37546611911](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37546611911), but its normal-host suite fails4/5 at the later fresh-assistance provenance assertion. That failure remains unresolved at this checkpoint; visible help and preceding focus assertions passed, but neither a timing cause nor a product defect is established. The formatting descendant `68365f14` passes all jobs in [CI37547035176](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37547035176), including normal-host5/5 and actual formatter/runtime parity against its recorded producer. This is not a waiver of the earlier failure or acceptance of the newly pinned final pair.
+
+The newly pinned checkpoint `dd56d6a95fc6e99d48d7513987fc50467631c177` passes the hosted synthetic matrix in [37549153975](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37549153975). [CI37549153957](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37549153957) passes lint/typecheck/full units/bundle, generic Chromium, all five persisted hosts and actual formatter/runtime parity. Its REST step observes all ten cases passing and verifies process exit and a free port, but CI remains **failed**: the successful Linux `lsof` no-listener probe leaves native exit status 1, propagated by the Actions PowerShell wrapper. A direct free-port control reproduces that status. Explicit shell success is now declared only after every suite and cleanup assertion succeeds; a synthetic thrown assertion still returns 1 and runs cleanup. Root and independent review confirm this wrapper-only correction, which still requires fresh exact-head hosted proof.
+
+The earlier synthetic matrix passes 16/16 at `d831600b` [37539555882](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37539555882), not subsequent corrected heads. Fresh complete unit/bundle/browser, all-five rebuilt persisted hosts, registered Jint/Fluid formatter parity, current-producer REST and exact-head review or the documented permitted fallback remain required after integration changes. All program PRs remain draft and unmerged; explicit final owner acceptance precedes Ready and dependency-ordered delivery. Preview packages are Feedz-only and existing Docker Hub publication is authorized; no stable release, deployment or Azure provisioning is performed. Native Chrome/Safari VoiceOver remains **SKIPPED BY OWNER DECISION — NEVER PASSED**.
+
+## Retained corrective checkpoint at d831600b
+
+Last reconciled: 2026-10-06 for preview-publication authorization and renewed main integration; all PRs draft/unmerged, final human acceptance pending
+
+## Current corrective checkpoint — 2026-10-07
+
+The synchronized Studio `bfd05336` synthetic matrix ends **14/16**, not passed: Firefox's fifty-field activation exceeds the unchanged 1500ms ceiling (5097ms), and its narrow case times out at the unchanged 60-second limit. Shared-machine load exceeds300–700 during the run; contention is a hypothesis, not proved attribution. These failures are retained. Hosted Studio569/578 also fail unchanged bundle budgets; at578, Definitions386.57/384.50kB and upgrades376.49/375.50kB. A CSS split is rejected and reverted because the host eagerly preloads all emitted module styles; a lower static-closure metric alone would not reduce actual delivery.
+
+Corrected Studio557 `a3fefdc7e238cc8f2c9c44bf1fb7f5d8ce85c2c8` passes all jobs in [CI37534033046](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37534033046), including rebuilt normal hosts. Its save-status locator follows main's current live region without relaxing exact save/readback/revision assertions. Studio562's malformed-symbol pagination fix at `408b3c42` preserves continuation using raw page length; the one/100-malformed controls fail before correction, then all39 transport cases, owning typecheck, scoped lint and independent/root review pass. These fixes are propagating through the existing stack; neither establishes final corrected-pair acceptance.
+
+The separate `Expression acceptance matrix` workflow now runs the unchanged synthetic Chromium/Firefox/WebKit/touch command on an isolated hosted runner for pull requests and resulting main. It checks out the exact head with read-only contents permission and no persisted credentials, installs all three engines, and disables traces. No test timeout, activation ceiling, assertion, retry, configuration, bundle budget or existing CI gate is relaxed. Actual workflow execution and final corrected-stack matrix remain pending. WebKit is not native Safari, and this does not replace the owner-skipped VoiceOver gate.
+
+Foundation main `2a0d1f10` is fully qualified; root planning head `bb13422fe` includes it and passes combined Maps37538022928 and filters37538023052, while CI37538023573 is still running at this checkpoint. Producer-stack synchronization, immutable-pin advancement, coherent final normal-host/runtime/REST/architecture proof, current review or documented permitted fallback, final explicit owner acceptance, dependency-ordered merges and resulting-main qualification remain open. All program PRs remain draft. Native Chrome/Safari VoiceOver remains **SKIPPED BY OWNER DECISION — NEVER PASSED**.
+
+## Retained historical checkpoints
+## Retained inherited integration checkpoint at 68365f14
+
+### Synchronized-head snapshot — 2026-10-07
 
 The existing Studio expression stack is being synchronized with qualified main `aedaacc360099f8a12fb3fa968fe97d5cd9d7aa4`. Its delta from `2bd5c076` is the contributor-matrix link plus explicit read-only CI/Docker permissions and non-persisted checkout credentials; no application source changes. Exact-head CI/review and fresh final Studio/Foundation producer pairing remain pending; no synchronized-pair pass is claimed. Retained M1/M2 automated passes apply only to their recorded revisions. The M1 `c9479fba` / `f81be4be` pair passed normal-host4/4 and unblocked M2 at that checkpoint. The dated entries below preserve historical statuses, including earlier M2-blocked states; they do not establish later integrated-head acceptance. Copilot requests do not establish a completed current-head review. All PRs remain draft/unmerged; final owner acceptance and delivery are open. Native Chrome/Safari VoiceOver is **SKIPPED BY OWNER DECISION — NEVER PASSED**.
 
@@ -24,9 +55,276 @@ Last reconciled: 2026-10-06 for Program #2310 T036 acceptance and in-progress T0
 
 ## Program #2310 status
 
-T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head automated M2 gate under the documented unavailable-external-review fallback. Studio spike #553 / T035 settles the technical decision: reject the current deeper-service candidate and retain the baseline path. No deeper-service dependency is adopted. T032-T034 pass their final exact-head automated M3 gate below. T036 passes its immutable bc305150/5cd44d63 automated gate; Task#572 / Decision20 now owns T037 signature/formatting implementation. T037-T038 and current-head manual accessibility/human acceptance/delivery remain open. The 2026-07-28 evidence remains historical. All program PRs remain draft and unmerged.
+T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head automated M2 gate under the documented unavailable-external-review fallback. Studio spike #553 / T035 settles the technical decision: reject the current deeper-service candidate and retain the baseline path. No deeper-service dependency is adopted. T032-T034 pass their final exact-head automated M3 gate below. T036 passes its immutable bc305150/5cd44d63 automated gate; Task#572 / T037 passes at immutable ef523911/5cd44d63. Task#577 owns T038. Actual current-head Chrome/Safari VoiceOver is now skipped by owner decision and never passed; final human acceptance and delivery remain open. The 2026-07-28 evidence remains historical. All program PRs remain draft and unmerged.
+
+## Renewed main synchronization and publication scope — 2026-10-06
+
+The owner explicitly authorizes preview NuGet/npm publication **only to feedz.io**, and subsequently authorizes Docker image publication to any endpoint. This delivery retains the existing Docker Hub workflows; it does not migrate registries, provision Azure resources, publish stable releases or deploy. This clears the publication-scope blocker, not the final acceptance gate. Earlier publication restrictions below describe their historical checkpoints.
+
+Root resumes the existing nine-layer Studio stack against qualified main `2bd5c0763e6091ad4995839c4bc61358da585ede`. The responsive stylesheet conflict is resolved by preserving main's compact horizontal navigation, 150px search and phone layout, adding only the existing expression scroll-padding and direct-child flex/transition safeguards. Sign-in styles remain byte-identical to main. Independent review finds no regression. T030 now explicitly scopes grammar alignment to the expression profile and preserves script/TypeScript/JSX project-file grammar; completed historical task checkboxes are retained.
+
+Local synchronized-source gates pass: normal-host layer Workflows161/161; conformance CodeEditor65/65 and JavaScript4/4; JavaScript-help CodeEditor77/77, JavaScript15/15 and Workflows expression-tooling37/37; Liquid-help Liquid25/25 and CodeEditor93/93; theme CodeEditor119/119 and shell/navigation31/31; formatting CodeEditor196/196, JavaScript16/16 and Liquid28/28. Workspace typechecks pass through the formatting layer; its executable source is unchanged by the final acceptance-layer main merge. Owning CodeEditor tsc, CSS lint, layout check and diff checks also pass at the theme resolution. These are local integration-tree checkpoints, not final paired-host, CI or review acceptance.
+
+The Liquid-help full editor run initially passes92/93 and an isolated retry fails the declared-local completion assertion under shared-machine load221. The isolated case then passes and the unchanged complete suite passes93/93 as load falls near30. No code, timeout or assertion is relaxed. Both failures remain recorded; CPU contention is a hypothesis, not a proved cause.
+
+The prior clean producer `946a237d2a5827ae58de569a081f9719be83ee33` has now completed full [CI37488305508](https://github.com/elsa-workflows/elsa-foundation/actions/runs/37488305508), including Architecture and Core-only, and [Maps37488310415](https://github.com/elsa-workflows/elsa-foundation/actions/runs/37488310415). Root's fresh rebuilt Debug JavaScript REST suite at that producer passes10/10 with an explicit failure-propagating wrapper and owned teardown (`/private/tmp/elsa-2310-root-946a-js-rest.log`). Studio documentation head `2dd71104cf6014069abb0a5303c6d81da2e80cd1` completes [CI37491378398](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37491378398); actual CodeRabbit coverage includes that head with no actionable finding. These results remain exact historical checkpoints, not proof of newly synchronized heads.
+
+Foundation main `93fba1c1f9cf97320d719a5acbd923fb9f9295e5` remains under the Contributor Experience owner's qualification/reservation at this checkpoint. Producer synchronization, strict immutable-pin refresh, rebuilt paired normal hosts, registered-runtime parity, synthetic browser matrix, affected producer/REST checks and exact-head CI/review remain pending. All expression PRs remain draft/open/unmerged. Native Chrome/Safari VoiceOver remains **SKIPPED BY OWNER DECISION — NEVER PASSED**. T038, final owner acceptance, dependency-ordered merging, resulting-main qualification and public closure remain open.
+
+The final acceptance-layer merged tree additionally passes the focused Workflows input-wire, expression-tooling, orchestration and property suites198/198, plus full repository lint with0errors/47existingwarnings, CSS lint and layout validation. This does not satisfy its pending browser/runtime, CI or review gates.
+
+## Owner acceptance-scope amendment — 2026-10-06
+
+The owner explicitly removes actual current-head Chrome+VoiceOver and Safari+VoiceOver observation from Program #2310 acceptance. Record both as **SKIPPED BY OWNER DECISION — NEVER PASSED**. Native screen-reader behavior remains unverified and is a final delivery limitation. This is not a test pass, an automation substitute or retrospective approval. See the [canonical Foundation decision](https://github.com/elsa-workflows/elsa-foundation/blob/claude/2310-expression-dx-foundation/docs/program-goals/studio-expression-developer-experience/decision-log.md#2026-10-06--remove-native-voiceover-verification-from-delivery-acceptance).
+
+Historical checkpoint statements and failed/unverified attempts below retain their original boundaries; July baseline AT does not establish current program acceptance. The immutable Studio `badc58e5c15d8403855992a49aa2eaacb1eb8798` / Foundation `5cd44d6312d9de85b13f4619fc7aa972a557d033` checkpoint passes root rebuilt5/5, synthetic cross-browser/axe16/16, registered Jint/Fluid parity and exact [CI37420205720](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37420205720). A fresh same-pair canonical rebuild rerun passes5/5 (24.3m), Foundation10NU1510warnings/0errors and Studio0warnings/0errors; local diagnostic log `/private/tmp/elsa-577-delivery-resume-normal-host.log` and [public root checkpoint](https://github.com/elsa-workflows/elsa-foundation-studio/pull/578#issuecomment-6018481800). Neither result is relabeled as a later documentation or integrated head's pass.
+
+Actual disposable native hosts and owned Chrome authentication/editor activation succeeded, but actual VoiceOver speech/caption output was not observed; Safari acceptance did not run. VoiceOver was restored OFF, original caption preferenceON remained unchanged, owned Chrome window closed, owned bootstrap completed exit0 and both listeners were absent. [Native cleanup record](https://github.com/elsa-workflows/elsa-foundation-studio/issues/577#issuecomment-6018480361) remains retained.
+
+This reconciliation changes documentation only. Fresh exact-head review/CI and all affected integrated-pair verification remain required. Keyboard, automated scoped accessibility, source/cursor/undo, runtime parity, technical/review/integration and required post-merge main gates are unchanged. T038 remains unchecked pending final acceptance/delivery. After all remaining gates pass, obtain explicit owner acceptance before Ready and dependency-ordered merging; no package publication or deployment is included.
+
+## Refreshed integrated-pair candidate — 2026-10-06
+
+At Studio `95be817419a15e48558dbc2aed86558f175d20cf`, the canonical CI host job pinned immutable Foundation `59a3dd723b646f45264c5a1940715bc5b00ddd1e`, the existing PR2367→2373→2378→2380 stack synchronized with Foundation main `d652f7342f79daea32e9986f9c381fac8a93ba3f`. Main's active spec192 and shell startup-validation registration are preserved; expression runtime/provider source is unchanged from the retained5cd checkpoint. Only generated-map conflicts required resolution, with deliberate regeneration and local authoritative checks passing. Final M3 task/evidence records distinguish retained automated proof from unaccepted integration heads. All Foundation PRs remain draft.
+
+This pin changes tested composition, so root starts a fresh coherent rebuild and all-five persisted-host browser gate, actual registered-runtime parity, synthetic cross-browser/axe, affected REST and exact-head CI/review. Results are pending, not inherited from5cd. Foundation main is still red and peer-owned WorkerOIDC correction plus subsequent green actual-main qualification remain required; the peer has released its local test lane but retains the main-merge reservation. The documentation-only Studio checkpoint `dc0d543a`/historical5cd and CI37484877562 remain separately recorded, not acceptance of this newly pinned pair.
+
+### Integrated checkpoint and strict-pin correction
+
+The exact `95be8174` / `59a3dd723` pair passes root canonical rebuilt normal hosts **5/5 (8.6m)**, with Foundation101warnings/0errors and Studio0warnings/0errors. Root synthetic Chromium/Firefox/WebKit/touch/axe passes **16/16 (54.0s)**, not native AT or registered-runtime evidence. Logs: `/private/tmp/elsa-577-root-integrated-59a3dd-normal-host.log` and `/private/tmp/elsa-577-root-integrated-95be-expression-matrix.log`.
+
+[CI37485740340](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37485740340) passes lint/typecheck, workspace and shuffled unit suites, bundle budget, generic Chromium, persisted-host request envelopes and real persisted-host browsers. Its final runtime-parity preflight **FAILS**: the parity test still requires historical5cd while checkout supplies59a3dd723. The local parity attempt also fails its revision preflight on the subsequently advanced producer. Neither attempt executes production-runtime evaluations; runtime parity is not passed. This failed checkpoint is retained, not waived.
+
+The current correction uses `.github/expression-foundation.json` as the single immutable pin for both checkout and strict parity verification, advancing to Foundation `946a237d2a5827ae58de569a081f9719be83ee33` after review-driven documentation/map corrections propagate through the existing stack. Full-SHA validation, exact HEAD equality, clean-source checks and all formatter/runtime assertions remain required. Fresh corrected-head parity, affected integration, CI/review and final owner acceptance are pending; preceding passes are not relabeled as this head's acceptance.
+
+Root correction preflight passes workflow `actionlint`, workspace typecheck, repository lint (0errors/48existingwarnings) and diff check. The deliberately wrong-checkout control rejects unrelated Foundation `6c3a9fe59f25c48cfef1e8fd8b8b742e674043ee` at exact revision equality before any build/runtime evaluation (`/private/tmp/elsa-577-shared-pin-wrong-head-negative.log`). This proves the shared pin remains discriminating; it is not a production-runtime pass.
+
+#### Stable executable checkpoint bef4e9bd — corrected integration passes
+
+Exact clean Studio `bef4e9bd3d79d0b9e7c7fa4dd886348a594df777` / Foundation `946a237d2a5827ae58de569a081f9719be83ee33` now passes root rebuilt real persisted-host browser **5/5 (8.4m)**, actual registered Jint/Fluid formatter runtime parity **one test covering all 10 fixtures**, and synthetic Chromium/Firefox/WebKit/touch/axe **16/16 (24.9s)**. The paired builds have Foundation 95 warnings/0 errors and Studio 0 warnings/0 errors; canonical owned teardown completes exit0 and both source checkouts remain clean. Logs: `/private/tmp/elsa-577-root-bef4e9bd-946a-normal-host.log`, `/private/tmp/elsa-577-root-shared-pin-runtime-parity.log` and `/private/tmp/elsa-577-root-bef4e9bd-expression-matrix.log`.
+
+[CI37488503333](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37488503333) passes **ALL jobs**, including full lint/typecheck/workspace units/three Workflows shuffle seeds/bundle budgets, generic Chromium, actual Foundation persisted-host request envelopes, exact-pair rebuilt normal-host browsers and registered-runtime formatter parity. The strict shared-pin check now executes runtime evaluations; it is not a skipped or preflight-only pass. See [root normal-host checkpoint](https://github.com/elsa-workflows/elsa-foundation-studio/pull/578#issuecomment-6019922760) and [runtime checkpoint](https://github.com/elsa-workflows/elsa-foundation-studio/pull/578#issuecomment-6019775139).
+
+At producer946a, root complete affected locked Release suites also pass Expressions236/236, Jint126/126, Design534/534, DesignAPI143/143 and PublishingAPI714/714, with zero failed/skipped, and exact Maps37488310415 passes. Foundation complete CI/Core-only/Architecture and fresh rebuilt REST remain pending at this record update, not inherited from 5cd. Public evidence: [current producer suites](https://github.com/elsa-workflows/elsa-foundation/pull/2380#issuecomment-6020016389).
+
+**Later reconciliation for the same producer:** `946a237d2a5827ae58de569a081f9719be83ee33` subsequently passes full [CI37488305508](https://github.com/elsa-workflows/elsa-foundation/actions/runs/37488305508), including Core-only and Architecture, and root's fresh Debug REST journey passes 10/10 with owned teardown (`/private/tmp/elsa-2310-root-946a-js-rest.log`). The preceding pending sentence is retained checkpoint history, not the current status of producer 946a. The newer 4c producer and its paired verification are recorded separately above.
+
+Root and independent pin-correction review find no actionable issue. CodeRabbit's actual coverage metadata names bef4e9bd as reviewed and asks that this verification record reflect the reported runtime pass; this evidence update addresses that documentation request. Its default docstring warning is a non-required advisory, not passed. CLI Copilot requests do not establish a completed current-head review or approval. The newly selected producer is the root-reviewed existing Foundation stack, not an arbitrary third-party revision; deployment/custom-host security coverage is not inferred.
+
+This subsequent record update changes documentation only; executable tests, production bytes and immutable producer pin remain identical to bef4e9bd. Its fresh exact-head CI/review is required separately; none of the retained executable checkpoint results is relabeled as a later head's run. Native Chrome/Safari VoiceOver stays **SKIPPED BY OWNER DECISION — NEVER PASSED**. T038 remains unchecked, all PRs draft/unmerged, final owner acceptance and verified green post-merge main pending. Merge-triggered preview package/image publication requires a separate owner scope decision; no workflow is disabled and no publication/deployment is authorized by this record.
 
 ## Verification evidence
+
+### T038 / Studio Task#577 — final matrix in progress, 2026-10-06
+
+The integration branch `codex/577-expression-acceptance-matrix` stacks over immutable
+T037 `ef523911` and retains the paired clean Foundation `5cd44d63`. This leaf changes
+acceptance tests/evidence only, not production editors, SDK/wire contracts or runtime.
+The root reviewed the bounded test writer's delta and corrected two proof gaps before
+the coherent run: observe the original native paste target after compact DOM replacement,
+and perform the one-format undo **after** Format/Escape/Tab exit and reactivation.
+Independent source review agrees. The executable checkpoint below passes its automated
+matrix; actual native AT and owner acceptance remain open.
+
+| Acceptance surface | Observation at the recorded checkpoint | State |
+|---|---|---|
+| Real persisted workflow and Activity Definition | JavaScript/Liquid compact/expanded, authorized live assistance, exact saves and independent missing-module/provider editing | PASS at b4083bd4/5cd44d63: root5/5 and hosted5/5 |
+| Light/Dark/Dim, narrow inspector | Preview/editor/selection/help/completion/diagnostic contrast, native visible caret, clipped Liquid match-start precondition | PASS at the same exact pair |
+| Native multiline paste | Trusted browser paste event with exact synthetic payload, preserved whitespace, automatic expansion, persisted text, native caret and one undo/redo | PASS at the same exact pair; restored negative control fails without trusted paste |
+| Explicit Format and native exit | Visible narrow real Format control, mapped collapsed caret, exact source/persistence, Escape-to-editor and actual Tab exit, reactivation followed by one undo | PASS at the same exact pair; restored negative control catches omitted exit undo |
+| Generic cross-browser/axe | Synthetic Chromium/Firefox/WebKit/touch fixture; not real-host/runtime or actual screen-reader evidence | PASS16/16 at b4083bd4, traces off |
+| Chrome + VoiceOver; Safari + VoiceOver | Historical native-observation requirement, now non-gating by owner decision | Historical blocked attempt: UNVERIFIED, native control reports locked Mac; manual unlock required at that checkpoint. Current scope: **SKIPPED BY OWNER DECISION — NEVER PASSED**; native behavior remains unverified |
+| Human acceptance and delivery | Owner acceptance; draft-to-ready/merge/delivery separately authorized | OPEN; all PRs draft/unmerged |
+
+The first coherent candidate run passes3/5 (5.3m) and exposes two test-assumption failures,
+not accepted product regressions: the Liquid caret now opens signature status alongside
+formatter status, making the former broad status locator ambiguous; single-line preview
+focus immediately activates its editor, so waiting for that preview to remain focused is
+incorrect. The corrected test selects the exact formatter status, also measures its contrast,
+and observes native Shift+Tab reactivation directly. This failed run remains retained in
+`/private/tmp/elsa-577-root-normal-host-candidate.log`; the final corrected result is below.
+
+Committed `cadd58ba` passes4/5 (8.6m): the persisted-workflow/Activity Definition and both
+independent degradation cases pass. The narrow case reaches native paste but the added
+clipboard guard incorrectly infers headless mode from a user agent overridden by the
+Desktop Chrome device profile. It refuses the write before touching clipboard data.
+The correction uses Playwright's resolved built-in `headless` fixture instead; headed
+execution remains refused. Log: `/private/tmp/elsa-577-root-normal-host-cadd58ba.log`.
+CI37415408459 passes static/workspace and generic Chromium jobs; its paired job fails4/5
+on the same guard, with production-runtime parity skipped, not accepted. An explicit manual CodeRabbit request starts actual review of
+`cadd58ba` while keeping the PR draft; this is distinct from the initial draft skip.
+That review subsequently aborts when the head changes (bot reply6009576375), and the
+summary reverts to draft-skipped. No completed external review is claimed; the corrected
+checkpoint requires a fresh request and actual review-ledger inspection.
+
+The extra strict browser-harness typecheck also exposes three pre-existing variant alias
+type errors (redeclaring an already registered option fixture). Bare value overrides preserve
+the pinned Playwright1.61.1 option metadata and exact host variants, without dependency or
+host behavior changes. The rerun uses the existing bundled Node declarations, not a new
+repository package or weakened compiler option. Both raw failures are retained in
+`/private/tmp/elsa-577-root-harness-typecheck.log` and
+`/private/tmp/elsa-577-root-harness-typecheck-bundled.log`. Corrected strict compilation
+passes with no diagnostics in `/private/tmp/elsa-577-root-harness-typecheck-corrected.log`;
+changed-harness ESLint, five-case collection and diff checks pass.
+
+Committed `6f298c28` passes4/5 (6.7m): trusted native JavaScript paste, caret, exact saves,
+undo and redo pass. Liquid trusted paste, text and offset pass, but the empty final line
+returns a zero-sized native collapsed Range. Exact-head CI37416192618 fails the paired
+case on that visibility assertion; static/workspace and generic Chromium pass, actual
+runtime parity is skipped. Logs: `/private/tmp/elsa-577-root-normal-host-6f298c28.log`
+and `/private/tmp/elsa-577-root-ci-6f298c28-failed.log`.
+
+A root narrow rebuilt diagnostic confirms actual native selection at offset123, the empty
+line DIV at child offset0, no measurable collapsed Range, and its BR anchor at x92.8125,
+y406.5625–423.5625 within viewport x44–346.875/y358.1875–436.75. An independent synthetic
+Chromium probe corroborates the DOM limitation; it is not real-host acceptance. The
+correction permits that BR anchor only for this exact empty-line/zero-Range selection
+shape and keeps nonempty Range geometry, positive height and the same ±1 viewport bounds.
+The diagnostic remains `/private/tmp/elsa-577-root-empty-line-diagnostic.log`. The exact
+helper's independent synthetic probe returns visible for text-backed and in-viewport BR
+carets, false for offscreen and hidden BR anchors. Root review finds no actionable issue;
+these synthetic checks are not actual host or screen-reader acceptance.
+
+#### Executable checkpoint b4083bd4 — automated matrix passes
+
+Studio `b4083bd487164218265bd7b7e48b286b44f6813d` / clean pinned Foundation
+`5cd44d6312d9de85b13f4619fc7aa972a557d033` pass root canonical coherent rebuilt normal
+hosts5/5 (5.4m) and exact-head [CI37417314313](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37417314313)
+ALL jobs: lint/layout/typecheck, complete workspace units and Workflows shuffle seeds1/11/29,
+bundle budget, generic Chromium, Foundation persisted-host request envelopes, hosted5/5
+(6.0m), and actual registered Jint/Fluid formatter parity. This is an executable checkpoint,
+not a claim that any later documentation-only reconciliation already passed its own CI.
+Root actual registered-runtime parity also passes its ten synthetic fixtures; log:
+`/private/tmp/elsa-577-root-runtime-parity-b4083bd4.log`.
+
+Three root temporary harness mutations use the canonical rebuilt setup with only the
+narrow-case selection, unchanged timing and no configuration fork. Each fails at its
+intended assertion and is restored exactly (`git diff --exit-code`):
+
+- Replacing native paste with `keyboard.insertText` produces no trusted paste observation.
+- Omitting logical newline accounting reports native offset22 rather than23.
+- Omitting the single format undo after actual exit/reactivation leaves formatted source
+  instead of the exact unformatted source.
+
+These discriminate the acceptance assertions, not mutations of production editing code.
+Logs: `/private/tmp/elsa-577-root-negative-native-paste.log`,
+`/private/tmp/elsa-577-root-negative-newline-offset.log`,
+`/private/tmp/elsa-577-root-negative-format-exit-undo.log`.
+
+The synthetic cross-browser/axe matrix initially passes6/16 but cannot launch ten Firefox/
+WebKit cases because the pinned browser binaries are absent. Installing only Playwright's
+official matching test binaries fixes that environment prerequisite; no dependencies,
+personal browsers or test configuration are changed. The unchanged rerun passes16/16
+(39.6s) with trace capture explicitly off. This remains separate from real host/runtime
+and native AT evidence. Logs: `/private/tmp/elsa-577-root-expression-matrix-b4083bd4.log`,
+`/private/tmp/elsa-577-root-test-browser-install.log`,
+`/private/tmp/elsa-577-root-expression-matrix-b4083bd4-retry.log`.
+
+Actual CodeRabbit review completes at this exact head: summary comment6009541054,
+run4ff5830f-58d8-4c6a-b264-f58704a9226a, all four changed files, no actionable code
+comments and no unresolved review threads. Its default docstring-coverage warning remains
+explicitly recorded, not silently passed; that advisory is not a required repository gate,
+and existing focused helper comments explain the non-obvious proof boundaries. No bulk
+documentation boilerplate is added. This is completed bot review evidence, not a GitHub
+APPROVED review or human acceptance. Explicit Copilot request attempts return CLI success,
+but no persisted request or completed Copilot review is evidenced: actual request/review/
+inline arrays remain empty after the window. No Greptile review is claimed.
+
+Primary root logs: `/private/tmp/elsa-577-root-normal-host-b4083bd4.log`,
+`/private/tmp/elsa-577-root-ci-b4083bd4-pass.log`,
+`/private/tmp/elsa-577-root-external-review-b4083bd4.json`.
+
+The native preflight confirms VoiceOver is not running and macOS UI automation is
+available, without changing accessibility settings. The connected Chrome browser is
+extension-backed, not the isolated Playwright context. Its initial native binding unexpectedly
+exposed an unrelated existing window; that content was not used and no unrelated action was
+taken. The owned blank tab was focused and a new Incognito window was then created and
+verified before further native QA. No personal credentials or clipboard contents are read,
+and no native announcement has been counted. Both owned browser surfaces are closed after
+preflight. The VoiceOver utility process opens but repeated native observation attempts fail
+with a timeout and capture-stream failure, with no utility window exposed in the native
+inventory. No VoiceOver/caption setting was changed; this is an observation limitation,
+not current-head AT acceptance. Synthetic automated paste is guarded to
+headless Chromium, whose [platform-independent clipboard implementation](https://chromium.googlesource.com/chromium/src/+/HEAD/components/headless/clipboard/headless_clipboard.cc)
+is installed by both headless Chrome and the headless shell; no platform clipboard restore/read
+is used by the test.
+Default live catalogs supply single signatures; overload navigation remains separately
+proved by synthetic authorized-provider component tests, not invented live host data.
+
+#### Native AT blocker and exact acceptance handoff
+
+On resume, an owned blank QA tab opens, but native Chrome control reports the Mac locked
+and unable to unlock automatically. Manual unlock is requested; the temporary tab is
+closed. No native host is started, no personal surface is used, VoiceOver remains off,
+and no caption/accessibility setting is changed. The documented native keyboard caption
+path is still untried because the locked desktop prevents it; utility capture failure alone
+is not being treated as proof that all native observation paths are unavailable.
+
+**Superseded historical handoff — non-gating:** the instructions below retain the earlier locked-desktop checkpoint and its then-current acceptance rules. The later owner scope amendment removes native observation from acceptance. No unlock or native rerun is requested; a native failure does not now keep T038 open. T038 remains open for final owner acceptance and delivery.
+
+After manual unlock, retain this branch and pinned Foundation checkout, rebuild using
+`ELSA_FOUNDATION_WORKTREE=/private/tmp/elsa-2379-foundation pnpm test:browser:expression-normal-host`.
+The prepared local bootstrap `/private/tmp/elsa-577-native-at-host.mjs` (Node25, import
+and syntax preflight pass; not yet run) reuses the actual host lifecycle and live-catalog
+draft seeder. Start it with
+`ELSA_FOUNDATION_WORKTREE=/private/tmp/elsa-2379-foundation node /private/tmp/elsa-577-native-at-host.mjs`.
+For independent degradation, repeat with its validated `missing-javascript-editor` or
+`missing-liquid-provider` argument, stopping the previous owned pair first. It prints only
+owned loopback login/workflow URLs and bounded fixture labels; it owns fresh SQLite and
+stops its hosts on SIGINT/SIGTERM. Sign into each owned Chrome/Safari private window
+using only the synthetic local fixture account, then use the printed JavaScript/Liquid
+workflow URLs and select the `target` activity's Text input.
+
+For both actual browser/VoiceOver combinations, observe actual speech or the native
+caption panel, not just page AX/DOM: preview/editor names and keyboard instructions;
+completion invocation/navigation/acceptance; `Math.pow(2, 3)` active-parameter signature
+and keyboard hover; local syntax diagnostics; compact/expanded source/focus/undo;
+real Format status and Escape-to-editor/Tab exit; Control-M/Tab expanded escape; the
+applicable theme/narrow flow and independent unavailable-editor/provider editing.
+Use only synthetic authored values and actual supplied signatures; do not invent live
+overloads. Record browser/OS/AT versions, exact source pair, expected versus observed
+announcements and any failure. Preserve original VoiceOver/caption settings, restore
+them, close only owned windows and stop only owned hosts. A failure keeps T038 unchecked.
+Human acceptance, Ready/merge and delivery remain separate and unauthorized here.
+
+### Final T037 automated technical gate, 2026-10-06
+
+Immutable Studio `ef523911c72aad209d483580dcd24dcb638686a9` / clean Foundation
+`5cd44d6312d9de85b13f4619fc7aa972a557d033` pass root coherent rebuilt normal hosts5/5
+(6.0m), final actual registered Jint/Fluid parity (ten synthetic fixtures), and exact-head
+[CI37413241474](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37413241474)
+ALL jobs: full lint/layout/typecheck, complete workspace units (CodeEditor196, JS16, Liquid28,
+Workflows1506), three Workflows shuffle seeds1/11/29, unchanged bundles, generic Chromium,
+Foundation persisted-host request envelopes, paired hosts5/5 (6.9m) and actual runtime parity.
+Actual Studio-only solution restore/build also passes0warnings/errors without Foundation.
+
+Root final integrated-delta review and independent latest-delta source review find no remaining
+actionable blocker. Signature evidence preserves actual supplied arrays/per-item arity and
+parser-proven positions; default catalogs expose single signatures, so authorized synthetic
+provider overload controls remain separate from live-host signature proof. Formatter edit/
+selection freshness and fail-closed atomicity, native focus and one-undo controls discriminate;
+intentional arithmetic/overlap mutations fail and are restored. Predecessor failed CI/host
+checkpoints below retain their original boundaries.
+
+Copilot is explicitly re-requested after the final push but actual requests/reviews/inline
+comments remain empty after the review window; no Greptile signal appears, and CodeRabbit
+skips the draft. Completed root/independent/local/hosted evidence uses the documented unavailable
+external-review fallback, not actual external approval. DraftPR#574 remains immutable,
+draft/open/unmerged; Task572's implementation claim is released, automated verification Passed,
+separate ReviewRequired/human/delivery boundaries preserved.
+
+CI budgets remain primary127.50/127.50kB, CSS145.86/185kB, Definitions380.70/384.50kB,
+upgrades370.70/375.50kB, largest263.18/500kB, eight heavy surfaces deferred. Logs:
+`/private/tmp/elsa-572-root-normal-host-ef523911.log`,
+`/private/tmp/elsa-572-root-runtime-parity-ef523911.log`,
+`/private/tmp/elsa-572-root-ci-ef523911-pass.log`,
+`/private/tmp/elsa-572-root-solution-registration.log`.
+
+At T037 acceptance, Task577 / T038 became the sole active final acceptance leaf for native
+clipboard paste, Format caret/undo, narrow activation and native control exit. Its latest
+automated matrix and native AT blocker are recorded above. Current-head Chrome/Safari
+VoiceOver, human acceptance and delivery remain OPEN; DOM/axe/Playwright and July historical
+AT evidence do not satisfy those gates. All PRs stay draft/unmerged.
 
 ### T037 integration dd6bc1aa — complete gate pending
 
@@ -988,7 +1286,7 @@ At 12:29 UTC the canonical rebuilt normal-host browser passes 4/4 again in 2.4 m
 | Language contributions | JavaScript: 4 passing tests; Liquid: 4 passing tests |
 | Workflow integration | All feature-focused tests pass across tooling transport, activity orchestration, Object-editor regression, dynamic input options, property grouping, Test Run acknowledgement, and structured publication diagnostics |
 | Real inspector | 16 production-build Playwright cases pass across desktop Chromium, Firefox, and WebKit plus a Chromium touch profile: accessibility, completion/keyboard/expanded/type-switch continuity, unavailable-tooling degradation, 50-field lazy activation under the 1.5 s bound, and narrow touch interaction |
-| Manual assistive technology | Google Chrome and Safari pass with macOS VoiceOver enabled for focus, completion, signature/hover help, diagnostics, compact-to-expanded transition, Tab capture/escape, and unavailable-tooling editing |
+| Manual assistive technology | Historical 2026-07-28 Google Chrome/Safari VoiceOver evidence covers focus, completion, signature/hover help, diagnostics, compact-to-expanded transition, Tab capture/escape, and unavailable-tooling editing; current-head acceptance remains unverified |
 | Static gates | `pnpm lint` passes with existing warnings; `pnpm typecheck` passes; CSS token lint passes |
 | Build/bundles | `pnpm build` passes; Workflows entry 122.01 kB/122.50 kB, Definitions 376.93 kB/379 kB, upgrades 365.34 kB/367.50 kB, and largest JavaScript chunk 259.74 kB/500 kB |
 | .NET Studio | `dotnet test Elsa.Studio.slnx --no-build --no-restore` passes |
@@ -1007,7 +1305,10 @@ The historical baseline complete Workflows Vitest suite reported 1,059 passing a
 
 The current complete Workflows suite passes 1,470 tests and none of these failures reproduced. The historical complete Foundation architecture suite passed all 320 tests; current-head architecture proof is tracked separately above.
 
-## Requirement audit
+## Historical requirement audit — 2026-07-28 baseline
+
+This audit records the historical baseline, not current-head T038 acceptance. The exact
+automated checkpoints and open native AT/human acceptance gates are recorded above.
 
 | Requirement group | Evidence |
 |---|---|
@@ -1017,11 +1318,11 @@ The current complete Workflows suite passes 1,470 tests and none of these failur
 | FR-038–FR-047 | Editing remains available; full-draft Test Run/publication gates are authoritative; unavailable/unauthorized/incompatible states degrade safely; caches are memory-only and authorization-purged; no sensitive telemetry is emitted |
 | FR-048–FR-058 | Keyboard instructions/status semantics, pointer/touch viewport coverage, generic fallback, only JavaScript/Liquid advertised, stable module contract, design tokens, 50-field performance proof, unit degradation states, and real-inspector browser coverage |
 | SC-001–SC-011 | Focused/editor/browser tests, bundle budgets, version/cache tests, exact-source tests, Foundation gates, and cross-repository review provide the measurable automated acceptance evidence |
-| SC-012 | Automated browser accessibility checks and manual Google Chrome/Safari VoiceOver acceptance pass with no remaining release blocker |
+| SC-012 | Automated browser accessibility checks pass at the recorded checkpoint; manual Google Chrome/Safari VoiceOver evidence is historical (2026-07-28), and current-head acceptance remains unverified |
 
 No CodeMirror type crosses the Studio SDK boundary, no expression source enters metadata caches, and no generic “Elsa globals” are synthesized. Each expression provider owns its globals/functions/variables.
 
-## Manual assistive-technology evidence
+## Historical manual assistive-technology evidence — 2026-07-28, not current-head acceptance
 
 The production fixture was exercised in Google Chrome and Safari with macOS VoiceOver enabled. Both runs confirmed:
 
