@@ -2,6 +2,8 @@
 
 ## Current paired candidate — 2026-10-07
 
+The executable checkpoint `d6bb378005682704cefb9ebaa9c52f92f31e2189` / Foundation `4c388b94e672e0334e577db4d959d38050527456` passes every job in [CI37551754993](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37551754993), including all five persisted-host cases, registered-runtime parity and the strict ten-case REST step with owned teardown. The exact-head synthetic matrix passes 16/16 in [37551754830](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37551754830). The subsequent documentation-only clarification below preserves historical pending/blocked statements while identifying their later resolution; executable source, tests, workflows and producer pin are unchanged. Fresh documentation-head CI/review remains required, not inferred from this checkpoint.
+
 The final Studio layer includes qualified main `aedaacc360099f8a12fb3fa968fe97d5cd9d7aa4`, the corrected save-status locator, raw-count catalog pagination, supported lazy CodeMirror theme selectors and the authoring-versus-catalog provenance correction from `deaa83c33dbffc68d15b18f787d8c71b3fe1432f`. The formatting parent is `8f95386b26859fc2909f709dc2dbb638ae8492ad`. Historical failures and passes below remain tied to their recorded heads; none establishes this integrated candidate's acceptance.
 
 The shared immutable producer pin is now `4c388b94e672e0334e577db4d959d38050527456`, qualified by full [CI37540394248](https://github.com/elsa-workflows/elsa-foundation/actions/runs/37540394248) and [Maps37540393180](https://github.com/elsa-workflows/elsa-foundation/actions/runs/37540393180). The other three synchronized Foundation heads also pass their exact CI and Maps. The paired host job now additionally builds this producer in Debug and invokes the unchanged canonical ten-case JavaScript REST suite through its existing fresh-SQLite/free-loopback/owned-process lifecycle. It verifies the exact producer SHA, requires all ten results, and asserts owned-process exit plus a free port even after failure. Root and independent review cover the workflow delta; actionlint passes. No external publishing, secrets or deployment are part of this test.
@@ -105,6 +107,8 @@ Exact clean Studio `bef4e9bd3d79d0b9e7c7fa4dd886348a594df777` / Foundation `946a
 
 At producer946a, root complete affected locked Release suites also pass Expressions236/236, Jint126/126, Design534/534, DesignAPI143/143 and PublishingAPI714/714, with zero failed/skipped, and exact Maps37488310415 passes. Foundation complete CI/Core-only/Architecture and fresh rebuilt REST remain pending at this record update, not inherited from 5cd. Public evidence: [current producer suites](https://github.com/elsa-workflows/elsa-foundation/pull/2380#issuecomment-6020016389).
 
+**Later reconciliation for the same producer:** `946a237d2a5827ae58de569a081f9719be83ee33` subsequently passes full [CI37488305508](https://github.com/elsa-workflows/elsa-foundation/actions/runs/37488305508), including Core-only and Architecture, and root's fresh Debug REST journey passes 10/10 with owned teardown (`/private/tmp/elsa-2310-root-946a-js-rest.log`). The preceding pending sentence is retained checkpoint history, not the current status of producer 946a. The newer 4c producer and its paired verification are recorded separately above.
+
 Root and independent pin-correction review find no actionable issue. CodeRabbit's actual coverage metadata names bef4e9bd as reviewed and asks that this verification record reflect the reported runtime pass; this evidence update addresses that documentation request. Its default docstring warning is a non-required advisory, not passed. CLI Copilot requests do not establish a completed current-head review or approval. The newly selected producer is the root-reviewed existing Foundation stack, not an arbitrary third-party revision; deployment/custom-host security coverage is not inferred.
 
 This subsequent record update changes documentation only; executable tests, production bytes and immutable producer pin remain identical to bef4e9bd. Its fresh exact-head CI/review is required separately; none of the retained executable checkpoint results is relabeled as a later head's run. Native Chrome/Safari VoiceOver stays **SKIPPED BY OWNER DECISION — NEVER PASSED**. T038 remains unchecked, all PRs draft/unmerged, final owner acceptance and verified green post-merge main pending. Merge-triggered preview package/image publication requires a separate owner scope decision; no workflow is disabled and no publication/deployment is authorized by this record.
@@ -122,14 +126,14 @@ and perform the one-format undo **after** Format/Escape/Tab exit and reactivatio
 Independent source review agrees. The executable checkpoint below passes its automated
 matrix; actual native AT and owner acceptance remain open.
 
-| Acceptance surface | Current-head observation required | State |
+| Acceptance surface | Observation at the recorded checkpoint | State |
 |---|---|---|
 | Real persisted workflow and Activity Definition | JavaScript/Liquid compact/expanded, authorized live assistance, exact saves and independent missing-module/provider editing | PASS at b4083bd4/5cd44d63: root5/5 and hosted5/5 |
 | Light/Dark/Dim, narrow inspector | Preview/editor/selection/help/completion/diagnostic contrast, native visible caret, clipped Liquid match-start precondition | PASS at the same exact pair |
 | Native multiline paste | Trusted browser paste event with exact synthetic payload, preserved whitespace, automatic expansion, persisted text, native caret and one undo/redo | PASS at the same exact pair; restored negative control fails without trusted paste |
 | Explicit Format and native exit | Visible narrow real Format control, mapped collapsed caret, exact source/persistence, Escape-to-editor and actual Tab exit, reactivation followed by one undo | PASS at the same exact pair; restored negative control catches omitted exit undo |
 | Generic cross-browser/axe | Synthetic Chromium/Firefox/WebKit/touch fixture; not real-host/runtime or actual screen-reader evidence | PASS16/16 at b4083bd4, traces off |
-| Chrome + VoiceOver; Safari + VoiceOver | Actual current-head screen-reader navigation/announcements, settings restored | UNVERIFIED: native control reports locked Mac; manual unlock required |
+| Chrome + VoiceOver; Safari + VoiceOver | Historical native-observation requirement, now non-gating by owner decision | Historical blocked attempt: UNVERIFIED, native control reports locked Mac; manual unlock required at that checkpoint. Current scope: **SKIPPED BY OWNER DECISION — NEVER PASSED**; native behavior remains unverified |
 | Human acceptance and delivery | Owner acceptance; draft-to-ready/merge/delivery separately authorized | OPEN; all PRs draft/unmerged |
 
 The first coherent candidate run passes3/5 (5.3m) and exposes two test-assumption failures,
@@ -255,6 +259,8 @@ closed. No native host is started, no personal surface is used, VoiceOver remain
 and no caption/accessibility setting is changed. The documented native keyboard caption
 path is still untried because the locked desktop prevents it; utility capture failure alone
 is not being treated as proof that all native observation paths are unavailable.
+
+**Superseded historical handoff — non-gating:** the instructions below retain the earlier locked-desktop checkpoint and its then-current acceptance rules. The later owner scope amendment removes native observation from acceptance. No unlock or native rerun is requested; a native failure does not now keep T038 open. T038 remains open for final owner acceptance and delivery.
 
 After manual unlock, retain this branch and pinned Foundation checkout, rebuild using
 `ELSA_FOUNDATION_WORKTREE=/private/tmp/elsa-2379-foundation pnpm test:browser:expression-normal-host`.
