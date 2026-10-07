@@ -38,7 +38,6 @@ internal static class BridgeTestHost
         var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions
         {
             EnvironmentName = Environments.Production,
-            ContentRootPath = AppContext.BaseDirectory
         });
         builder.WebHost.UseTestServer();
         builder.Configuration.AddInMemoryCollection(settings);
