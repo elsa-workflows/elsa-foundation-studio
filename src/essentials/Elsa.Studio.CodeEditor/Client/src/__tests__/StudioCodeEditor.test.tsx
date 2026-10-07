@@ -19,11 +19,116 @@ import {
   setupStudioCodeEditorTestLifecycle,
   waitFor
 } from "./StudioCodeEditor.testSupport";
-import type { StudioCodeCompletion } from "../types";
+import type { StudioCodeCompletion, StudioCodeFormatResult } from "../types";
 
 setupStudioCodeEditorTestLifecycle();
 
 describe("StudioCodeEditor", () => {
+  it("returns focus to compact editing before replacing displayed signature authority", async () => {
+    const onBlur = vi.fn();
+    const props = { profile: "compact" as const, document: codeDocument({ value: "f(a, b)" }),
+      languageAdapter: javaScriptLanguageAdapter, onBlur };
+    const { container, rerender } = renderEditor({ ...props,
+      signatureProvider: async () => ({ label: "f(x)", signatures: [{ label: "f(x)" }, { label: "f(x, y)" }] }) });
+    const content = await activateRichEditor(container, "compact");
+    await waitFor(() => !!container.querySelector('[aria-label="Next signature"]'));
+    container.querySelector<HTMLButtonElement>('[aria-label="Next signature"]')!.focus();
+    rerender({ ...props, signatureProvider: async () => null });
+    expect(container.querySelector(".studio-code-editor-signature")).toBeNull();
+    expect(document.activeElement).toBe(content);
+    expect(onBlur).not.toHaveBeenCalled();
+    expect(container.querySelector(".cm-content")).toBe(content);
+  });
+
+  it.each(["format", "overload"])("exits a %s control with Escape then native Tab without releasing compact ownership early", async control => {
+    const onBlur = vi.fn();
+    const { container } = renderEditor({ profile: "compact", document: codeDocument({ value: "f(a, b)" }),
+      languageAdapter: javaScriptLanguageAdapter, onBlur,
+      signatureProvider: async () => ({ label: "f(x)", signatures: [{ label: "f(x)" }, { label: "f(x, y)" }] }) });
+    const content = await activateRichEditor(container, "compact");
+    const selector = control === "format" ? '[aria-label="Format source"]' : '[aria-label="Next signature"]';
+    await waitFor(() => !!container.querySelector(selector));
+    const next = container.querySelector<HTMLButtonElement>(selector)!;
+    next.focus();
+    click(next);
+    expect(document.activeElement).toBe(next);
+    key(next, "Escape");
+    expect(document.activeElement).toBe(content);
+    expect(container.querySelector(".studio-code-editor-signature")).toBeNull();
+    expect(onBlur).not.toHaveBeenCalled();
+    expect(key(content, "Tab").defaultPrevented).toBe(false);
+  });
+
+  it.each(["uri", "session"])("rejects an old pending format after the mounted %s changes", async transition => {
+    let resolve!: (result: StudioCodeFormatResult) => void;
+    const formatter = vi.fn(() => new Promise<StudioCodeFormatResult>(done => { resolve = done; }));
+    const adapter = { ...javaScriptLanguageAdapter, grammarProfile: "expression" as const, loadFormatter: async () => formatter };
+    const onChange = vi.fn();
+    const document = codeDocument({ value: "a+ b" });
+    const props = { profile: "expanded" as const, document, languageAdapter: adapter, onChange, sessionKey: "before" };
+    const { container, rerender } = renderEditor(props);
+    await activateRichEditor(container, "expanded");
+    click(container.querySelector<HTMLButtonElement>('[aria-label="Format source"]')!);
+    await waitFor(() => formatter.mock.calls.length === 1);
+    rerender({ ...props, document: transition === "uri" ? { ...document, uri: "elsa://other" } : document,
+      sessionKey: transition === "session" ? "after" : props.sessionKey });
+    resolve({ state: "ready", edits: [{ from: 0, to: 4, insert: "a + b" }] });
+    await new Promise(done => setTimeout(done, 0));
+    expect(container.querySelector(".cm-content")?.textContent).toBe("a+ b");
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it.each(["button", "shortcut"])("formats only on the explicit %s action and restores exact source in one undo", async action => {
+    const onBlur = vi.fn();
+    const onChange = vi.fn();
+    const formatter = vi.fn(() => ({ state: "ready" as const, edits: [{ from: 0, to: 4, insert: "a + b" }] }));
+    const adapter = { ...javaScriptLanguageAdapter, grammarProfile: "expression" as const, loadFormatter: async () => formatter };
+    const { container } = renderEditor({ profile: "compact", document: codeDocument({ value: "a+ b" }), languageAdapter: adapter, onBlur, onChange });
+    const content = await activateRichEditor(container, "compact");
+    const view = EditorView.findFromDOM(content)!;
+    expect(formatter).not.toHaveBeenCalled();
+    if (action === "button") {
+      const button = container.querySelector<HTMLButtonElement>('[aria-label="Format source"]')!;
+      button.focus();
+      click(button);
+    } else key(content, "f", { altKey: true, shiftKey: true });
+    await waitFor(() => view.state.doc.toString() === "a + b");
+    expect(formatter).toHaveBeenCalledTimes(1);
+    expect(onBlur).not.toHaveBeenCalled();
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ value: "a + b" }));
+    expect(container.querySelector(".cm-content")).toBe(content);
+    expect(undo(view)).toBe(true);
+    expect(view.state.doc.toString()).toBe("a+ b");
+  });
+
+  it("retains compact ownership on an internal control and blurs once on external exit", async () => {
+    const onBlur = vi.fn();
+    const { container } = renderEditor({
+      profile: "compact", languageAdapter: javaScriptLanguageAdapter, onBlur
+    });
+    await activateRichEditor(container, "compact");
+    const content = container.querySelector<HTMLElement>(".cm-content")!;
+    content.focus();
+    const control = globalThis.document.createElement("button");
+    control.textContent = "Internal editor action";
+    container.querySelector(".studio-code-editor")!.append(control);
+    control.focus();
+    await new Promise(resolve => queueMicrotask(() => resolve(undefined)));
+    expect(onBlur).not.toHaveBeenCalled();
+    expect(container.querySelector(".cm-content")).toBe(content);
+    expect(globalThis.document.activeElement).toBe(control);
+
+    const external = globalThis.document.createElement("button");
+    globalThis.document.body.append(external);
+    try {
+      external.focus();
+      await waitFor(() => !!container.querySelector(".studio-code-editor-preview"));
+      expect(onBlur).toHaveBeenCalledTimes(1);
+    } finally {
+      external.remove();
+    }
+  });
+
   it("renders the fallback editor for unsupported languages and emits document changes", () => {
     const document = codeDocument({ language: "liquid", value: "{{ total }}" });
     const onChange = vi.fn();
@@ -120,8 +225,7 @@ describe("StudioCodeEditor", () => {
 
     click(container.querySelector<HTMLButtonElement>(".studio-code-editor-preview")!);
     await waitFor(() => !!container.querySelector(".cm-content"));
-    container.querySelector<HTMLElement>(".cm-content")!
-      .dispatchEvent(new FocusEvent("blur", { bubbles: true }));
+    container.querySelector<HTMLElement>(".cm-content")!.blur();
     await waitFor(() => !!container.querySelector(".studio-code-editor-preview"));
 
     window.dispatchEvent(new Event("elsa:auth-session-ended"));
@@ -810,7 +914,7 @@ describe("StudioCodeEditor", () => {
     await waitFor(() => !!container.querySelector<HTMLElement>(".cm-content"));
     await waitFor(() => container.querySelectorAll(".cm-content span").length > 0);
     const initialTokenCount = container.querySelectorAll(".cm-content span").length;
-    container.querySelector<HTMLElement>(".cm-content")!.dispatchEvent(new FocusEvent("blur", { bubbles: true }));
+    container.querySelector<HTMLElement>(".cm-content")!.blur();
     await waitFor(() => !!container.querySelector(".studio-code-editor-preview"));
 
     click(container.querySelector<HTMLButtonElement>(".studio-code-editor-preview")!);

@@ -30,7 +30,7 @@ export function register(api: ElsaStudioModuleApi) {
       toolingCapabilities: {
         highlighting: true,
         signatures: true,
-        formatting: false,
+        formatting: true,
         localDiagnostics: true
       }
     },
@@ -127,7 +127,7 @@ function withJavaScriptCapabilities(
       ...authoringContext.capabilities,
       highlighting: true,
       signatures: true,
-      formatting: false,
+      formatting: true,
       localDiagnostics: true
     }
   };

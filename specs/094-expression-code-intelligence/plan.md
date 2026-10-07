@@ -133,4 +133,14 @@ T037 contract. Current-head manual AT and human acceptance remain explicitly ope
 
 ## Complexity Tracking
 
+### T037 implementation boundary — Studio Task#572
+
+Decision20 freezes [signature/formatting semantics](contracts/signatures-and-formatting.md) on
+the passing immutable T036 pair bc305150/5cd44d63. Separate bounded writers own language
+signature projection/panel and parser-only conservative formatters. Root owns neutral types,
+shared focus/session/request-generation seams, one-transaction edits, registered production
+Jint/Fluid differential harness, real-host proof and complete QA. No new dependency, language
+service, SDK/wire/runtime field, automatic formatting or evaluation in production tooling.
+This follows the existing constitution and ADR0002/0006; final manual/human/delivery gates remain open.
+
 No constitution violations require justification.

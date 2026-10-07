@@ -1,7 +1,8 @@
-import type {
-  StudioCodeToolingAuthoringContext,
-  StudioCodeToolingLanguageProjection,
-  StudioCodeToolingSymbol
+import {
+  createJavaScriptCallSignatureClassifier,
+  type StudioCodeToolingAuthoringContext,
+  type StudioCodeToolingLanguageProjection,
+  type StudioCodeToolingSymbol
 } from "@elsa-workflows/studio-code-editor";
 
 const identifierPattern = String.raw`[\p{L}_$][\p{L}\p{Nd}_$]*`;
@@ -9,6 +10,7 @@ const memberPathPattern = new RegExp(
   `(${identifierPattern}(?:\\(\\))?(?:\\.(?:${identifierPattern})?)+)$`,
   "u"
 );
+const classifyCallSignature = createJavaScriptCallSignatureClassifier();
 
 /** JavaScript owns the spelling of workflow facts; the shared editor only traverses projected symbols. */
 export const javaScriptToolingProjection: StudioCodeToolingLanguageProjection = {
@@ -52,6 +54,7 @@ export const javaScriptToolingProjection: StudioCodeToolingLanguageProjection = 
       !contextualKeys.has(symbol.id) && !contextualKeys.has(symbol.name) && hasVariableBindings(symbol, context));
   },
   callableNameAt,
+  signatureContextAt: (source, position) => classifyCallSignature(source, position),
   memberPathAt: (source, position, includeCurrentWord) => {
     const prefix = source.slice(0, Math.min(Math.max(0, position), source.length));
     const match = prefix.match(memberPathPattern);

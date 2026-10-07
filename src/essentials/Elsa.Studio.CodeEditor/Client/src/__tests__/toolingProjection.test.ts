@@ -56,7 +56,17 @@ describe("createStudioCodeToolingProjection", () => {
     });
     await expect(projection.signatureProvider(document, document.value.length, controller.signal)).resolves.toEqual({
       label: "customer()",
-      documentation: { markdown: "Returns the customer." }
+      documentation: { markdown: "Returns the customer." },
+      parameters: undefined,
+      returnShapeId: undefined,
+      signatures: [{
+        label: "customer()",
+        documentation: { markdown: "Returns the customer." },
+        parameters: undefined,
+        returnShapeId: undefined
+      }],
+      activeSignature: 0,
+      callableId: "customer"
     });
     expect(projectStudioCodeDiagnostics(document.uri, [{
       severity: "error",
@@ -73,6 +83,50 @@ describe("createStudioCodeToolingProjection", () => {
       endLineNumber: 2,
       endColumn: 11
     }]);
+  });
+
+  it("projects every delivered authorized signature with its own bounded active parameter", async () => {
+    const signatures = [
+      { label: "f(first, second)", parameters: [{ name: "first" }, { name: "second" }] },
+      { label: "f(value)", parameters: [{ name: "value" }] }
+    ];
+    const projection = createStudioCodeToolingProjection({
+      authoringContext: {
+        rootSymbols: [{ id: "catalog-f", name: "f", signatures }]
+      },
+      languageProjection: {
+        signatureContextAt: () => ({ callableName: "f", argumentOrdinal: 1 }),
+        callableNameAt: () => "legacy-fallback-must-not-win"
+      }
+    });
+    const document = { uri: "elsa://drafts/a/f", language: "javascript", value: "f(first, second)", version: 1 };
+
+    await expect(projection.signatureProvider(document, document.value.length - 1, new AbortController().signal))
+      .resolves.toMatchObject({
+        label: "f(first, second)",
+        signatures: [
+          { label: "f(first, second)", activeParameter: 1 },
+          { label: "f(value)" }
+        ],
+        activeSignature: 0,
+        activeParameter: 1,
+        callableId: "catalog-f"
+      });
+  });
+
+  it("hides an explicitly empty authorized signature catalog", async () => {
+    const projection = createStudioCodeToolingProjection({
+      authoringContext: {
+        rootSymbols: [{ id: "catalog-f", name: "f", signatures: [] }]
+      },
+      languageProjection: { signatureContextAt: () => ({ callableName: "f", argumentOrdinal: 0 }) }
+    });
+
+    await expect(projection.signatureProvider(
+      { uri: "elsa://drafts/a/f", language: "javascript", value: "f(", version: 1 },
+      2,
+      new AbortController().signal
+    )).resolves.toBeNull();
   });
 
   it("retains local context when the catalog is unavailable", async () => {

@@ -7,6 +7,8 @@ export interface StudioCodeLiquidCursorContext {
   to: number;
   prefix: string;
   valuePath?: readonly string[];
+  /** Parser-proven callable identity; Liquid tag argument ordinals stay unknown. */
+  signatureContext?: { callableName: string; argumentOrdinal?: number; kind: "filter" | "tag" };
 }
 
 export type StudioCodeLiquidCursorClassifier = (
@@ -61,46 +63,93 @@ export function createLiquidCursorClassifier(): StudioCodeLiquidCursorClassifier
     }
 
     const outerNode = cachedTree.resolve(pos, -1);
-    if (ancestorNodes(outerNode).some(candidate => isQuietNode(candidate.name))) return quietCursor(pos);
-
     const node = cachedTree.resolveInner(pos, -1).enterUnfinishedNodesBefore(pos);
     const ancestors = ancestorNodes(node);
-    if (ancestors.some(candidate => isQuietNode(candidate.name))) return quietCursor(pos);
-    if (ancestors.some(candidate => candidate.name === "SubscriptExpression")) return quietCursor(pos);
+    const signatureContext = liquidSignatureContext(node, source, pos);
+    const outerAncestors = ancestorNodes(outerNode);
+    const inCommentOrRawText = [...outerAncestors, ...ancestors].some(candidate =>
+      isQuietNode(candidate.name) && candidate.name !== "StringLiteral");
+    if (outerAncestors.some(candidate => isQuietNode(candidate.name)) ||
+        ancestors.some(candidate => isQuietNode(candidate.name))) {
+      return quietCursor(pos, inCommentOrRawText ? undefined : signatureContext);
+    }
+    if (ancestors.some(candidate => candidate.name === "SubscriptExpression")) return quietCursor(pos, signatureContext);
 
     const leaf = findActiveNameNode(node, pos, "FilterName");
-    if (leaf) return tokenCursor("filter", source, pos, leaf.from, leaf.to);
+    if (leaf) return withSignatureContext(tokenCursor("filter", source, pos, leaf.from, leaf.to), signatureContext);
     const emptyFilter = enclosingNode(node, "Filter");
     if (emptyFilter && positionAfterMarker(source, emptyFilter, pos, "|")) {
-      return tokenCursor("filter", source, pos, activeTokenStart(source, emptyFilter.from, pos, "|"), pos);
+      return withSignatureContext(
+        tokenCursor("filter", source, pos, activeTokenStart(source, emptyFilter.from, pos, "|"), pos),
+        signatureContext
+      );
     }
 
     const tag = enclosingNode(node, "Tag");
     const tagName = tag && parsedTagNameNode(tag);
     if (tagName && pos >= tagName.from && pos <= tagName.to) {
-      return tokenCursor("tag", source, pos, tagName.from, tagName.to);
+      return withSignatureContext(tokenCursor("tag", source, pos, tagName.from, tagName.to), signatureContext);
     }
     if (tag && !tagName && cursorIsTagNamePosition(source, tag, pos)) {
-      return tokenCursor("tag", source, pos, tagNameInsertionStart(source, tag, pos), pos);
+      return withSignatureContext(tokenCursor("tag", source, pos, tagNameInsertionStart(source, tag, pos), pos), signatureContext);
     }
 
     if (ancestors.some(candidate => candidate.name === "EndTag")) return quietCursor(pos);
 
     const value = findValueCursor(node, source, pos);
-    if (value?.quiet) return quietCursor(pos);
+    if (value?.quiet) return quietCursor(pos, signatureContext);
     if (value || ancestors.some(candidate => candidate.name === "Interpolation" || candidate.name === "Tag")) {
-      return {
+      return withSignatureContext({
         ...tokenCursor("value", source, pos, value?.from ?? pos, value?.to ?? pos),
         valuePath: value?.path
-      };
+      }, signatureContext);
     }
 
     return { region: "text", from: pos, to: pos, prefix: "" };
   };
 }
 
-function quietCursor(position: number): StudioCodeLiquidCursorContext {
-  return { region: "quiet", from: position, to: position, prefix: "" };
+function quietCursor(
+  position: number,
+  signatureContext?: StudioCodeLiquidCursorContext["signatureContext"]
+): StudioCodeLiquidCursorContext {
+  return withSignatureContext({ region: "quiet", from: position, to: position, prefix: "" }, signatureContext);
+}
+
+function withSignatureContext<T extends StudioCodeLiquidCursorContext>(
+  cursor: T,
+  signatureContext: StudioCodeLiquidCursorContext["signatureContext"]
+): T {
+  return signatureContext ? { ...cursor, signatureContext } : cursor;
+}
+
+function liquidSignatureContext(node: CursorSyntaxNode, source: string, position: number) {
+  const ancestors = ancestorNodes(node);
+  if (ancestors.some(candidate => candidate.name === "EndTag")) return undefined;
+
+  const filter = ancestors.find(candidate => candidate.name === "Filter");
+  const filterName = filter?.getChild("FilterName");
+  if (filter && filterName) {
+    if (position >= filterName.from && position <= filterName.to) {
+      return { callableName: source.slice(filterName.from, filterName.to), kind: "filter" as const };
+    }
+    const colon = filter.getChild(":");
+    if (colon && position >= colon.to && position <= filter.to) {
+      let argumentOrdinal = 0;
+      for (let child = filter.firstChild; child; child = child.nextSibling) {
+        if (child.name === "|" && child.from > colon.from) break;
+        if (child.name === "," && child.from >= colon.to && child.to <= position) argumentOrdinal++;
+      }
+      return { callableName: source.slice(filterName.from, filterName.to), argumentOrdinal, kind: "filter" as const };
+    }
+  }
+
+  const tag = ancestors.find(candidate => candidate.name === "Tag");
+  const tagName = tag && parsedTagNameNode(tag);
+  if (tag && tagName && position >= tag.from && position <= tag.to) {
+    return { callableName: source.slice(tagName.from, tagName.to), kind: "tag" as const };
+  }
+  return undefined;
 }
 
 function tokenCursor(

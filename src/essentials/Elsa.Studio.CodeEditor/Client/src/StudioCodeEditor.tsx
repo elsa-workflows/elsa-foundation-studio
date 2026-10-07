@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentType } from "react";
 import { FallbackCodeEditor } from "./engines/FallbackCodeEditor";
 import {
@@ -61,6 +61,8 @@ export function StudioCodeEditor({
   onExpand,
   onNewline
 }: StudioCodeEditorProps) {
+  const sectionRef = useRef<HTMLElement>(null);
+  const ownsFocus = useRef(false);
   const [compactActive, setCompactActive] = useState(profile === "expanded");
   const compactSession = sessionKey ?? document.uri;
   const [authorizationRevoked, setAuthorizationRevoked] = useState(
@@ -99,6 +101,15 @@ export function StudioCodeEditor({
   void authorizationGeneration;
   const session = suppliedSession ?? getStudioCodeEditorSession(compactSession);
   const isCompactPreview = profile === "compact" && !compactActive;
+  const observeFocusBoundary = () => {
+    const section = sectionRef.current;
+    queueMicrotask(() => {
+      if (!section || section.contains(globalThis.document.activeElement) || !ownsFocus.current) return;
+      ownsFocus.current = false;
+      onBlur?.();
+      if (profile === "compact") releaseCompactSession(compactSession);
+    });
+  };
   const engineProps: StudioCodeEditorEngineProps = {
     document,
     profile,
@@ -114,15 +125,14 @@ export function StudioCodeEditor({
     completionProvider,
     hoverProvider,
     signatureProvider,
+    loadFormatter: languageAdapter?.loadFormatter,
     onChange,
     onFocus: () => {
+      ownsFocus.current = true;
       if (profile === "compact") activateCompactSession(compactSession);
       onFocus?.();
     },
-    onBlur: () => {
-      onBlur?.();
-      if (profile === "compact") releaseCompactSession(compactSession);
-    },
+    onBlur: observeFocusBoundary,
     onExpand,
     onNewline
   };
@@ -137,22 +147,14 @@ export function StudioCodeEditor({
 
   return (
     <section
+      ref={sectionRef}
       className={`studio-code-editor studio-code-editor-${profile}`}
       data-studio-code-editor="true"
       data-language={document.language}
       data-profile={profile}
       data-theme={theme}
       data-readonly={readOnly}
-      onBlurCapture={event => {
-        if (profile !== "compact") return;
-        // CodeMirror may hand focus directly to another compact preview while its lazy editor is
-        // resolving. Observe the section boundary as well as the engine callback so a blurred
-        // compact editor always returns to its lightweight preview.
-        const editorElement = event.currentTarget;
-        queueMicrotask(() => {
-          if (!editorElement.contains(globalThis.document.activeElement)) releaseCompactSession(compactSession);
-        });
-      }}
+      onBlurCapture={observeFocusBoundary}
     >
       {authorizationRevoked ? (
         <div className="studio-code-editor-status" role="status">

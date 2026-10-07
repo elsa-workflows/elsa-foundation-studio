@@ -12,6 +12,7 @@
     "test:browser:expression-matrix": "playwright test --config tests/browser/playwright.expression-matrix.config.ts",
     "test:browser:expression-normal-host": "playwright test --config tests/browser/playwright.expression-normal-host.config.ts",
     "test:expression-normal-host:lifecycle": "node --test scripts/expression-normal-host.test.mjs",
+    "test:expression-formatting:parity": "vitest run --config tests/runtime/vitest.formatting-parity.config.ts",
     "test:browser:performance": "playwright test --config tests/browser/playwright.performance.config.ts",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint . && pnpm lint:css && pnpm lint:layout",

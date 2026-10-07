@@ -308,7 +308,78 @@ describe("Liquid tooling projection", () => {
       .resolves.toMatchObject({
         range: { from: memberSource.indexOf("email"), to: memberSource.indexOf("email") + "email".length },
         documentation: { markdown: "email\n\nEmail address." }
+    });
+  });
+
+  it("projects authorized filter overloads from explicit arguments, including quiet strings", async () => {
+    const signatures = [
+      { label: "append(first, second)", parameters: [{ name: "first" }, { name: "second" }] },
+      { label: "append(first)", parameters: [{ name: "first" }] }
+    ];
+    const getCatalog = vi.fn().mockResolvedValue({ state: "ready", data: { symbols: [
+      { id: "filter-append", name: "append", kind: "filter", signatures }
+    ] } });
+    const projection = setup(getCatalog);
+    const source = '{{ price | append: "left,right", other }}';
+    const firstArgument = source.indexOf("right") + 2;
+    const secondArgument = source.indexOf("other") + 2;
+
+    await expect(projection.signatureProvider({ ...document, value: source }, firstArgument, new AbortController().signal))
+      .resolves.toMatchObject({
+        label: "append(first, second)",
+        signatures: [
+          { label: "append(first, second)", activeParameter: 0 },
+          { label: "append(first)", activeParameter: 0 }
+        ],
+        activeParameter: 0,
+        activeSignature: 0,
+        callableId: "filter-append"
       });
+
+    await expect(projection.signatureProvider({ ...document, value: source }, secondArgument, new AbortController().signal))
+      .resolves.toMatchObject({
+        signatures: [
+          { label: "append(first, second)", activeParameter: 1 },
+          { label: "append(first)" }
+        ],
+        activeParameter: 1
+      });
+  });
+
+  it("shows actual tag signatures without guessing custom tag argument ordinals", async () => {
+    const getCatalog = vi.fn().mockResolvedValue({ state: "ready", data: { symbols: [
+      { id: "tag-custom", name: "customTag", kind: "tag", signatures: [
+        { label: "customTag(first, second)", parameters: [{ name: "first" }, { name: "second" }] }
+      ] }
+    ] } });
+    const projection = setup(getCatalog);
+    const source = "{% customTag first, second %}";
+    const position = source.indexOf("first") + 2;
+
+    await expect(projection.signatureProvider({ ...document, value: source }, position, new AbortController().signal))
+      .resolves.toMatchObject({
+        label: "customTag(first, second)",
+        signatures: [{ label: "customTag(first, second)" }],
+        activeSignature: 0,
+        callableId: "tag-custom"
+      });
+    const result = await projection.signatureProvider({ ...document, value: source }, position, new AbortController().signal);
+    expect(result?.activeParameter).toBeUndefined();
+    expect(result?.signatures?.[0]?.activeParameter).toBeUndefined();
+  });
+
+  it("hides an explicitly empty authorized Liquid signature array", async () => {
+    const getCatalog = vi.fn().mockResolvedValue({ state: "ready", data: { symbols: [
+      { id: "filter-safe", name: "safeFilter", kind: "filter", signatures: [] }
+    ] } });
+    const projection = setup(getCatalog);
+    const source = "{{ value | safeFilter: argument }}";
+
+    await expect(projection.signatureProvider(
+      { ...document, value: source },
+      source.indexOf("argument") + 2,
+      new AbortController().signal
+    )).resolves.toBeNull();
   });
 
   it("keeps strings and raw/comment bodies quiet", async () => {

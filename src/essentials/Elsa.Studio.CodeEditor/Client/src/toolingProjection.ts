@@ -3,6 +3,7 @@ import type {
   StudioCodeCompletionProvider,
   StudioCodeDiagnostic,
   StudioCodeHoverProvider,
+  StudioCodeSignatureInfo,
   StudioCodeSignatureParameter,
   StudioCodeSignatureProvider
 } from "./types";
@@ -70,6 +71,16 @@ export interface StudioCodeToolingLanguageProjection {
   ): readonly StudioCodeToolingSymbol[];
   memberPathAt?(source: string, position: number, includeCurrentWord: boolean): readonly string[] | undefined;
   callableNameAt?(source: string, position: number): string | undefined;
+  signatureContextAt?(
+    source: string,
+    position: number
+  ): StudioCodeToolingSignatureContext | null | undefined | Promise<StudioCodeToolingSignatureContext | null | undefined>;
+}
+
+/** Plain language-owned callable evidence; parser nodes must not cross this seam. */
+export interface StudioCodeToolingSignatureContext {
+  callableName: string;
+  argumentOrdinal?: number;
 }
 
 export interface StudioCodeToolingCatalogClient {
@@ -220,24 +231,48 @@ export function createStudioCodeToolingProjection(options: StudioCodeToolingProj
 
   const signatureProvider: StudioCodeSignatureProvider = async (document, position, signal) => {
     if (options.authoringContext?.capabilities?.signatures === false) return null;
-    const name = options.languageProjection?.callableNameAt
-      ? options.languageProjection.callableNameAt(document.value, position)
-      : (callableWordAt(document.value, position) ?? wordAt(document.value, position)).text;
+    const projection = options.languageProjection;
+    const signatureContext = projection?.signatureContextAt
+      ? await projection.signatureContextAt(document.value, position)
+      : undefined;
+    const name = projection?.signatureContextAt
+      ? signatureContext?.callableName
+      : projection?.callableNameAt
+        ? projection.callableNameAt(document.value, position)
+        : (callableWordAt(document.value, position) ?? wordAt(document.value, position)).text;
     if (!name || signal.aborted) return null;
     const symbol = (await getSymbols(name, signal)).find(candidate => candidate.name === name);
     if (signal.aborted) return null;
-    const signature = symbol?.signatures?.[0];
-    return signature
-      ? {
-          label: signature.label,
-          documentation: signature.documentation ? { markdown: signature.documentation } : undefined,
-          parameters: signature.parameters,
-          returnShapeId: signature.returnShapeId
-        }
-      : null;
+    const signatures = symbol?.signatures;
+    if (!symbol || !signatures || signatures.length === 0) return null;
+    const projected = signatures.map(signature => projectStudioCodeToolingSignature(signature, signatureContext?.argumentOrdinal));
+    return {
+      ...projected[0]!,
+      signatures: projected,
+      activeSignature: 0,
+      callableId: symbol.id ?? symbol.name
+    };
   };
 
   return { completionProvider, hoverProvider, signatureProvider };
+}
+
+/** Projects only catalog-supplied signature metadata and a parser-proven, arity-bounded argument index. */
+export function projectStudioCodeToolingSignature(
+  signature: StudioCodeToolingSignature,
+  argumentOrdinal?: number
+): StudioCodeSignatureInfo {
+  const activeParameter = typeof argumentOrdinal === "number" && Number.isInteger(argumentOrdinal) && argumentOrdinal >= 0 &&
+    argumentOrdinal < (signature.parameters?.length ?? 0)
+    ? argumentOrdinal
+    : undefined;
+  return {
+    label: signature.label,
+    documentation: signature.documentation ? { markdown: signature.documentation } : undefined,
+    parameters: signature.parameters,
+    returnShapeId: signature.returnShapeId,
+    ...(activeParameter === undefined ? {} : { activeParameter })
+  };
 }
 
 /** Associates backend semantic diagnostics with the active editor document. */

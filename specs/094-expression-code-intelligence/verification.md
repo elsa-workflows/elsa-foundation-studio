@@ -20,13 +20,133 @@ Root and independent source review identify a separate reproducible predicate de
 
 ## Retained historical checkpoints
 
-Last reconciled: 2026-10-06 for Program #2310 final automated M3 proof and M4 Task#568 verification corrections; all PRs draft/unmerged, current-head manual AT and human acceptance pending
+Last reconciled: 2026-10-06 for Program #2310 T036 acceptance and in-progress T037 integration; all PRs draft/unmerged, current-head manual AT and human acceptance pending
 
 ## Program #2310 status
 
-T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head automated M2 gate under the documented unavailable-external-review fallback. Studio spike #553 / T035 settles the technical decision: reject the current deeper-service candidate and retain the baseline path. No deeper-service dependency is adopted. T032-T034 pass their final exact-head automated M3 gate below, permitting assigned M4 Task#568 / T036. Three-theme presentation, active parameters/overloads, formatting and current-head manual accessibility/continuity acceptance (T036-T038) remain open. The 2026-07-28 evidence remains historical. All program PRs remain draft and unmerged; final human acceptance is outstanding.
+T026-T029 pass at the exact M1 pair below. T030-T031 pass their exact-head automated M2 gate under the documented unavailable-external-review fallback. Studio spike #553 / T035 settles the technical decision: reject the current deeper-service candidate and retain the baseline path. No deeper-service dependency is adopted. T032-T034 pass their final exact-head automated M3 gate below. T036 passes its immutable bc305150/5cd44d63 automated gate; Task#572 / Decision20 now owns T037 signature/formatting implementation. T037-T038 and current-head manual accessibility/human acceptance/delivery remain open. The 2026-07-28 evidence remains historical. All program PRs remain draft and unmerged.
 
 ## Verification evidence
+
+### T037 integration dd6bc1aa — complete gate pending
+
+Studio `dd6bc1aa7ff591ffdb6f4a66ec6a7e8922e5a459` / clean immutable Foundation
+`5cd44d6312d9de85b13f4619fc7aa972a557d033` pass root canonical coherent rebuilt normal
+hosts5/5 (9.4m, initially under high machine load). Actual compact/expanded JS/Liquid button
+and shortcut formatting, persisted source, completed announcement, same editor and one-step
+undo pass. The theme journey additionally proves the Liquid match-start is horizontally clipped
+while the native caret remains visible on the same visual row, then completion stays visible.
+Activity Definition and both independent missing-module/provider paths pass. Log:
+`/private/tmp/elsa-572-root-normal-host-dd6bc1aa.log`.
+
+Exact-head CI37412147300 fails the layout gate because the new paired-runtime harness was
+not registered in `Elsa.Studio.slnx`; generic Chromium passes, paired-host job remains running
+at this reconciliation. The solution registration correction uses explicit `Build=false`,
+not a layout exception: paired CI still obligatorily builds/runs the harness directly. Native
+SDK10.0.300 scratch solution restore/build both prove this excludes the harness without a
+Foundation root. Logs: `/private/tmp/elsa-572-parity-solution-restore-probe.log`,
+`/private/tmp/elsa-572-parity-solution-build-probe.log`,
+`/private/tmp/elsa-572-root-ci-dd6bc1aa-static.log`. The corrected actual Studio solution
+restore/build passes without a Foundation root (0 warnings/errors), and the unchanged layout
+guard passes20 projects/20 packages/19 module roots. Logs:
+`/private/tmp/elsa-572-root-solution-registration.log`,
+`/private/tmp/elsa-572-root-layout-registration.log`. Successor exact-head CI remains pending;
+this checkpoint does not accept T037.
+
+Full repository lint passes with48 pre-existing warnings/0errors, and full workspace typecheck
+passes after registration. Logs: `/private/tmp/elsa-572-root-full-lint-registration.log`,
+`/private/tmp/elsa-572-root-full-typecheck-registration.log`.
+
+Independent latest-delta source review finds no blocker in native control focus, cancellation,
+status preservation or conservative formatters, and flags the solution restore risk above.
+Root retains final integration/QA; this review is not browser/runtime/human acceptance.
+
+### Earlier T037 checkpoints — not accepted
+
+Current in-progress integration resolves native-action focus boundaries, URI/session identity,
+render-time async provider generation and layout-phase source/provider invalidation. Initial
+passive formatter cleanup after lazy mounting could cancel the first action: localized with a
+value-free stack diagnostic, then moved into layout phase; temporary diagnostics are removed.
+Final affected suites pass240/240 (CodeEditor196, JavaScript16, Liquid28), including
+program-grammar controls and focus recovery before signature-authority refresh removes its
+focused native control. Owning TypeScript checks, changed-source ESLint, CSS Stylelint and
+diff check pass. Log: `/private/tmp/elsa-572-root-final-affected-units.log`.
+
+Actual registered-runtime parity passes ten synthetic fixtures against clean pinned Foundation5cd44d63:
+meaningfully changed JavaScript expression/program and Liquid filter output, opaque tokens/ASI,
+undefined versus JSON null and exact quiet Liquid text/tag/raw/comment/trim outputs.
+An intentional changed arithmetic output fails the actual runtime golden; it is restored.
+Removing overlap/same-position/ordering validation makes three real atomic-edit tests fail;
+that mutation is also restored. Logs: `/private/tmp/elsa-572-root-runtime-parity.log`,
+`/private/tmp/elsa-572-root-runtime-parity-mutation.log`,
+`/private/tmp/elsa-572-root-atomic-edit-mutation.log`.
+
+The final integration rerun also passes all ten fixtures after the program-grammar guard;
+log: `/private/tmp/elsa-572-root-runtime-parity-final.log`. This is actual registered runtime
+proof, not a substitute for the still-pending rebuilt normal-host and exact-head CI gates.
+
+The first coherent integration rebuild finishes4/5 (4.5m): the existing theme/fresh-hover,
+Activity Definition and both missing-module/provider paths pass. The persisted workflow case
+proves changed formatting source persisted, then fails because autosave erases its completed
+live announcement. Root keeps completed announcements through host acknowledgements but still
+cancels pending work and clears status on new source/selection edits. Targeted announcement/
+native-boundary controls reproduce RED2failed/37passed then GREEN39/39. Chromium separately
+confirms disabling the focused native button loses focus; navigation now uses bounded no-op
+`aria-disabled` actions without disabling/removing that control. Explicit format/overload
+Escape-to-editor/native-Tab controls reproduce RED2failed then GREEN2/2. Corrected coherent
+host proof remains pending. Logs: `/private/tmp/elsa-572-root-normal-host-integration.log`,
+`/private/tmp/elsa-572-root-status-focus-red.log`,
+`/private/tmp/elsa-572-root-status-focus-green.log`,
+`/private/tmp/elsa-572-root-control-exit-red.log`,
+`/private/tmp/elsa-572-root-control-exit-green.log`.
+
+Program formatting additionally declines JSX/TypeScript/module constructs accepted by the
+broader legacy authoring grammar but unsupported by the registered runtime. JSX/TypeScript
+quiet controls reproduce two failures; installed plain-parser checks alone miss a TypeAnnotation,
+so the selected-tree feature-node guard is also required. Final affected-suite verification
+passes; corrected coherent rebuilt-host verification remains pending. Independent source-only review confirms the earlier
+old-entry/pinned-dirty-source gaps are closed; it does not claim hosted/runtime acceptance.
+
+DraftPR#574 starts at Studio `863e55ef712e62cb6023b659a6efd4d83bd3122b`
+on immutable Foundation `5cd44d6312d9de85b13f4619fc7aa972a557d033`.
+[CI37408723729](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37408723729)
+is terminal failed: generic Chromium passes; the units job has two failing synthetic-blur
+tests (118 pass), and normal hosts pass four cases but fail the theme journey's fresh-hover
+revision assertion at line203 after its unchanged30s limit (6.1m).
+Log: `/private/tmp/elsa-572-root-ci-863e55ef-failed.log`.
+
+The two unit fixtures dispatch a synthetic blur without moving native focus outside the
+editor. The corrected fixtures use actual native blur and retain their parked-view and
+repeated-activation assertions. Current root wrapper/controller suites pass68/68, including
+internal native-button focus, explicit button/shortcut formatting, atomic selection/edit
+validation, late-result rejection and one-step undo. Log:
+`/private/tmp/elsa-572-root-engine-wrapper-tests-final.log`.
+This is focused in-progress evidence, not acceptance. The hosted fresh-hover failure remains
+unaccepted until a coherent rebuilt run proves the current integration. T037 implementation,
+production-runtime formatting parity, T038, manual AT and human acceptance remain open.
+
+### Final T036 automated technical gate, 2026-10-06
+
+Immutable Studio `bc3051501a4ec8bf391e8bb80727339409b77f98` / Foundation
+`5cd44d6312d9de85b13f4619fc7aa972a557d033` pass root coherent rebuilt normal hosts **5/5 (6.1m)**
+and exact-head [CI37407169529](https://github.com/elsa-workflows/elsa-foundation-studio/actions/runs/37407169529)
+**all jobs**, including full units/three Workflows shuffle seeds/lint/typecheck/bundles,
+generic Chromium, Foundation persisted-host envelopes and paired normal hosts **5/5 (6.3m)**.
+The CI log records both exact revisions. Final CodeEditor119/119, owning tsc, scoped ESLint,
+diff and frozen/offline install pass. Original-dependency anchor RED2failed/12passed becomes
+patched GREEN14/14, with final geometry controls and all retained predecessor failures below.
+Root integrated-delta review and independent current patch/harness review find no blocker.
+Copilot is explicitly re-requested but actual requests/reviews remain empty; the documented
+unavailable-external-review fallback is used, not actual external approval.
+
+Unchanged exact rebuilt budgets: primary127.44/127.50kB, stylesheet145.19/185kB,
+definitions379.97/384.50kB, upgrades369.97/375.50kB, largest263.18/500kB, eight heavy surfaces deferred.
+Logs: `/private/tmp/elsa-568-root-all-five-bc305150.log` and
+`/private/tmp/elsa-568-root-ci-bc305150-pass.log`. DraftPR#569 stays draft/open/unmerged;
+Task#568 implementation claim is released and automated verification is Passed.
+This clears T037's dependency, assigned Task#572 / Decision20. Manual AT, human acceptance,
+T038 and delivery stay OPEN. This reconciliation is recorded on the child without moving
+the immutable tested T036 head; candidate evidence below retains its historical boundaries.
 
 ### M4 T036 guarded completion-anchor candidate (not accepted)
 

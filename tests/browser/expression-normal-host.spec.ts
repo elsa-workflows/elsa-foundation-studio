@@ -20,6 +20,7 @@ completeTest("persisted workflow drafts use live JavaScript and Liquid assistanc
 
   await exerciseWorkflowAssistance(page, hostPair, compactJavaScript, draft, traffic, "JavaScript");
   await exerciseJavaScriptDepth(page, hostPair, compactJavaScript, draft, traffic);
+  await exerciseExplicitFormatting(page, hostPair, compactJavaScript, draft, traffic, "JavaScript", "button");
   await exerciseJavaScriptConformance(page, hostPair, compactJavaScript, draft, traffic, [
     { source: "(value: number) => value", code: "JavaScript/Syntax" },
     { source: "<span />", code: "JavaScript/Syntax" },
@@ -33,6 +34,7 @@ completeTest("persisted workflow drafts use live JavaScript and Liquid assistanc
   await expect(expandedJavaScript).toContainText("args.customerName");
   await exerciseWorkflowAssistance(page, hostPair, expandedJavaScript, draft, traffic, "JavaScript");
   await exerciseJavaScriptDepth(page, hostPair, expandedJavaScript, draft, traffic);
+  await exerciseExplicitFormatting(page, hostPair, expandedJavaScript, draft, traffic, "JavaScript", "shortcut");
   await exerciseJavaScriptConformance(page, hostPair, expandedJavaScript, draft, traffic, [
     { source: "Math.random()", code: "JavaScript/AmbientCapability" }
   ]);
@@ -49,12 +51,14 @@ completeTest("persisted workflow drafts use live JavaScript and Liquid assistanc
   await expect(compactLiquid).toBeVisible();
   await exerciseWorkflowAssistance(page, hostPair, compactLiquid, draft, traffic, "Liquid");
   await exerciseLiquidDepth(page, hostPair, compactLiquid, draft, traffic);
+  await exerciseExplicitFormatting(page, hostPair, compactLiquid, draft, traffic, "Liquid", "button");
   await replaceEditorSource(page, compactLiquid, `{{ customerName }} {{ predecessor.${draft.outputName} }}`);
   await page.getByRole("button", { name: `Open expanded ${draft.inputName} editor` }).click();
   const expandedLiquid = page.getByRole("dialog").locator(".studio-code-editor-rich-expanded .cm-content");
   await expect(expandedLiquid).toContainText("customerName");
   await exerciseWorkflowAssistance(page, hostPair, expandedLiquid, draft, traffic, "Liquid");
   await exerciseLiquidDepth(page, hostPair, expandedLiquid, draft, traffic, true);
+  await exerciseExplicitFormatting(page, hostPair, expandedLiquid, draft, traffic, "Liquid", "shortcut");
   await replaceEditorSource(page, expandedLiquid, `{{ customerName }} {{ predecessor.${draft.outputName} | string }}`);
   await page.getByRole("dialog").getByRole("button", { name: `Close ${draft.inputName} editor` }).click();
   await expect(page.getByRole("button", { name: "Liquid expression. Activate to edit." })).toContainText("string");
@@ -171,6 +175,7 @@ completeTest("normal-host expression previews and help remain readable in Light,
       const position = language === "JavaScript" ? source.indexOf("abs") + 4 : source.indexOf("append") + 6;
       await moveEditorCursor(editor, source, position);
       const section = editor.locator("xpath=ancestor::section[@data-studio-code-editor='true'][1]");
+      await expectReadableCodeSurface(section.locator(".studio-code-editor-actions"));
       const signature = section.locator(".studio-code-editor-signature");
       await expect(signature).toContainText(language === "JavaScript" ? "abs(x): Number" : "append(value): String");
       await expectReadableCodeSurface(signature);
@@ -186,6 +191,12 @@ completeTest("normal-host expression previews and help remain readable in Light,
       const completionPosition = language === "JavaScript" ? source.indexOf("abs") + 2 : position;
       await moveEditorCursor(editor, source, completionPosition);
       await expect.poll(() => readNativeEditorCaret(editor)).toEqual({ offset: completionPosition, visible: true });
+      if (language === "Liquid") {
+        // Preserve the actual T036 fallback precondition: clipped token start, same-row
+        // visible caret. A later layout change must not turn this into a vacuous anchor test.
+        await expect.poll(() => readCompletionAnchorPrecondition(editor, source.indexOf("append")))
+          .toEqual({ startClipped: true, sameRow: true });
+      }
       await expect(async () => {
         await editor.press("Control+Space");
         const menu = page.locator(".cm-tooltip-autocomplete");
@@ -567,6 +578,28 @@ async function expectHorizontalEditorNavigation(editor: Locator, source: string)
   await expect.poll(() => readEditorSource(editor)).toBe(source);
 }
 
+async function readCompletionAnchorPrecondition(editor: Locator, position: number) {
+  return editor.evaluate((element, offset) => {
+    const viewport = element.closest(".cm-scroller")?.getBoundingClientRect();
+    const selection = window.getSelection();
+    if (!viewport || !selection?.isCollapsed || !selection.rangeCount || !element.contains(selection.anchorNode)) return null;
+    const caret = selection.getRangeAt(0).getBoundingClientRect();
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    let remaining = offset;
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const length = node.textContent?.length ?? 0;
+      if (remaining > length) { remaining -= length; continue; }
+      const range = document.createRange();
+      range.setStart(node, remaining);
+      range.collapse(true);
+      const start = range.getBoundingClientRect();
+      return { startClipped: start.left < viewport.left || start.right > viewport.right,
+        sameRow: Math.abs(start.top - caret.top) < 1 && Math.abs(start.bottom - caret.bottom) < 1 };
+    }
+    return null;
+  }, position);
+}
+
 async function readNativeEditorCaret(editor: Locator) {
   return editor.evaluate(element => {
     const selection = window.getSelection();
@@ -713,12 +746,13 @@ async function exerciseJavaScriptDepth(page: Page, pair: NormalHostPair, editor:
     await expect(editor).toContainText(source);
   }
 
-  const source = "Math.abs(-2)";
+  const source = "Math.pow(2, 3)";
   await replacePersistedWorkflowSource(page, pair, editor, draft, traffic, "JavaScript", source);
-  await editor.press("End");
-  for (let step = 0; step < 3; step++) await editor.press("ArrowLeft");
-  await expect(editor.locator("xpath=ancestor::section[@data-studio-code-editor='true'][1]")
-    .locator(".studio-code-editor-signature")).toContainText("abs(x): Number");
+  await moveEditorCursor(editor, source, source.indexOf("3"));
+  const signature = editor.locator("xpath=ancestor::section[@data-studio-code-editor='true'][1]")
+    .locator(".studio-code-editor-signature");
+  await expect(signature).toContainText("pow(base, exponent): Number");
+  await expect(signature.locator(".studio-code-editor-signature-parameter")).toContainText("exponent");
   await expect(editor).toContainText(source);
 }
 
@@ -769,6 +803,11 @@ async function exerciseLiquidDepth(page: Page, pair: NormalHostPair, editor: Loc
   await moveEditorCursor(editor, source, marked.indexOf("¦"));
   const section = editor.locator("xpath=ancestor::section[@data-studio-code-editor='true'][1]");
   await expect(section.locator(".studio-code-editor-signature")).toContainText("append(value): String");
+  // The filter name is not an argument. Only its explicit colon argument proves parameter0.
+  await expect(section.locator(".studio-code-editor-signature-parameter")).toHaveText("");
+  await moveEditorCursor(editor, source, source.indexOf("'x'") + 1);
+  await expect(section.locator(".studio-code-editor-signature-parameter")).toContainText("value");
+  await moveEditorCursor(editor, source, marked.indexOf("¦"));
   await editor.press("Alt+i");
   await expect(page.getByRole("status", { name: "Hover information" }))
     .toContainText("Appends the argument to the input text.");
@@ -791,6 +830,35 @@ async function exerciseLiquidDepth(page: Page, pair: NormalHostPair, editor: Loc
   await editor.press("ControlOrMeta+Z");
   await expect.poll(() => readEditorSource(editor)).toBe(template);
   await expect.poll(() => readPersistedSource(page, pair, draft)).toBe(template);
+}
+
+async function exerciseExplicitFormatting(page: Page, pair: NormalHostPair, editor: Locator,
+  draft: PersistedExpressionDraft, traffic: SafeBackendTraffic[], language: "JavaScript" | "Liquid", action: "button" | "shortcut") {
+  const source = language === "JavaScript" ? "args.customerName+ '!'" : "  Hello {{customerName|append: '  exact  '}}!  ";
+  const formatted = language === "JavaScript" ? "args.customerName + '!'" : "  Hello {{customerName | append: '  exact  '}}!  ";
+  await replacePersistedWorkflowSource(page, pair, editor, draft, traffic, language, source);
+  const section = editor.locator("xpath=ancestor::section[@data-studio-code-editor='true'][1]");
+  const format = section.getByRole("button", { name: "Format source", exact: true });
+  await expect(format).toBeEnabled();
+  // Mere availability must not normalize source or create an extra history entry.
+  await expect.poll(() => readEditorSource(editor)).toBe(source);
+  const nativeEditor = await editor.elementHandle();
+  if (action === "button") {
+    await format.focus();
+    await expect(format).toBeFocused();
+    await expect(editor).toBeVisible();
+    await format.press("Enter");
+    await expect(format).toBeFocused();
+  } else await editor.press("Alt+Shift+f");
+  await expect.poll(() => readEditorSource(editor)).toBe(formatted);
+  await expect.poll(() => readPersistedSource(page, pair, draft)).toBe(formatted);
+  expect(await editor.evaluate((element, original) => element === original, nativeEditor)).toBe(true);
+  await expect(section.getByRole("status")).toContainText("Source formatted. Undo restores the original source.");
+  await editor.focus();
+  await editor.press("ControlOrMeta+Z");
+  await expect.poll(() => readEditorSource(editor)).toBe(source);
+  await expect.poll(() => readPersistedSource(page, pair, draft)).toBe(source);
+  await nativeEditor?.dispose();
 }
 
 async function readEditorSource(editor: Locator) {

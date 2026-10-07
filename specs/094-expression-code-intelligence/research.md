@@ -221,6 +221,16 @@ proof, with controlled-removal or tests-first failures for adverse boundaries. M
 formatting remain separate. Final-head CI/review and manual acceptance are not inferred from the
 reviewed predecessor's local browser pass; all PRs stay draft and unmerged.
 
+## Decision 20: Authorized signature semantics and explicit conservative formatting
+
+Studio Task#572 owns T037 on the immutable passing T036 pair Studio bc305150 / Foundation5cd44d63.
+The frozen [internal signature/formatting contract](contracts/signatures-and-formatting.md) specifies
+actual authorized arrays, parser-proven per-item parameters, conservative formatter boundaries,
+shared focus/lifecycle ownership and pinned production-runtime differential proof. It is additive
+internal infrastructure under ADR0002/0006, not an SDK/wire/runtime contract or shipping claim.
+Root reviews two disjoint bounded writers and owns shared engine integration and complete gates.
+All PRs stay draft/unmerged; T038/manual AT/human acceptance and delivery remain open.
+
 ## Decision 19: Bounded presentation-only syntax previews and shared theme roles
 
 **Decision**: Studio Task#568 owns T036, starting from the passing automated M3 pair

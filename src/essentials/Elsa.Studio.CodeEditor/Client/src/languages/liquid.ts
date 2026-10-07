@@ -10,6 +10,10 @@ export const liquidLanguageAdapter: StudioCodeLanguageAdapter = {
   async loadSupport() {
     return { language: "liquid" };
   },
+  async loadFormatter() {
+    const module = await import("./liquidFormatting");
+    return module.formatLiquid;
+  },
   async loadPreviewHighlighter() {
     const module = await import("../engines/liquidPreview");
     return module.createLiquidPreviewHighlighter();

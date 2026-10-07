@@ -141,6 +141,34 @@ describe("Liquid cursor classification", () => {
     });
   });
 
+  it("classifies only explicit Liquid filter arguments, even inside a quiet string", async () => {
+    const classify = createLiquidCursorClassifier();
+    const source = '{{ price | append: "left,right", other | join: delimiter }}';
+    const firstArgument = source.indexOf("right") + 2;
+    const secondArgument = source.indexOf("other") + 2;
+    const pipedValue = source.indexOf("price") + 2;
+
+    expect(await classify(source, firstArgument)).toMatchObject({
+      region: "quiet",
+      signatureContext: { callableName: "append", argumentOrdinal: 0 }
+    });
+    expect(await classify(source, secondArgument)).toMatchObject({
+      signatureContext: { callableName: "append", argumentOrdinal: 1 }
+    });
+    expect(await classify(source, pipedValue)).not.toHaveProperty("signatureContext");
+  });
+
+  it("exposes tag identity without guessing the tag argument ordinal", async () => {
+    const classify = createLiquidCursorClassifier();
+    const source = "{% customTag first, second %}";
+    const cursor = source.indexOf("first") + 2;
+
+    expect(await classify(source, cursor)).toMatchObject({
+      signatureContext: { callableName: "customTag" }
+    });
+    expect(await classify(source, cursor)).not.toHaveProperty("signatureContext.argumentOrdinal");
+  });
+
   it("uses a zero-width range in plaintext and refuses oversized documents", async () => {
     const classify = createLiquidCursorClassifier();
     expect(await classify("plain text", 5)).toMatchObject({ region: "text", from: 5, to: 5, prefix: "" });

@@ -159,3 +159,6 @@ jobs:
         # The dedicated setup builds both actual applications from these checkouts. Each variant
         # owns fresh SQLite/configuration and only its own child processes; traces remain off.
         run: pnpm test:browser:expression-normal-host
+
+      - name: Prove actual formatter production-runtime parity
+        run: pnpm test:expression-formatting:parity
