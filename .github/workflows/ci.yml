@@ -47,6 +47,9 @@ jobs:
         # One package at a time, so the Workflows suite does not compete with the others for the runner's cores.
         run: pnpm --recursive --workspace-concurrency=1 test
 
+      - name: Prove assistance traffic provenance
+        run: node --test scripts/expression-assistance-traffic.test.mjs
+
       # Fixed seeds catch order-dependent tests deterministically: a PR that introduces one fails on
       # every run, never at random on a later PR (#512).
       - name: Unit tests (Workflows, shuffled)
