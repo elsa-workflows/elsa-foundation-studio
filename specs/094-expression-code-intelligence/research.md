@@ -103,3 +103,49 @@
 **Decision**: Render module documentation as sanitized Markdown with HTML and executable links disabled. Telemetry records only aggregate usage, latency, availability, and non-sensitive error codes.
 
 **Rationale**: Catalog documentation is untrusted, and expression/source-derived identifiers can contain secrets or business data.
+
+## Decision 11: Installed text syntax requires explicit readiness conformance
+
+**Decision**: Treat an installed runtime Expression Type, its Studio editor Contribution, and its Foundation tooling provider as independently composed capabilities. Studio reports their resolved readiness and degrades explicitly when one part is missing.
+
+**Rationale**: Runtime installation does not prove that the editor module loaded or that backend tooling is reachable. A plain input must not silently look like the intended developer experience.
+
+**Alternatives considered**:
+
+- Infer readiness from the expression descriptor alone: rejected because PR #546 proved editor modules can be absent while the runtime type exists.
+- Force every Expression Type into the code editor: rejected because reference and structured types have purpose-built editors.
+
+## Decision 12: JavaScript editing follows the runtime expression grammar
+
+**Decision**: Configure local JavaScript parsing and advertised libraries for expressions only. Do not enable TypeScript, JSX, statement bodies, DOM, browser, or Node APIs unless the Foundation runtime explicitly supports them.
+
+**Rationale**: Editor acceptance and completion are promises about executable source. A broader browser-side grammar creates false positives that authoritative validation must later retract.
+
+**Alternatives considered**:
+
+- Keep the current TypeScript/JSX parser for richer coloring: rejected because visual acceptance implies unsupported source is viable.
+- Adopt a full language service immediately: deferred behind a bounded spike; baseline grammar alignment and local completion merging are smaller reversible changes.
+
+## Decision 13: Merge local and runtime-owned JavaScript assistance
+
+**Decision**: Preserve useful CodeMirror-local JavaScript completions and snippets while combining them with authorized workflow/context results. Runtime-owned items retain authority for workflow scope and known shapes, with deterministic de-duplication and ranking.
+
+**Rationale**: Replacing the local completion source removes local bindings and snippets; using only local help loses workflow scope and permission filtering.
+
+## Decision 14: Liquid help uses effective runtime metadata and parser position
+
+**Decision**: Foundation exposes the same binding-pure Liquid filter/tag profile used by runtime evaluation. Studio classifies interpolation, filter, tag and template positions before presenting values, filters, tags, snippets and signatures.
+
+**Rationale**: A fresh default parser catalog can advertise filters or tags unavailable in the actual host, while a single prefix list cannot provide relevant help at different Liquid positions.
+
+## Decision 15: Formatting is language-owned, explicit and behavior-preserving
+
+**Decision**: Each language advertises a formatter only after tests prove runtime-equivalent output; formatting is a single undoable edit. Liquid formatting preserves meaningful whitespace and trim markers.
+
+**Rationale**: Generic or automatic formatting can change template output and violates the exact-source editing contract.
+
+## Decision 16: Bound the deeper JavaScript language-service spike
+
+**Decision**: Limit the spike to two engineer-days and a disposable prototype. Adoption requires all of the following evidence: runtime-specific declarations contain no DOM or Node surface; analysis runs in a cancellable worker and rejects stale results; the service loads lazily and stays within the existing Workflows bundle gate; current completion, keyboard and screen-reader flows remain operable; and disabling the prototype restores the baseline local-plus-authorized completion path without source loss. If any gate fails or remains unproved at the timebox, reject the dependency and continue with the baseline projection.
+
+**Rationale**: A timebox and binary exit criteria prevent an optional inference experiment from delaying the required runtime-compatible experience or becoming an unreviewed architecture commitment.

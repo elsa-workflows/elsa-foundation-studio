@@ -1,6 +1,8 @@
 # Tasks: Expression Code Intelligence
 
-All implementation tasks are complete. File names below reflect the landed design rather than provisional planning names.
+Baseline implementation tasks are complete. File names below reflect the landed design rather than provisional planning names.
+
+The baseline tasks T001-T025 are historical. Program #2310 reopens this feature for the dependency-ordered completion tasks T026-T038 below; they are not complete until current-head normal-host evidence passes.
 
 ## Contracts and transport
 
@@ -41,3 +43,29 @@ All implementation tasks are complete. File names below reflect the landed desig
 - [x] T023 Reconcile the OpenAPI fixture with Foundation work unit 143 and record verification evidence.
 - [x] T024 Run repository lint/typecheck/build, focused regression suites, browser tests, and Foundation coordinated gates.
 - [x] T025 Complete iterative cross-repository self-review and required manual assistive-technology acceptance with no actionable release blockers.
+
+## Program #2310 continuation: User Story 5 — Trust installed text-syntax support
+
+- [ ] T026 [US5] Add the normal-host Playwright configuration, package script and persisted-workflow JavaScript/Liquid journey in `tests/browser/playwright.expression-normal-host.config.ts`, `package.json` and `tests/browser/expression-code-intelligence.normal-host.spec.ts`, including matching Studio/Foundation host startup and teardown plus every currently supported workflow and activity-definition authoring surface.
+- [ ] T027 [P] [US5] Add installed text-syntax readiness and independent module/provider degradation handling in `src/essentials/Elsa.Studio.Workflows/Client/src/ActivityPropertiesPanel.tsx` and focused Workflows tests.
+- [ ] T028 [US5] Add a negative normal-host regression that removes one editor feature and one backend capability in turn and asserts the exact missing/degraded state in `tests/browser/expression-code-intelligence.normal-host.spec.ts`; do not modify the merged #545 discovery guard.
+- [ ] T029 [US5] Record rebuilt Studio/Foundation normal-host evidence, exact revisions and `pnpm test:browser:expression-normal-host` results in `specs/094-expression-code-intelligence/verification.md`.
+- [ ] T030 [US5] Align JavaScript expression-editor grammar and local diagnostics with the runtime expression grammar in `src/essentials/Elsa.Studio.CodeEditor/Client/src/languages/javascriptCodeMirror.ts` and its tests after T029 passes. Apply this only to the explicit expression profile; preserve the shared script/TypeScript/JSX project-file grammar.
+- [ ] T031 [US5] Add installed-text-syntax conformance cases for missing adapters/providers, permissions, incompatibility, incomplete source, syntax switching and independent composition under `tests/browser/` and the expression-editor module tests after T029 passes.
+
+## Program #2310 continuation: User Story 6 — Receive precise, readable language help
+
+- [ ] T032 [US6] Merge local JavaScript completion/snippet sources with authorized workflow assistance in `src/essentials/Elsa.Studio.CodeEditor/Client/src/engines/codeMirrorCodeIntelligence.ts` and its tests after T031 passes.
+- [ ] T033 [P] [US6] Project parser-position-aware Liquid values, filters, tags, snippets and signatures in `src/extensions/Elsa.Studio.ExpressionEditors.Liquid/Client/src/` with focused tests, consuming the runtime-profile evidence delivered by Foundation spec 143 T028-T029.
+- [ ] T034 [P] [US6] Deepen JavaScript local/member/signature projection without DOM or Node globals in `src/extensions/Elsa.Studio.ExpressionEditors.JavaScript/Client/src/` with focused tests and Foundation spec 143 T028 parity evidence.
+- [ ] T035 [US6] Complete the two-engineer-day deeper-JavaScript-language-service spike defined by Decision 16 in `specs/094-expression-code-intelligence/research.md`; adopt a dependency only if every binary runtime-declaration, worker/cancellation, stale-result, existing-bundle, accessibility and fallback gate passes.
+- [ ] T036 [US6] Add Studio-token themes, lightweight highlighted previews, readable help/diagnostics and light/dark/dim coverage in `src/essentials/Elsa.Studio.CodeEditor/Client/src/` and its styles/tests after T033-T035 settle language behavior.
+- [ ] T037 [P] [US6] Add active-parameter and overload navigation plus explicit behavior-preserving JavaScript/Liquid format actions in the shared editor and language modules with undo/whitespace tests.
+- [ ] T038 [US6] Run and document the current-head real-browser theme, narrow inspector, multiline paste, source/cursor/undo, keyboard exit/help/completion and screen-reader acceptance matrix in `specs/094-expression-code-intelligence/verification.md`.
+
+## Dependencies
+
+- T026 is the first executable implementation leaf; T027-T028 may follow on the same integration head, and T029 closes milestone 1 only after all three pass.
+- T030-T031 remain Not Ready until T029 passes.
+- T032-T035 remain Not Ready until T031 and the linked Foundation provider tasks pass.
+- T036-T038 remain Not Ready until T032-T035 settle the language behavior they present.

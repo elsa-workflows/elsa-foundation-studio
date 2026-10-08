@@ -4,9 +4,11 @@
 
 **Created**: 2026-07-28
 
-**Status**: Implemented
+**Status**: Active hardening and completion under Foundation Program #2310 (baseline implemented 2026-07-28; continuation approved 2026-10-02)
 
 **Input**: User description: "Provide JavaScript and Liquid expressions with syntax highlighting, context-aware code intelligence, diagnostics, and a consistent rich editing experience in compact single-line property fields and expanded editors."
+
+**Program continuation**: The implemented baseline remains authoritative, but its historical fixture evidence does not prove normal-host integration. Program #2310 extends acceptance to every installed supported text Expression Type, reconciles JavaScript and Liquid help with their runtime semantics, and completes the real-workflow presentation and accessibility experience without replacing the existing editor or expression-module boundaries.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -90,6 +92,42 @@ A workflow author can continue viewing and editing source when language tooling 
 4. **Given** tooling reports no symbols, **When** Studio receives the response, **Then** it distinguishes a valid empty catalog from unavailable, unauthorized, and incompatible states.
 5. **Given** a keyboard-only or screen-reader user, **When** they edit, complete, inspect, diagnose, expand, or leave an expression, **Then** every action remains discoverable and operable.
 6. **Given** a supported touch browser, **When** the author edits an expression, **Then** highlighting, completion, diagnostics, selection, and expansion remain functional.
+
+---
+
+### User Story 5 - Trust installed text-syntax support (Priority: P1)
+
+A workflow author selecting an installed supported text Expression Type can immediately tell whether rich editing and runtime-owned assistance are ready. The editor accepts only syntax that the runtime can execute, and it explains missing, unauthorized, incompatible, or partially composed capabilities without pretending that a plain text field is a complete experience.
+
+**Why this priority**: An installed Expression Type that silently falls back or advertises a broader grammar than the runtime creates false confidence and makes every later assistance improvement unreliable.
+
+**Independent Test**: In a normally composed Studio connected to a rebuilt Foundation host, create a persisted workflow with scoped inputs, variables, and activity outputs; select each installed supported text Expression Type and verify editor readiness, runtime-compatible syntax, location-scoped help, and each degraded state through the real property inspector.
+
+**Acceptance Scenarios**:
+
+1. **Given** an installed supported text Expression Type with its editor and backend provider composed, **When** the author selects it, **Then** the inspector shows a syntax-aware editor whose advertised capabilities match the provider.
+2. **Given** the runtime Expression Type is installed but its editor adapter or tooling provider is missing, **When** the author selects it, **Then** Studio preserves the source and identifies the missing capability instead of silently presenting the degraded editor as fully ready.
+3. **Given** JavaScript source containing TypeScript, JSX, statements, browser APIs, or Node APIs that the runtime does not support, **When** the author edits or validates it, **Then** the editor does not present that construct or API as executable JavaScript.
+4. **Given** independently composed JavaScript and Liquid modules, **When** one module is unavailable, unauthorized, or incompatible, **Then** the other module remains usable and reports only its own state.
+5. **Given** a reference or structured Expression Type, **When** the author selects it, **Then** its appropriate picker or structured editor remains in use rather than being forced into a code text area.
+
+---
+
+### User Story 6 - Receive precise, readable language help (Priority: P2)
+
+A workflow author gets relevant JavaScript local/member/type help and Liquid interpolation/filter/tag help, with signatures, overloads, active parameters, documentation, diagnostics, explicit formatting, and previews that remain readable in every supported Studio theme.
+
+**Why this priority**: The baseline can display help, but an author still loses confidence when suggestions ignore language position, local JavaScript structure, the actual Liquid runtime profile, or the chosen visual theme.
+
+**Independent Test**: Author representative JavaScript locals, callbacks and member chains plus Liquid interpolation, filter and tag examples in compact and expanded surfaces; verify relevant help, precise diagnostics for mistakes that the supplied metadata proves invalid, honest unknown results for dynamic shapes, safe explicit formatting, active signature state, and readable light/dark/dim presentation while preserving source, cursor and undo continuity.
+
+**Acceptance Scenarios**:
+
+1. **Given** a JavaScript local binding or callback parameter, **When** the author requests completion or follows a known member chain, **Then** local language help and authorized workflow symbols appear together without duplicate or forbidden entries.
+2. **Given** a Liquid cursor inside interpolation, after a filter pipe, or inside a tag, **When** completion opens, **Then** values, runtime-supported filters, or runtime-supported tags respectively are prioritized with useful insertion text and argument help.
+3. **Given** a callable with multiple signatures, **When** the author enters arguments, **Then** the active overload and parameter are identified and can be navigated without obscuring the source.
+4. **Given** light, dark, or dim Studio presentation, **When** source, diagnostics, completion, hover, signature help, or an unfocused preview is shown, **Then** all information remains readable and uses the shared design-token contract.
+5. **Given** explicit formatting is supported for the selected Expression Type, **When** the author invokes it, **Then** behavior and meaningful Liquid whitespace are preserved, the edit is undoable, and no formatting occurs implicitly.
 
 ### Edge Cases
 
@@ -175,6 +213,18 @@ A workflow author can continue viewing and editing source when language tooling 
 - **FR-056**: Permission or Host Policy revision changes MUST invalidate affected catalog and value-shape caches, reauthorize active requests, and remove source or metadata from active views when the user is no longer authorized.
 - **FR-057**: The changed inspector workflows MUST use shared Studio primitives and the public `--studio-*` design-token contract.
 - **FR-058**: Verification MUST include the real activity-properties inspector in compact, expanded, loading, unavailable, unauthorized, invalid, and multiline states.
+- **FR-059**: Every installed supported text Expression Type MUST expose editor readiness and tooling-provider status as separate dimensions before activation; an available syntax editor MAY activate while tooling is degraded, but missing adapters or providers MUST remain visible as distinct states.
+- **FR-060**: Normal-host verification MUST exercise a persisted workflow through the real Studio module catalog, syntax picker, property inspector, authoring-context capability links, and Foundation provider responses.
+- **FR-061**: JavaScript local grammar, completions, diagnostics, and advertised APIs MUST be a subset of the runtime expression grammar and host-provided runtime surface; TypeScript, JSX, statement bodies, browser APIs, and Node APIs MUST NOT be implied when unavailable at runtime.
+- **FR-062**: JavaScript assistance MUST combine useful local language completions with authorized workflow/catalog completions instead of replacing either source wholesale.
+- **FR-063**: Liquid assistance MUST distinguish interpolation, filter, tag, and plain-template positions and MUST source filter/tag metadata from the runtime's effective Liquid profile.
+- **FR-064**: Known member, callable, and argument-shape mistakes that the supplied metadata proves invalid MUST produce precise diagnostics, while unknown dynamic shapes MUST remain honestly unknown rather than being rejected as known-invalid.
+- **FR-065**: Signature help MUST identify the active overload and parameter and allow accessible overload navigation when multiple signatures exist.
+- **FR-066**: Syntax colors, gutters, selections, diagnostics, completion, hover, signatures, and previews MUST use Studio design tokens and remain readable in light, dark, and dim presentation.
+- **FR-067**: Unfocused compact previews MUST preserve readable syntax emphasis without mounting a rich editor for every field.
+- **FR-068**: Explicit formatting MUST preserve executable behavior, meaningful template whitespace, source/cursor continuity, and a single undoable edit; no automatic formatting is permitted.
+- **FR-069**: Assistance MUST remain metadata-only and MUST NOT evaluate authored expressions, retrieve runtime values, or expose unavailable browser/Node capabilities.
+- **FR-070**: Conformance coverage MUST include independent language composition, missing adapters/providers, unavailable, unauthorized and incompatible tooling, incomplete source, syntax switching, authorization changes, and stale-request rejection.
 
 ### Key Entities
 
@@ -202,6 +252,11 @@ A workflow author can continue viewing and editing source when language tooling 
 - **SC-010**: Publication is rejected in 100% of validation-unavailable scenarios; Test Run presents an explicit warning and remains available.
 - **SC-011**: Automated security tests find no expression source, completion prefix, symbol name, or diagnostic message in emitted telemetry.
 - **SC-012**: The feature passes the supported desktop and touch-browser matrix with no critical or serious automated accessibility violations and documented keyboard and screen-reader acceptance runs for focus, completion, hover/signature help, diagnostics, compact-to-expanded transition, Tab-capture escape, and unavailable states.
+- **SC-013**: In a rebuilt normal-host demonstration, 100% of installed supported text Expression Types either provide their declared rich-editing capabilities or show the exact degraded state; none silently appear as complete plain-text editing.
+- **SC-014**: JavaScript conformance examples accept every documented supported expression and reject or avoid suggesting every tested runtime-unsupported construct and browser/Node global.
+- **SC-015**: Liquid conformance examples return position-appropriate values, filters, and tags from the effective runtime profile, with zero advertised filters or tags that the same host cannot execute.
+- **SC-016**: Light, dark, and dim visual review finds no unreadable syntax, diagnostic, completion, hover, signature, selection, or preview state at the supported narrow inspector width.
+- **SC-017**: Multiline paste, compact/expanded transitions, syntax switching, explicit formatting, and help interactions preserve exact source where required plus cursor and undo continuity in every applicable real-browser acceptance case.
 
 ## Assumptions
 
@@ -215,3 +270,5 @@ A workflow author can continue viewing and editing source when language tooling 
 - External module documentation is untrusted presentation content and is sanitized before display.
 - The reference performance benchmark runs in the repository's browser test harness using current stable Chromium at 4× CPU throttling on the project CI runner; results record the browser, runner class, fixture revision, samples, and percentile so regressions are reproducible.
 - Accessibility acceptance evidence uses the supported browser matrix and at least Chromium with a desktop screen reader plus Safari with VoiceOver; automated checks supplement but do not replace the documented manual flows.
+- The deeper JavaScript language-service choice is deferred to a bounded technical spike. Baseline local completion merging and runtime-grammar alignment do not depend on adopting a new service.
+- Installed supported text syntaxes participate through the existing Expression Editor Contribution and tooling contracts; reference and structured Expression Types keep their specialized editors.

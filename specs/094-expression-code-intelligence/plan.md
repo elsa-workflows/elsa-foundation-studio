@@ -1,6 +1,6 @@
 # Implementation Plan: Expression Code Intelligence
 
-**Branch**: `codex/expression-code-intelligence` | **Date**: 2026-07-28 | **Spec**: [spec.md](spec.md)
+**Branch**: `claude/2310-expression-dx-studio` | **Date**: 2026-10-02 continuation of the 2026-07-28 baseline | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from `specs/094-expression-code-intelligence/spec.md`
 
@@ -9,6 +9,8 @@
 Add rich JavaScript and Liquid expression authoring to the activity-properties inspector by extending the existing engine-neutral `Elsa.Studio.CodeEditor` package with compact and expanded CodeMirror 6 profiles, workflow-lifetime editor sessions, and neutral completion/diagnostic inputs. Extend the public Studio expression-editor SDK with stable document identity, language-neutral authoring context, capability/status envelopes, and cancellation/version metadata. JavaScript and Liquid modules remain responsible for language projection and editor adapters; Workflows remains responsible for draft/activity/property scope and consequential-action integration.
 
 Authoritative symbol metadata, source-aware completion/hover, semantic validation, and full-draft execution/publication gates are delivered by the coordinated Elsa Foundation work unit `143-expression-code-intelligence` through capability `expressions.tooling.v1`. Studio discovers those additive API relations, uses them when compatible, and retains syntax-aware or generic editing when they are absent.
+
+Program #2310 now completes the baseline through four thin milestones: prove normal-host persisted-workflow integration; enforce installed-text-syntax and JavaScript-runtime conformance; deepen JavaScript and Liquid assistance with runtime-owned metadata; then finish theme, preview, signature, formatting, accessibility and continuity behavior. Historical fixture evidence remains regression evidence, not a substitute for the normal-host demonstration.
 
 ## Technical Context
 
@@ -26,9 +28,9 @@ Authoritative symbol metadata, source-aware completion/hover, semantic validatio
 
 **Performance Goals**: p95 focused compact activation ≤100 ms warm and ≤500 ms cold; no p95 typing task >50 ms in the defined 50-field fixture; only the focused compact field mounts a rich editor
 
-**Constraints**: Preserve exact source; keep CodeMirror types internal; no project-wide TypeScript service; no evaluation or live values for intelligence; permission/Host Policy filtering is server-authoritative; draft autosave/history stays authoritative; semantic features must degrade independently
+**Constraints**: Preserve exact source; keep CodeMirror types internal; do not adopt a project-wide TypeScript service without the bounded Program #2310 spike; no evaluation or live values for intelligence; permission/Host Policy filtering is server-authoritative; draft autosave/history stays authoritative; semantic features must degrade independently; JavaScript help must stay within runtime grammar/APIs; Liquid metadata must match the effective runtime profile
 
-**Scale/Scope**: JavaScript and Liquid only; one shared editor substrate; bounded/searchable catalogs; recursive value shapes by reference; workflow drafts with high-density inspectors and expressions up to 2,000 characters in the benchmark
+**Scale/Scope**: Complete JavaScript and Liquid behavior plus conformance for every installed supported text Expression Type; one shared editor substrate; bounded/searchable catalogs; recursive value shapes by reference; workflow drafts with high-density inspectors and expressions up to 2,000 characters in the benchmark
 
 ## Constitution Check
 
@@ -38,8 +40,10 @@ Authoritative symbol metadata, source-aware completion/hover, semantic validatio
 - **Workbench pattern fit — PASS**: This extends the existing workflow master/detail workbench's activity-properties inspector and modal property editor; no new page archetype is introduced.
 - **Typography and token discipline — PASS**: Changed module CSS uses only the stable `--studio-*` token contract. CodeMirror theme projection is centralized in `Elsa.Studio.CodeEditor`.
 - **Accessible interaction — PASS**: Compact focus activation, completion acceptance, multiline expansion, diagnostic announcements, loading/degraded states, Tab behavior, Escape handling, and the expanded-editor Tab escape are explicit test scenarios.
-- **Real-screen proof — PASS**: Playwright exercises the actual activity-properties inspector fixture in compact, expanded, multiline, invalid, unavailable, and touch viewport states; visual evidence is captured for review.
+- **Fixture-screen regression coverage — HISTORICAL PASS**: Playwright exercises the real activity-properties components in the synthetic browser fixture across compact, expanded, multiline, invalid, unavailable, and touch viewport states. This remains useful regression evidence but is not the normal-host gate.
 - **Cross-repository authority — PASS**: Studio consumes additive Elsa API capability links. Runtime-owned JavaScript/Liquid metadata and semantic validation remain in Foundation modules, avoiding a Studio authority inversion.
+- **Installed-syntax conformance — PASS**: Readiness is projected through the existing Expression Editor Contribution and tooling contracts. Reference and structured Expression Types retain their specialized editors.
+- **Real-screen proof — OPEN GATE**: Historical fixture and assistive-technology evidence is retained, but Program #2310 cannot close until rebuilt matching Studio/Foundation hosts pass the persisted-workflow demonstration in light, dark and dim presentation.
 
 ## Project Structure
 
@@ -94,6 +98,15 @@ The Studio implementation can be built and tested against fixtures independently
 2. treats missing relations as an explicit unavailable state;
 3. ships contract fixtures that match the coordinated Foundation OpenAPI;
 4. never substitutes a client-only validator for authoritative publication or Test Run gates.
+
+## Program #2310 milestone design
+
+1. **Normally composed baseline**: run Studio and Foundation from matching reviewed heads; create a persisted workflow containing scoped inputs, variables and outputs; prove JavaScript/Liquid module discovery, syntax selection, compact/expanded editing, real authoring-context relations and explicit degraded states. Add normal-host regression coverage without duplicating the merged #545/#546 discovery guard.
+2. **Installed-syntax conformance**: add a shared readiness/conformance matrix for supported text Expression Types, align the JavaScript parser with the runtime expression grammar, and merge CodeMirror-local JavaScript completions with authorized workflow assistance.
+3. **Language depth**: use Foundation runtime metadata for Liquid filters/tags and parser-position-aware Studio projection; deepen known JavaScript member/signature help. Run a bounded worker/service spike before any deeper JavaScript language-service dependency is adopted.
+4. **Experience polish**: project syntax/help surfaces onto shared theme tokens, render lightweight highlighted previews, show active parameters and overloads, add explicit behavior-preserving formatters, and complete real keyboard/screen-reader/continuity proof.
+
+Each milestone retains one integration lane and separate exact-head review and live-verification evidence. A failed live demonstration reopens the owning task and keeps the milestone incomplete.
 
 ## Complexity Tracking
 
