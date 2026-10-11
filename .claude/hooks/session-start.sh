@@ -15,8 +15,9 @@ if [ -x "$install_dir/dotnet" ] && "$install_dir/dotnet" --list-sdks 2>/dev/null
   echo "A .NET 10 SDK is already installed."
 else
   script="$(mktemp)"
-  if curl -fsSL https://dot.net/v1/dotnet-install.sh -o "$script" \
-     && bash "$script" --channel 10.0 --install-dir "$install_dir" --no-path >/dev/null; then
+  # Bounded, so a stalled download reaches the warning below instead of holding the session at startup.
+  if curl -fsSL --connect-timeout 20 --max-time 120 https://dot.net/v1/dotnet-install.sh -o "$script" \
+     && timeout 900 bash "$script" --channel 10.0 --install-dir "$install_dir" --no-path >/dev/null; then
     echo "Installed the .NET 10 SDK into $install_dir."
   else
     echo "WARNING: could not install the .NET 10 SDK. Allow dot.net and builds.dotnet.microsoft.com" \
@@ -26,7 +27,7 @@ else
 fi
 
 pnpm_version=$(sed -n 's/.*"packageManager": *"pnpm@\([^"]*\)".*/\1/p' package.json)
-if command -v corepack >/dev/null && corepack enable pnpm 2>/dev/null && corepack prepare "pnpm@$pnpm_version" --activate >/dev/null 2>&1; then
+if command -v corepack >/dev/null && corepack enable pnpm 2>/dev/null && timeout 300 corepack prepare "pnpm@$pnpm_version" --activate >/dev/null 2>&1; then
   echo "Activated pnpm $pnpm_version."
 else
   echo "WARNING: could not activate pnpm $pnpm_version through corepack; run 'npx pnpm@$pnpm_version' instead." >&2

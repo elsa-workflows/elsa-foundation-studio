@@ -10,11 +10,11 @@ Its input is the issues that elsa-foundation's [UX QA routine](https://github.co
 2. **Stop at two.** If two `claude/ux-fix-*` PRs are still open after servicing, report them and start nothing new.
 3. **Pick one issue.** Candidates are open issues labelled `ready-for-agent` and `auto-qa` with `size:S` or `size:M`. Exclude any issue that:
    - is labelled `size:L` or `status:in-progress`
-   - carries a claim comment that no release comment followed (a release says the work shipped or was dropped)
+   - carries a claim comment without a matching release: a later comment that names the same routine run and branch and says the work shipped or was dropped. A release for a different claim does not close this one.
    - is referenced by an open PR
 
    Prefer `size:S`, then the oldest issue. If nothing qualifies, report that and stop.
-4. **Claim it.** Choose the branch name `claude/ux-fix-<issue number>-<short-slug>`. Post one comment on the issue that names the routine run, that branch and the exact scope, then add `status:in-progress`. Re-read the issue's comments in the same step. If another claim appeared, release yours and pick again.
+4. **Claim it.** Choose the branch name `claude/ux-fix-<issue number>-<short-slug>`. Post one comment on the issue that names the routine run, that branch and the exact scope, then add `status:in-progress`. Every later release comment names the same run and branch. Re-read the issue's comments in the same step. If another claim appeared, release yours and pick again.
 5. **Reproduce first.** Branch from current `origin/main`. Before changing product code, turn the issue's reproduction into a test that fails:
    - a component or hook defect becomes a vitest test in the owning package;
    - a defect that needs a page becomes a `tests/browser/*.spec.ts` case on the fixture server.
