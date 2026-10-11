@@ -33,6 +33,8 @@ else
   echo "WARNING: could not activate pnpm $pnpm_version through corepack; run 'npx pnpm@$pnpm_version' instead." >&2
 fi
 
+# Write .NET environment exports to stdout for the session env file or shell profile.
+# Takes no arguments; reads install_dir and preserves a literal $PATH for later expansion.
 exports() {
   echo "export DOTNET_ROOT=\"$install_dir\""
   echo "export PATH=\"$install_dir:\$PATH\""
